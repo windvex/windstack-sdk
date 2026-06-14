@@ -10,6 +10,8 @@ export const VEXANIUM_METHODS = {
   GET_CHAIN: "vex_getChain",
   SIGNING_REQUEST: "vex_signingRequest",
   SIGN_MESSAGE: "vex_signMessage",
+  SIGN_DIGEST: "vex_signDigest",
+  SIGN_TRANSACTION: "vex_signTransaction",
   DISCONNECT: "vex_disconnect",
 } as const;
 

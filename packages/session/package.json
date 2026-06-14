@@ -1,6 +1,6 @@
 {
   "name": "@windstack/session",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Unified multichain session layer for Wind Stack SDK packages and WharfKit SessionKit.",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,10 +24,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "0.1.0",
-    "@windstack/evm": "0.1.0",
-    "@windstack/solana": "0.1.0",
-    "@windstack/vexanium": "0.1.0"
+    "@windstack/core": "0.2.0",
+    "@windstack/evm": "0.2.0",
+    "@windstack/solana": "0.2.0",
+    "@windstack/vexanium": "0.2.0"
   },
   "sideEffects": false,
   "keywords": [

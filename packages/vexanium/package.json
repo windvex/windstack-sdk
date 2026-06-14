@@ -1,7 +1,7 @@
 {
   "name": "@windstack/vexanium",
-  "version": "0.1.0",
-  "description": "Vexanium provider, discovery, and VSR utilities for Wisp Wallet-compatible dApps.",
+  "version": "0.2.0",
+  "description": "Standard Vexanium provider client, discovery, session sync, and VSR utilities for dApps.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -24,7 +24,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "0.1.0",
+    "@windstack/core": "0.2.0",
     "@wharfkit/abicache": "^1.2.2",
     "@wharfkit/antelope": "^1.2.0",
     "@wharfkit/signing-request": "^3.4.0"
@@ -32,16 +32,17 @@
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "windcrypto",
-    "wind-crypto",
-    "wisp-wallet",
-    "wisp",
     "vexanium",
-    "vsr",
-    "antelope",
-    "wharfkit",
+    "vex",
+    "wisp-wallet",
+    "provider",
     "wallet",
-    "provider"
+    "dapp",
+    "antelope",
+    "eosio",
+    "vsr",
+    "wharfkit",
+    "typescript"
   ],
   "license": "MIT",
   "author": "PT WIND KRIPTOGRAFI TEKNOLOGI",

@@ -41,8 +41,8 @@ export type VexaniumDappSession = {
 };
 
 export type VexaniumProviderInfo = ProviderInfo & {
-  name: "Wisp";
-  rdns: "com.wisp.wallet";
+  /** Reverse-DNS wallet identifier. Wisp Wallet uses `com.wisp.wallet`. */
+  rdns: string;
   chains?: readonly VexaniumChainId[];
 };
 
@@ -57,8 +57,6 @@ export type VexaniumProviderEventMap = {
 };
 
 export type VexaniumProvider = {
-  /** Canonical Wisp marker. Do not use legacy wallet markers. */
-  isWisp?: true;
   providerInfo?: VexaniumProviderInfo;
   request<TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult>;
   on?<TEvent extends keyof VexaniumProviderEventMap>(event: TEvent, handler: (payload: VexaniumProviderEventMap[TEvent]) => void): void;
@@ -66,10 +64,43 @@ export type VexaniumProvider = {
   removeListener?<TEvent extends keyof VexaniumProviderEventMap>(event: TEvent, handler: (payload: VexaniumProviderEventMap[TEvent]) => void): void;
 };
 
+export type VexaniumClientSessionChangeReason =
+  | "connect"
+  | "accountsChanged"
+  | "disconnect"
+  | "chainChanged"
+  | "sync";
+
+export type VexaniumClientSessionChange = {
+  session: VexaniumDappSession | null;
+  accounts: VexaniumAccount[];
+  reason: VexaniumClientSessionChangeReason;
+};
+
+export type VexaniumClientEventMap = VexaniumProviderEventMap & {
+  sessionChanged: VexaniumClientSessionChange;
+};
+
+export type VexaniumSessionSyncOptions = {
+  /** Bind provider events such as accountsChanged and disconnect. Defaults to true. */
+  providerEvents?: boolean;
+  /** Re-check vex_getAccounts when the browser window regains focus. Defaults to true. */
+  windowFocus?: boolean;
+  /** Re-check vex_getAccounts when the document becomes visible again. Defaults to true. */
+  visibilityChange?: boolean;
+};
+
 export type VexaniumClientOptions = {
   dapp?: DappMetadataInput;
+  /** Optional explicit provider. The SDK stores this reference only; it never wraps or overwrites Wisp Wallet globals. */
   provider?: VexaniumProvider;
   discoveryTimeoutMs?: number;
+  /**
+   * Keeps the local SDK session aligned with wallet state.
+   * Enabled by default so wallet-side revoke/disconnect clears dApp state once the provider emits an event
+   * or the page regains focus.
+   */
+  autoSync?: boolean | VexaniumSessionSyncOptions;
 };
 
 export type VexaniumConnectParams = DappRequestMetadataParams & {
@@ -113,6 +144,22 @@ export type VexSignMessageParams = DappRequestMetadataParams & {
   permission?: string;
 };
 
+export type VexSignDigestParams = DappRequestMetadataParams & {
+  digest: string;
+  account?: string;
+  permission?: string;
+};
+
+export type VexSignTransactionParams = DappRequestMetadataParams & {
+  serializedTransaction?: string;
+  packed_trx?: string;
+  packedTransaction?: string;
+  chainId?: VexaniumChainId;
+  account?: string;
+  permission?: string;
+  transaction?: unknown;
+};
+
 export type VexaniumClient = {
   isAvailable(): boolean;
   getProvider(): VexaniumProvider | null;
@@ -122,12 +169,20 @@ export type VexaniumClient = {
   connect(params?: VexaniumConnectParams): Promise<VexaniumAccount[]>;
   connectOne(params?: VexaniumConnectParams): Promise<VexaniumAccount>;
   getAccounts(): Promise<VexaniumAccount[]>;
+  /** Silent alias for getAccounts(), useful after wallet revoke/focus events. */
+  syncAccounts(): Promise<VexaniumAccount[]>;
   getChain(): Promise<VexaniumChainId>;
   signVsr(params: VsrSigningRequestParams): Promise<VsrSigningRequestResult>;
   signMessage(message: string | Uint8Array, account?: string): Promise<unknown>;
+  signDigest(digest: string, account?: string): Promise<unknown>;
+  signTransaction(params: VexSignTransactionParams): Promise<unknown>;
   disconnect(): Promise<void>;
-  on<TEvent extends keyof VexaniumProviderEventMap>(event: TEvent, handler: (payload: VexaniumProviderEventMap[TEvent]) => void): void;
-  off<TEvent extends keyof VexaniumProviderEventMap>(event: TEvent, handler: (payload: VexaniumProviderEventMap[TEvent]) => void): void;
+  on<TEvent extends keyof VexaniumClientEventMap>(event: TEvent, handler: (payload: VexaniumClientEventMap[TEvent]) => void): void;
+  off<TEvent extends keyof VexaniumClientEventMap>(event: TEvent, handler: (payload: VexaniumClientEventMap[TEvent]) => void): void;
+  /** Subscribe to normalized SDK session changes and receive an unsubscribe function. */
+  subscribeSession(handler: (payload: VexaniumClientEventMap["sessionChanged"]) => void): () => void;
+  /** Remove provider/window listeners created by the SDK client. */
+  destroy(): void;
 };
 
 export type CreateVsrFromActionArgs = {
