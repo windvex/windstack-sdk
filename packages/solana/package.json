@@ -1,0 +1,50 @@
+{
+  "name": "@windstack/solana",
+  "version": "0.1.0",
+  "description": "Solana provider client for Wisp Wallet-compatible dApps.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit false",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@windstack/core": "0.1.0"
+  },
+  "sideEffects": false,
+  "keywords": [
+    "windstack",
+    "windcrypto",
+    "wind-crypto",
+    "wisp-wallet",
+    "wisp",
+    "solana",
+    "wallet-standard",
+    "dapp",
+    "web3"
+  ],
+  "license": "MIT",
+  "author": "PT WIND KRIPTOGRAFI TEKNOLOGI",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

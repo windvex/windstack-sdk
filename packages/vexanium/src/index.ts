@@ -1,0 +1,56 @@
+export { normalizeVexaniumAccount, normalizeVexaniumAccounts, parsePermissionLevel } from "./accounts.js";
+export { createVexaniumClient } from "./client.js";
+export {
+  DEFAULT_PROVIDER_DISCOVERY_TIMEOUT_MS,
+  VEXANIUM_ANNOUNCE_PROVIDER_EVENT,
+  VEXANIUM_MAINNET_CHAIN_ID,
+  VEXANIUM_MAINNET_SCOPE,
+  VEXANIUM_METHODS,
+  VEXANIUM_PROVIDER_GLOBAL,
+  VEXANIUM_REQUEST_PROVIDER_EVENT,
+  VSR_SCHEME,
+  WISP_PROVIDER_RDNS,
+  WISP_VEXANIUM_PROVIDER_INFO,
+} from "./constants.js";
+export {
+  announceVexaniumProvider,
+  discoverVexaniumProviders,
+  getInjectedVexaniumProvider,
+  getVexaniumProvider,
+  requestVexaniumProviders,
+} from "./discovery.js";
+export type {
+  CreateVsrFromActionArgs,
+  CreateVsrFromActionsArgs,
+  CreateVsrFromTransactionArgs,
+  CreateVsrIdentityArgs,
+  PermissionLevelInput,
+  VexSignMessageParams,
+  VexaniumAccount,
+  VexaniumCaip2ChainId,
+  VexaniumChainId,
+  VexaniumClient,
+  VexaniumClientOptions,
+  VexaniumConnectParams,
+  VexaniumConnectResponse,
+  VexaniumDappSession,
+  VexaniumFullChainId,
+  VexaniumPermissionLevel,
+  VexaniumProvider,
+  VexaniumProviderDetail,
+  VexaniumProviderEventMap,
+  VexaniumProviderInfo,
+  VsrCreateInput,
+  VsrCreateOptions,
+  VsrSigningRequestParams,
+  VsrSigningRequestResult,
+  VsrUri,
+} from "./types.js";
+export {
+  createAbiCache,
+  createVsr,
+  createVsrFromAction,
+  encodeVsr,
+  normalizeVsrUri,
+  parseVsr,
+} from "./vsr.js";
