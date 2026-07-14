@@ -1,10 +1,9 @@
 {
   "name": "@windstack/evm",
-  "version": "0.2.0",
+  "version": "0.6.0",
   "description": "EIP-1193 and EIP-6963 EVM provider client for Wisp Wallet-compatible dApps.",
   "type": "module",
   "main": "./dist/index.js",
-  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -24,7 +23,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "0.2.0"
+    "@windstack/core": "0.6.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -41,6 +40,15 @@
   ],
   "license": "MIT",
   "author": "PT WIND KRIPTOGRAFI TEKNOLOGI",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/evm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/windvex/windstack-sdk.git",
+    "directory": "packages/evm"
+  },
+  "bugs": {
+    "url": "https://github.com/windvex/windstack-sdk/issues"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

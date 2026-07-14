@@ -1,10 +1,9 @@
 {
   "name": "@windstack/vexanium",
-  "version": "0.2.0",
-  "description": "Standard Vexanium provider client, discovery, session sync, and VSR utilities for dApps.",
+  "version": "0.6.0",
+  "description": "Vexanium wallet provider client, chain metadata, signing requests, and explorer utilities.",
   "type": "module",
   "main": "./dist/index.js",
-  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -24,8 +23,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "0.2.0",
-    "@wharfkit/abicache": "^1.2.2",
+    "@windstack/core": "0.6.0",
     "@wharfkit/antelope": "^1.2.0",
     "@wharfkit/signing-request": "^3.4.0"
   },
@@ -39,13 +37,24 @@
     "wallet",
     "dapp",
     "antelope",
-    "eosio",
     "vsr",
     "wharfkit",
-    "typescript"
+    "typescript",
+    "esr",
+    "signing-request",
+    "vexanium-provider"
   ],
   "license": "MIT",
   "author": "PT WIND KRIPTOGRAFI TEKNOLOGI",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/vexanium#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/windvex/windstack-sdk.git",
+    "directory": "packages/vexanium"
+  },
+  "bugs": {
+    "url": "https://github.com/windvex/windstack-sdk/issues"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

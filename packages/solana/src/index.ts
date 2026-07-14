@@ -1,4 +1,9 @@
-export { normalizeSolanaAccount, normalizeSolanaAccounts } from "./accounts.js";
+export {
+  isSolanaPublicKey,
+  isSolanaScope,
+  normalizeSolanaAccount,
+  normalizeSolanaAccounts,
+} from "./accounts.js";
 export { createSolanaClient } from "./client.js";
 export { DEFAULT_SOLANA_SCOPE, SOLANA_METHODS, SOLANA_PROVIDER_GLOBAL } from "./constants.js";
 export { getInjectedSolanaProvider } from "./discovery.js";

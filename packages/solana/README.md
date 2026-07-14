@@ -1,29 +1,25 @@
 # @windstack/solana
 
-Solana provider client helpers for Wisp Wallet-compatible dApps.
-
-## Install
+Provider client for the Solana interface exposed by Wisp-compatible wallets.
 
 ```bash
 npm install @windstack/core @windstack/solana
 ```
 
-## Usage
-
 ```ts
-import { createSolanaClient } from '@windstack/solana';
+import { createSolanaClient } from "@windstack/solana";
 
 const client = await createSolanaClient();
 const accounts = await client.connect();
 
-const signature = await client.signMessage(new TextEncoder().encode('hello'));
+const result = await client.signMessage(
+  new TextEncoder().encode("Sign in to My App"),
+  accounts[0]?.publicKey,
+);
 ```
 
-## Notes
-
-- This package is chain-specific and does not depend on Vexanium, VSR, EVM providers, or WharfKit.
-- Use `@windstack/session` when your dApp needs a single session layer across multiple chains.
+The client reads `window.solana`, forwards provider requests, normalizes account payloads, and preserves numeric provider error codes. It does not bundle a Solana transaction library.
 
 ## License
 
-MIT © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.

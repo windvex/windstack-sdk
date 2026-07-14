@@ -1,4 +1,4 @@
-import type { DappMetadataInput, RequestArguments } from "@windstack/core";
+import type { RequestArguments } from "@windstack/core";
 
 export type SolanaScope = "solana:mainnet" | "solana:devnet" | `solana:${string}`;
 
@@ -29,7 +29,6 @@ export type SolanaProvider = {
 };
 
 export type SolanaClientOptions = {
-  dapp?: DappMetadataInput;
   provider?: SolanaProvider;
 };
 

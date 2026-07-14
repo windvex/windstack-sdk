@@ -11,9 +11,12 @@ export {
   discoverEVMProviders,
   getEVMProvider,
   getInjectedEVMProvider,
+  isEIP6963ProviderDetail,
+  isEIP6963ProviderInfo,
   requestEIP6963Providers,
 } from "./discovery.js";
 export type {
+  AddEthereumChainParameter,
   EIP1193Provider,
   EIP6963ProviderDetail,
   EIP6963ProviderInfo,

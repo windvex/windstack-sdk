@@ -1,33 +1,42 @@
 # @windstack/evm
 
-EVM provider client helpers for Wisp Wallet-compatible dApps.
-
-The client works with EIP-1193 providers and uses EIP-6963 discovery when available. It prefers a provider with `rdns: "com.wisp.wallet"`, then falls back to injected providers.
-
-## Install
+Small EIP-1193 client with EIP-6963 discovery for browser wallets.
 
 ```bash
 npm install @windstack/core @windstack/evm
 ```
 
-## Usage
-
 ```ts
-import { createEVMClient } from '@windstack/evm';
+import { createEVMClient } from "@windstack/evm";
 
 const client = await createEVMClient();
-
-const accounts = await client.requestAccounts();
+const accounts = await client.connect();
 const chainId = await client.getChainId();
 
-await client.switchChain('0x1');
+client.on("accountsChanged", (nextAccounts) => {
+  // Update application state.
+});
 ```
 
-## Notes
+`connect()` calls `eth_requestAccounts`. `getAccounts()` calls the silent `eth_accounts` method.
 
-- EVM uses `window.ethereum` and standard EVM JSON-RPC methods.
-- This package is independent from Vexanium, VSR, and WharfKit.
+## Chain requests
+
+```ts
+await client.switchChain("0x1a50");
+
+await client.addChain({
+  chainId: "0x1a50",
+  chainName: "VEX EVM",
+  nativeCurrency: { name: "Vexanium", symbol: "VEX", decimals: 18 },
+  rpcUrls: ["https://rpc.example"],
+});
+```
+
+Chain IDs must be canonical `0x`-prefixed hexadecimal values. Chain metadata URLs must use HTTPS. Always verify an RPC endpoint's `eth_chainId` response before presenting it to users.
+
+EIP-6963 announcements are retained for the lifetime of the page, as required by the specification. `window.ethereum` is only used as a fallback when no announced provider is available.
 
 ## License
 
-MIT © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.

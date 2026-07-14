@@ -10,10 +10,8 @@ export type RequestArguments<TParams = unknown> = {
 export type DappMetadata = {
   /** Human-readable dApp name shown in wallet approval UI. */
   name: string;
-  /** Current dApp URL or canonical app URL. */
+  /** Current dApp URL or canonical app URL. Display metadata only; never use it as a permission boundary. */
   url: string;
-  /** Security boundary used for permissions. This must not change silently inside a session. */
-  origin: string;
   /** Preferred app icon/logo URL or data URI. */
   icon?: string;
   /** Ordered icon candidates. */
@@ -22,8 +20,13 @@ export type DappMetadata = {
   description?: string;
 };
 
-export type DappMetadataInput = Partial<DappMetadata> & {
-  name?: string;
+export type DappMetadataInput = Partial<DappMetadata> & { name?: string };
+
+export type DappRequestContext = {
+  /** Runtime/transport origin used to bind the local SDK session. */
+  origin: string;
+  /** How the SDK obtained the origin. Wallets should normally use `transport`. */
+  source: "runtime" | "transport" | "unknown";
 };
 
 export type ProviderInfo = {
@@ -66,10 +69,6 @@ export type WispSession = {
   accounts: WispSessionAccount[];
   createdAt: number;
   updatedAt: number;
-};
-
-export type WispClientOptions = {
-  dapp?: DappMetadataInput;
 };
 
 export type WispProviderLike<TEvents extends Record<string, unknown> = Record<string, unknown>> = {

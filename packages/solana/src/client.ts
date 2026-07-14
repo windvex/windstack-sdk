@@ -1,7 +1,7 @@
 import { WISP_ERROR_CODES, WispProviderError, normalizeProviderError } from "@windstack/core";
 import type { RequestArguments } from "@windstack/core";
 import { SOLANA_METHODS } from "./constants.js";
-import { normalizeSolanaAccounts } from "./accounts.js";
+import { isSolanaPublicKey, normalizeSolanaAccounts } from "./accounts.js";
 import { getInjectedSolanaProvider } from "./discovery.js";
 import type {
   SolanaClient,
@@ -29,6 +29,12 @@ export async function createSolanaClient(options: SolanaClientOptions = {}): Pro
     }
   };
 
+  const assertBase64Transaction = (value: string): void => {
+    if (value.length === 0 || value.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
+      throw new WispProviderError(WISP_ERROR_CODES.INVALID_PARAMS, "Transaction must be standard base64");
+    }
+  };
+
   return {
     isAvailable() {
       return Boolean(provider?.request || getInjectedSolanaProvider()?.request);
@@ -44,20 +50,25 @@ export async function createSolanaClient(options: SolanaClientOptions = {}): Pro
     async getAccounts() {
       return normalizeSolanaAccounts(await request({ method: SOLANA_METHODS.GET_ACCOUNTS }));
     },
-    signMessage(message: string | Uint8Array, publicKey?: string) {
+    async signMessage(message: string | Uint8Array, publicKey?: string) {
+      if (publicKey && !isSolanaPublicKey(publicKey)) {
+        throw new WispProviderError(WISP_ERROR_CODES.INVALID_PARAMS, "Invalid Solana public key");
+      }
       const params: SolanaSignMessageParams = {
         message: typeof message === "string" ? message : Array.from(message),
         publicKey,
       };
-      return request({ method: SOLANA_METHODS.SIGN_MESSAGE, params });
+      return await request({ method: SOLANA_METHODS.SIGN_MESSAGE, params });
     },
-    signTransaction(transactionBase64: string) {
+    async signTransaction(transactionBase64: string) {
+      assertBase64Transaction(transactionBase64);
       const params: SolanaTransactionParams = { transaction: transactionBase64 };
-      return request({ method: SOLANA_METHODS.SIGN_TRANSACTION, params });
+      return await request({ method: SOLANA_METHODS.SIGN_TRANSACTION, params });
     },
-    signAndSendTransaction(transactionBase64: string) {
+    async signAndSendTransaction(transactionBase64: string) {
+      assertBase64Transaction(transactionBase64);
       const params: SolanaTransactionParams = { transaction: transactionBase64 };
-      return request({ method: SOLANA_METHODS.SIGN_AND_SEND_TRANSACTION, params });
+      return await request({ method: SOLANA_METHODS.SIGN_AND_SEND_TRANSACTION, params });
     },
     async disconnect() {
       await request({ method: SOLANA_METHODS.DISCONNECT });

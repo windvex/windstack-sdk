@@ -16,6 +16,8 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "paths": {
       "@windstack/core": [
         "./packages/core/dist/index.d.ts"
@@ -31,6 +33,9 @@
       ],
       "@windstack/session": [
         "./packages/session/dist/index.d.ts"
+      ],
+      "@windstack/wallet-plugin-wisp": [
+        "./packages/wallet-plugin-wisp/dist/index.d.ts"
       ]
     }
   }

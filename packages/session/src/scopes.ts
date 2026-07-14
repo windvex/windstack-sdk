@@ -1,15 +1,15 @@
 import type { WispScope } from "@windstack/core";
 
 export function isEVMScope(scope: WispScope): scope is `eip155:${number}` {
-  return scope.startsWith("eip155:");
+  return /^eip155:(?:0|[1-9]\d*)$/.test(scope);
 }
 
 export function isVexaniumScope(scope: WispScope): scope is `antelope:${string}` {
-  return scope.startsWith("antelope:");
+  return /^antelope:[0-9a-f]{32}$/.test(scope);
 }
 
 export function isSolanaScope(scope: WispScope): scope is Extract<WispScope, `solana:${string}`> {
-  return scope.startsWith("solana:");
+  return /^solana:[a-zA-Z0-9_-]+$/.test(scope);
 }
 
 export function createSessionId(scopes: WispScope[]): string {

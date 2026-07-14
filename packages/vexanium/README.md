@@ -1,212 +1,139 @@
 # @windstack/vexanium
 
-Standard Vexanium provider client, discovery helpers, session sync, and VSR utilities for Vexanium dApps.
-
-This package is for dApps. Wallets such as Wisp Wallet implement the standard provider at `window.vexanium`; dApps use this package to connect, restore sessions, create VSR payloads, and request signatures.
-
-## Install
+Vexanium provider client, chain metadata, signing requests, and explorer helpers.
 
 ```bash
-npm install @windstack/core @windstack/vexanium
+npm install @windstack/vexanium
 ```
 
-## Version
+The package uses the current WharfKit Antelope and Signing Request libraries. It does not define a second transaction serializer.
 
-Current release: `0.2.0`.
-
-## Provider model
+## Network Metadata
 
 ```ts
-window.vexanium
+import { vexEvm, vexNative } from "@windstack/vexanium";
 ```
 
-Methods:
+VEX Native:
 
-| Method | Purpose |
-|---|---|
-| `vex_requestAccounts` | Request account permission from a Vexanium wallet. |
-| `vex_getAccounts` | Read authorized accounts for the current origin without prompting. |
-| `vex_getChain` | Read the active Vexanium chain id. |
-| `vex_signingRequest` | Send a VSR for signature and optional broadcast. |
-| `vex_signMessage` | Request a message signature. |
-| `vex_signDigest` | Request a digest signature. |
-| `vex_signTransaction` | Request a serialized or packed transaction signature. |
-| `vex_disconnect` | Revoke the current dApp session/origin permission. |
+- Chain ID: `f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f`
+- CAIP-2 scope: `antelope:f9f432b1851b5c179d2091a96f593aa`
+- RPC/API base: `https://api.windcrypto.com`
+- Token: `VEX`, precision 4
 
-Events:
+VEX EVM:
 
-```txt
-connect
-disconnect
-accountsChanged
-chainChanged
-message
-```
+- Chain ID: `6736` (`0x1a50`)
+- Native currency: `VEX`, 18 decimals
+- JSON-RPC: `https://api.windcrypto.com/rpc`
+- Indexed data API: `https://api.windcrypto.com/v3/evm`
+- Live stats: `https://api.windcrypto.com/v3/evm/stats`
+- Explorer: `https://explorer.windcrypto.com/evm`
 
-## Standard provider guard
+Use `vexEvm.rpcUrl` with JSON-RPC clients and `wallet_addEthereumChain`. The indexed API remains a separate REST service.
 
-Windstack exposes one canonical guard for all Vexanium-compatible wallets:
+## Connect
 
 ```ts
-import { isVexaniumProvider } from '@windstack/vexanium';
-
-if (isVexaniumProvider(window.vexanium)) {
-  const accounts = await window.vexanium.request({ method: 'vex_getAccounts' });
-}
-```
-
-There is no brand-specific provider guard. Wisp Wallet implements the same standard Vexanium provider shape as any future compatible wallet. Wallet identity belongs in provider metadata, not in a separate public guard.
-
-## Vexanium mainnet
-
-```ts
-import { VEXANIUM_MAINNET_CHAIN_ID, VEXANIUM_MAINNET_SCOPE } from '@windstack/vexanium';
-```
-
-```txt
-VEXANIUM_MAINNET_CHAIN_ID = f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f
-VEXANIUM_MAINNET_SCOPE    = antelope:f9f432b1851b5c179d2091a96f593aa
-```
-
-## Connect and restore
-
-Use `getAccounts()` on page load. It restores an existing approved session without showing an approval sheet.
-
-```ts
-import { VEXANIUM_MAINNET_CHAIN_ID, createVexaniumClient } from '@windstack/vexanium';
+import { createVexaniumClient, vexNative } from "@windstack/vexanium";
 
 const client = await createVexaniumClient({
   dapp: {
-    name: 'Wind Explorer',
-    url: 'https://explorer.windcrypto.com',
-    icon: 'https://explorer.windcrypto.com/icon-128.png',
-    description: 'Vexanium blockchain explorer.',
+    name: "My App",
+    url: "https://app.example",
+    icon: "https://app.example/icon.png",
   },
 });
 
 let accounts = await client.getAccounts();
-
 if (accounts.length === 0) {
-  accounts = await client.connect({ chainId: VEXANIUM_MAINNET_CHAIN_ID });
+  accounts = await client.connect({ chainId: vexNative.chainId });
 }
-
-console.log(accounts[0]);
-console.log(client.getSession());
 ```
 
-## Sign messages, digests, and transactions
+The client discovers providers announced on the page or exposed as `window.vexanium`. `providerInfo` is required, so the SDK never invents a wallet name for an unknown provider.
+
+`getAccounts()` checks an existing permission without prompting. `connect()` requests permission and creates an in-memory session mirror. Provider events and browser focus/visibility changes keep that mirror in sync.
 
 ```ts
-await client.signMessage('hello', 'alice@active');
-await client.signDigest('0x0123456789abcdef', 'alice@active');
-await client.signTransaction({
-  chainId: VEXANIUM_MAINNET_CHAIN_ID,
-  serializedTransaction: '...',
-  account: 'alice@active',
-});
-```
-
-## Create a VSR
-
-VSR means Vexanium Signing Request. It is the public Vexanium wallet signing-request name for a request created with `@wharfkit/signing-request`.
-
-```ts
-import { VEXANIUM_MAINNET_CHAIN_ID, createVsr } from '@windstack/vexanium';
-
-const vsr = await createVsr({
-  action: {
-    account: 'vex.token',
-    name: 'transfer',
-    authorization: [
-      { actor: 'alice', permission: 'active' },
-    ],
-    data: {
-      from: 'alice',
-      to: 'bob',
-      quantity: '1.0000 VEX',
-      memo: '',
-    },
-  },
-  chainId: VEXANIUM_MAINNET_CHAIN_ID,
-  broadcast: true,
-});
-```
-
-## Sign a VSR
-
-```ts
-const result = await client.signVsr({
-  vsr,
-  broadcast: true,
-});
-
-console.log(result.transactionId);
-console.log(result.signatures);
-```
-
-If the dApp has an active session, `signVsr()` sends the stored `sessionId`. The wallet reads dApp metadata from the approved session and shows only the transaction approval.
-
-## Revoke/disconnect sync
-
-`createVexaniumClient()` keeps the SDK session aligned with provider state by default. It listens to provider events and silently re-checks `vex_getAccounts` when the browser window regains focus or the document becomes visible again.
-
-```ts
-const client = await createVexaniumClient({ dapp });
-
-const unsubscribe = client.subscribeSession(({ accounts, session, reason }) => {
-  if (accounts.length === 0) {
-    localStorage.removeItem('vexanium.wallet');
-    queryClient.removeQueries({ queryKey: ['wallet'] });
-    return;
-  }
-
-  console.log('Vexanium session updated', reason, session);
+const unsubscribe = client.subscribeSession(({ session, reason }) => {
+  updateWalletState(session, reason);
 });
 
 unsubscribe();
 client.destroy();
 ```
 
-Low-level events are also normalized by the client:
+## SessionKit
+
+For a normal VEX Native dApp, use `@windstack/wallet-plugin-wisp`. SessionKit resolves the transaction and the plugin forwards the exact serialized bytes to the provider.
+
+```bash
+npm install @windstack/wallet-plugin-wisp @wharfkit/session
+```
+
+Direct exact-byte signing is also available:
 
 ```ts
-client.on('accountsChanged', (accounts) => {
-  if (accounts.length === 0) {
-    // Wallet disconnected or origin permission revoked.
-  }
+const result = await client.signTransaction({
+  chainId: vexNative.chainId,
+  serializedTransaction: "00a1",
+  account: "alice",
+  permission: "active",
+});
+```
+
+The client validates the full chain ID, serialized hex, Antelope names, and returned signatures before accepting the result.
+
+## Vexanium Signing Requests
+
+Use VSR for a request that must travel through a QR code, link, clipboard, or external wallet.
+
+```ts
+import { createSigningRequest, parseSigningRequest, vexNative } from "@windstack/vexanium";
+
+const uri = await createSigningRequest({
+  chainId: vexNative.chainId,
+  broadcast: true,
+  action: {
+    account: "vex.token",
+    name: "transfer",
+    authorization: [{ actor: "alice", permission: "active" }],
+    data: {
+      from: "alice",
+      to: "bob",
+      quantity: "1.0000 VEX",
+      memo: "",
+    },
+  },
 });
 
-client.on('disconnect', () => {
-  // Clear dApp wallet state.
-});
+const request = parseSigningRequest(uri);
 ```
 
-You can opt out of automatic sync when you need a manually controlled lifecycle:
+New requests are encoded as `vsr:`. Existing `esr:` input is accepted because the payload is parsed by WharfKit's Signing Request implementation.
+
+## Utilities
 
 ```ts
-const client = await createVexaniumClient({ dapp, autoSync: false });
-await client.syncAccounts();
+import {
+  buildExplorerAccountUrl,
+  buildExplorerTxUrl,
+  formatAsset,
+  mapExplorerTransaction,
+  parseAsset,
+} from "@windstack/vexanium";
+
+const asset = parseAsset("-1.2500 VEX");
+const value = formatAsset(asset.amount, asset.precision, asset.symbol);
 ```
 
-## ABI cache
+Explorer URL builders encode path segments. `mapExplorerTransaction` maps common node and indexer response shapes into the explorer view model while preserving the raw response. It does not decode, rebuild, or serialize an Antelope transaction.
 
-```ts
-import { createAbiCache } from '@windstack/vexanium';
+## Provider Authors
 
-const abiProvider = createAbiCache(apiClient);
-```
-
-This is a thin helper over `@wharfkit/abicache`. Import WharfKit primitives directly when your dApp needs `APIClient`, `Action`, `Transaction`, `PermissionLevel`, or `SigningRequest`.
-
-## Provider compatibility boundary
-
-`@windstack/vexanium` is a dApp SDK, not a wallet runtime. It must not compete with any wallet for ownership of injected globals.
-
-
-## Scope
-
-This package does not define a custom Antelope transaction format. It uses WharfKit for signing requests, Antelope types, ABI lookup, and serialization.
+The wallet contract, methods, errors, events, and security boundary are documented in the repository's `VEXANIUM-PROVIDER-V1.md` file.
 
 ## License
 
-MIT © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.

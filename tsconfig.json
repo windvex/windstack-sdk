@@ -5,6 +5,7 @@
     { "path": "./packages/evm" },
     { "path": "./packages/solana" },
     { "path": "./packages/vexanium" },
+    { "path": "./packages/wallet-plugin-wisp" },
     { "path": "./packages/session" }
   ]
 }

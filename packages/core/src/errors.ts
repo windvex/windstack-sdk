@@ -1,5 +1,9 @@
 export const WISP_ERROR_CODES = {
   USER_REJECTED: 4001,
+  UNAUTHORIZED: 4100,
+  UNSUPPORTED_METHOD: 4200,
+  DISCONNECTED: 4900,
+  CHAIN_DISCONNECTED: 4901,
   REQUEST_PENDING: -32002,
   METHOD_NOT_FOUND: -32601,
   INVALID_PARAMS: -32602,
@@ -25,7 +29,8 @@ export function isWispProviderError(value: unknown): value is WispProviderError 
     typeof value === "object" &&
     value !== null &&
     "code" in value &&
-    typeof (value as { code: unknown }).code === "number"
+    typeof (value as { code: unknown }).code === "number" &&
+    Number.isInteger((value as { code: number }).code)
   );
 }
 

@@ -1,7 +1,7 @@
 {
-  "name": "@windstack/core",
+  "name": "@windstack/wallet-plugin-wisp",
   "version": "0.6.0",
-  "description": "Shared provider primitives for Wind Stack SDK packages.",
+  "description": "WharfKit SessionKit wallet plugin for exact Vexanium transaction signing with Wisp.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -22,25 +22,39 @@
     "typecheck": "tsc -p tsconfig.json --noEmit false",
     "prepack": "npm run build"
   },
+  "dependencies": {
+    "@windstack/core": "0.6.0",
+    "@windstack/vexanium": "0.6.0"
+  },
+  "peerDependencies": {
+    "@wharfkit/antelope": "^1.2.0",
+    "@wharfkit/session": "^1.6.1",
+    "@wharfkit/signing-request": "^3.4.0"
+  },
+  "devDependencies": {
+    "@wharfkit/antelope": "^1.2.0",
+    "@wharfkit/session": "^1.6.1",
+    "@wharfkit/signing-request": "^3.4.0"
+  },
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "windcrypto",
-    "wind-crypto",
-    "wisp-wallet",
     "wisp",
-    "wallet",
-    "provider",
-    "typescript",
-    "web3"
+    "wisp-wallet",
+    "wallet-plugin",
+    "wharfkit",
+    "sessionkit",
+    "vexanium",
+    "antelope",
+    "vaulta"
   ],
   "license": "MIT",
   "author": "PT WIND KRIPTOGRAFI TEKNOLOGI",
-  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/core#readme",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/wallet-plugin-wisp#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/windvex/windstack-sdk.git",
-    "directory": "packages/core"
+    "directory": "packages/wallet-plugin-wisp"
   },
   "bugs": {
     "url": "https://github.com/windvex/windstack-sdk/issues"

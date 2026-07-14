@@ -1,59 +1,39 @@
 # @windstack/core
 
-Shared TypeScript foundation for Wind Stack SDK packages.
-
-This package contains provider-safe primitives used by `@windstack/evm`, `@windstack/solana`, `@windstack/vexanium`, and `@windstack/session`.
-
-## Install
+Shared provider types and browser-safe utilities for the Wind Stack SDK.
 
 ```bash
 npm install @windstack/core
 ```
 
-## Exports
-
-```ts
-import {
-  WISP_ERROR_CODES,
-  WispEventEmitter,
-  WispProviderError,
-  normalizeProviderError,
-  readDappMetadataFromDocument,
-  resolveDappMetadata,
-  sameDappOrigin,
-} from '@windstack/core';
-```
-
-Types:
-
-```ts
-import type {
-  DappMetadata,
-  DappMetadataInput,
-  ProviderDetail,
-  ProviderInfo,
-  RequestArguments,
-  WispClientOptions,
-  WispProviderLike,
-  WispSession,
-} from '@windstack/core';
-```
-
 ## dApp metadata
 
-Use `resolveDappMetadata()` before requesting wallet access. Explicit values take priority, then the browser document is used when available.
+`resolveDappMetadata()` combines explicit values with the current document title, description, URL, and icons. URLs are restricted to safe web/image schemes.
 
 ```ts
-const dapp = resolveDappMetadata({
-  name: 'Wind Explorer — Vexanium Blockchain',
-  url: 'https://explorer.windcrypto.com',
-  icon: 'https://explorer.windcrypto.com/icon-128.png',
-  description: 'Explore Vexanium: blocks, transactions, accounts, contracts, and analytics — all in one sleek explorer.',
+import { resolveDappMetadata } from "@windstack/core";
+
+const metadata = resolveDappMetadata({
+  name: "My App",
+  url: "https://app.example",
+  icon: "https://app.example/icon.png",
 });
 ```
 
-The returned metadata always includes `name`, `url`, and `origin`.
+Metadata is only for display. A wallet must derive the trusted origin from its transport, such as the browser extension sender, rather than accepting an origin supplied by a dApp.
+
+## Errors and events
+
+```ts
+import {
+  WispEventEmitter,
+  WispProviderError,
+  normalizeProviderError,
+} from "@windstack/core";
+```
+
+`normalizeProviderError()` preserves numeric provider error codes. `WispEventEmitter` provides typed `on`, `off`, `once`, and listener cleanup methods for SDK packages.
 
 ## License
 
-MIT © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.

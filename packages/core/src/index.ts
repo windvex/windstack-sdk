@@ -11,11 +11,17 @@ export {
 } from "./errors.js";
 export type { WispErrorCode } from "./errors.js";
 export { WispEventEmitter } from "./events.js";
-export { readDappMetadataFromDocument, resolveDappMetadata, sameDappOrigin } from "./metadata.js";
+export {
+  readDappMetadataFromDocument,
+  resolveDappMetadata,
+  resolveDappRequestContext,
+  sameDappRequestOrigin,
+} from "./metadata.js";
 export type { EventHandler, EventMap } from "./events.js";
 export type {
   DappMetadata,
   DappMetadataInput,
+  DappRequestContext,
   DappRequestMetadataParams,
   JsonObject,
   JsonPrimitive,
@@ -23,7 +29,6 @@ export type {
   ProviderDetail,
   ProviderInfo,
   RequestArguments,
-  WispClientOptions,
   WispProviderLike,
   WispScope,
   WispSession,

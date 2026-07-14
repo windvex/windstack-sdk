@@ -29,7 +29,7 @@ export class WispEventEmitter<TEvents extends EventMap> {
   }
 
   removeAllListeners<TEvent extends keyof TEvents>(event?: TEvent): void {
-    if (event) {
+    if (event !== undefined) {
       this.listeners.delete(event);
       return;
     }

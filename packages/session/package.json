@@ -1,10 +1,9 @@
 {
   "name": "@windstack/session",
-  "version": "0.2.0",
-  "description": "Unified multichain session layer for Wind Stack SDK packages and WharfKit SessionKit.",
+  "version": "0.6.0",
+  "description": "Optional unified multichain session facade for Wind Stack EVM, Solana, and Vexanium clients.",
   "type": "module",
   "main": "./dist/index.js",
-  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -24,10 +23,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "0.2.0",
-    "@windstack/evm": "0.2.0",
-    "@windstack/solana": "0.2.0",
-    "@windstack/vexanium": "0.2.0"
+    "@windstack/core": "0.6.0",
+    "@windstack/evm": "0.6.0",
+    "@windstack/solana": "0.6.0",
+    "@windstack/vexanium": "0.6.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -37,24 +36,22 @@
     "wisp-wallet",
     "wisp",
     "session",
-    "wallet-plugin",
     "vexanium",
     "evm",
     "solana",
     "antelope"
   ],
-  "peerDependencies": {
-    "@wharfkit/antelope": "^1.2.0",
-    "@wharfkit/session": "^1.6.1",
-    "@wharfkit/signing-request": "^3.4.0"
-  },
-  "devDependencies": {
-    "@wharfkit/antelope": "^1.2.0",
-    "@wharfkit/session": "^1.6.1",
-    "@wharfkit/signing-request": "^3.4.0"
-  },
   "license": "MIT",
   "author": "PT WIND KRIPTOGRAFI TEKNOLOGI",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/session#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/windvex/windstack-sdk.git",
+    "directory": "packages/session"
+  },
+  "bugs": {
+    "url": "https://github.com/windvex/windstack-sdk/issues"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
