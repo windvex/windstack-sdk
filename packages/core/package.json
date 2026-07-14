@@ -1,6 +1,6 @@
 {
   "name": "@windstack/core",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Shared provider primitives for Wind Stack SDK packages.",
   "type": "module",
   "main": "./dist/index.js",

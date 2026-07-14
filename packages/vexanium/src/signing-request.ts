@@ -1,11 +1,18 @@
-import { SigningRequest } from "@wharfkit/signing-request";
+import {
+  SigningRequest,
+  type ZlibProvider,
+} from "@wharfkit/signing-request";
+import { deflateRaw, inflateRaw } from "pako";
 import { ESR_SCHEME, VSR_SCHEME } from "./constants.js";
 import type {
   CanonicalSigningRequestUri,
   VexSigningRequestCreateInput,
   VexSigningRequestCreateOptions,
+  VexSigningRequestParseOptions,
   VexSigningRequestUri,
 } from "./types.js";
+
+const defaultZlib: ZlibProvider = { deflateRaw, inflateRaw };
 
 /**
  * Create the canonical Vexanium Signing Request URI.
@@ -18,16 +25,27 @@ export async function createSigningRequest(
   args: VexSigningRequestCreateInput,
   options: VexSigningRequestCreateOptions = {},
 ): Promise<CanonicalSigningRequestUri> {
-  const request = await SigningRequest.create(args, options);
-  return encodeSigningRequest(request, options);
+  const { compress, slashes, ...createOptions } = options;
+  const zlib = createOptions.zlib ?? (compress === true ? defaultZlib : undefined);
+  const request = await SigningRequest.create(args, { ...createOptions, zlib });
+  return encodeSigningRequest(request, { compress, slashes, zlib });
 }
 
 /** Encode a WharfKit SigningRequest using the canonical Vexanium `vsr:` scheme. */
 export function encodeSigningRequest(
   request: SigningRequest,
-  options: Pick<VexSigningRequestCreateOptions, "compress" | "slashes"> = {},
+  options: Pick<VexSigningRequestCreateOptions, "compress" | "slashes" | "zlib"> = {},
 ): CanonicalSigningRequestUri {
-  return request.encode(options.compress, options.slashes ?? true, VSR_SCHEME) as CanonicalSigningRequestUri;
+  const zlib = options.zlib ?? defaultZlib;
+  const encodableRequest = options.compress === true
+    ? SigningRequest.from(request.encode(false), { zlib })
+    : request;
+
+  return encodableRequest.encode(
+    options.compress,
+    options.slashes ?? true,
+    VSR_SCHEME,
+  ) as CanonicalSigningRequestUri;
 }
 
 function assertSigningRequestUri(uri: VexSigningRequestUri): VexSigningRequestUri {
@@ -53,7 +71,13 @@ function assertSigningRequestUri(uri: VexSigningRequestUri): VexSigningRequestUr
   return uri;
 }
 
-/** Parse VSR or ESR directly with WharfKit without rewriting the URI or payload. */
-export function parseSigningRequest(uri: VexSigningRequestUri): SigningRequest {
-  return SigningRequest.from(assertSigningRequestUri(uri));
+/** Parse compressed or uncompressed VSR/ESR without rewriting its URI or payload. */
+export function parseSigningRequest(
+  uri: VexSigningRequestUri,
+  options: VexSigningRequestParseOptions = {},
+): SigningRequest {
+  return SigningRequest.from(assertSigningRequestUri(uri), {
+    ...options,
+    zlib: options.zlib ?? defaultZlib,
+  });
 }

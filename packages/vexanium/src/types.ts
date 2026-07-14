@@ -163,6 +163,10 @@ export type VexSigningRequestCreateOptions = SigningRequestEncodingOptions & {
   compress?: boolean;
   slashes?: boolean;
 };
+export type VexSigningRequestParseOptions = Pick<
+  SigningRequestEncodingOptions,
+  "abiProvider" | "zlib"
+>;
 
 /** Portable Vexanium Signing Request parameters for QR/deep-link/external wallet flows. */
 export type VexSigningRequestParams = DappRequestMetadataParams & {

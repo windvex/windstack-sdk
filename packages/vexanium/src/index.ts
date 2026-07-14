@@ -53,6 +53,7 @@ export type {
   VexSignTransactionResult,
   VexSigningRequestCreateInput,
   VexSigningRequestCreateOptions,
+  VexSigningRequestParseOptions,
   VexSigningRequestParams,
   VexSigningRequestResult,
   VexSigningRequestUri,

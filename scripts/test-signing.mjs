@@ -8,6 +8,7 @@ import {
   Transaction,
 } from "@wharfkit/antelope";
 import { SigningRequest } from "@wharfkit/signing-request";
+import { deflateRaw, inflateRaw } from "pako";
 import {
   ESR_SCHEME,
   VSR_SCHEME,
@@ -18,6 +19,7 @@ import {
   VEXANIUM_PROVIDER_STANDARD,
   VEXANIUM_PROVIDER_VERSION,
   WISP_VEXANIUM_PROVIDER_INFO,
+  createSigningRequest,
   createVexaniumClient,
   encodeSigningRequest,
   parseSigningRequest,
@@ -95,6 +97,51 @@ assert.ok(canonicalVsr.startsWith(`${VSR_SCHEME}//`));
 assert.ok(esr.startsWith(`${ESR_SCHEME}//`));
 assert.equal(parseSigningRequest(canonicalVsr).encode(false, true), esr);
 assert.equal(parseSigningRequest(esr).encode(false, true), esr);
+
+// Compressed portable requests work without app-level zlib configuration.
+const compressedSigningInput = {
+  chainId: VEXANIUM_MAINNET_CHAIN_ID,
+  transaction: portableTransaction,
+  info: { note: "windstack-zlib-round-trip-".repeat(64) },
+};
+const uncompressedVsr = await createSigningRequest(compressedSigningInput, {
+  compress: false,
+});
+const compressedVsr = await createSigningRequest(compressedSigningInput, {
+  compress: true,
+});
+const compressedPayload = Buffer.from(
+  compressedVsr.slice(compressedVsr.indexOf(":") + 1).replace(/^\/\//, ""),
+  "base64url",
+);
+
+assert.notEqual(compressedPayload[0] & 0x80, 0);
+assert.equal(
+  parseSigningRequest(compressedVsr).encode(false, true),
+  parseSigningRequest(uncompressedVsr).encode(false, true),
+);
+
+let customDeflateCalls = 0;
+let customInflateCalls = 0;
+const customZlib = {
+  deflateRaw(data) {
+    customDeflateCalls += 1;
+    return deflateRaw(data);
+  },
+  inflateRaw(data) {
+    customInflateCalls += 1;
+    return inflateRaw(data);
+  },
+};
+const customCompressedVsr = await createSigningRequest({
+  chainId: VEXANIUM_MAINNET_CHAIN_ID,
+  transaction: portableTransaction,
+  info: { note: "custom-zlib-provider-".repeat(64) },
+}, { compress: true, zlib: customZlib });
+parseSigningRequest(customCompressedVsr, { zlib: customZlib });
+
+assert.equal(customDeflateCalls, 1);
+assert.equal(customInflateCalls, 1);
 
 const client = await createVexaniumClient({ provider, autoSync: false });
 await client.signSigningRequest({ request: esr, broadcast: false });

@@ -106,12 +106,12 @@ const uri = await createSigningRequest({
       memo: "",
     },
   },
-});
+}, { compress: true });
 
 const request = parseSigningRequest(uri);
 ```
 
-New requests are encoded as `vsr:`. Existing `esr:` input is accepted because the payload is parsed by WharfKit's Signing Request implementation.
+New requests are encoded as `vsr:`. When `compress: true` is used, the SDK supplies its built-in zlib implementation for both encoding and parsing. Existing `esr:` input is accepted because the payload is parsed by WharfKit's Signing Request implementation. A custom `options.zlib` provider can still be supplied for specialized runtimes.
 
 ## Utilities
 

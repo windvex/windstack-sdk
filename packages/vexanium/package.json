@@ -1,6 +1,6 @@
 {
   "name": "@windstack/vexanium",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Vexanium wallet provider client, chain metadata, signing requests, and explorer utilities.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,9 +23,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "0.6.0",
     "@wharfkit/antelope": "^1.2.0",
-    "@wharfkit/signing-request": "^3.4.0"
+    "@wharfkit/signing-request": "^3.4.0",
+    "@windstack/core": "0.6.1",
+    "pako": "^2.2.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -61,5 +62,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/pako": "^2.0.4"
   }
 }
