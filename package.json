@@ -11,11 +11,12 @@
     "build": "tsc -b packages/core packages/evm packages/solana packages/vexanium packages/wallet-plugin-wisp packages/session",
     "typecheck": "tsc -b packages/core packages/evm packages/solana packages/vexanium packages/wallet-plugin-wisp packages/session --pretty",
     "pack:dry-run": "npm pack --dry-run --workspaces",
-    "test": "node scripts/test-signing.mjs && node scripts/test-provider-contract.mjs && node scripts/test-sdk-behavior.mjs",
+    "test": "node scripts/test-signing.mjs && node scripts/test-provider-contract.mjs && node scripts/test-provider-spec.mjs && node scripts/test-sdk-behavior.mjs",
     "validate": "npm run clean && npm run typecheck && npm run build && npm test && npm run pack:dry-run",
     "prepublishOnly": "npm run validate",
     "test:signing": "node scripts/test-signing.mjs",
-    "test:provider": "node scripts/test-provider-contract.mjs"
+    "test:provider": "node scripts/test-provider-contract.mjs && node scripts/test-provider-spec.mjs",
+    "test:provider-spec": "node scripts/test-provider-spec.mjs"
   },
   "devDependencies": {
     "typescript": "^7.0.2"
