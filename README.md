@@ -8,7 +8,7 @@ The SDK keeps each chain integration separate. VEX Native applications use Wharf
 
 | Package | Use it for |
 | --- | --- |
-| `@windstack/core` | Provider errors, events, dApp metadata, and shared types |
+| `@windstack/core` | Provider contract, errors, events, dApp metadata, and shared types |
 | `@windstack/evm` | EIP-1193 requests and EIP-6963 wallet discovery |
 | `@windstack/solana` | Wisp-compatible Solana provider requests |
 | `@windstack/vexanium` | Vexanium provider access, chain metadata, VSR, and explorer helpers |
@@ -129,7 +129,11 @@ if (chainId !== "0x1a50") {
 
 Vexanium wallets expose `window.vexanium` and identify themselves through `providerInfo`. The SDK checks the provider shape, negotiates protocol version `1.x`, and verifies declared capabilities before connect or signing calls.
 
-The full wallet-facing contract is documented in [VEXANIUM-PROVIDER-V1.md](./VEXANIUM-PROVIDER-V1.md).
+`WISP_PROVIDER_CONTRACT` from `@windstack/core` is the runtime single source for shared Wisp/Vexanium and EVM provider identity, methods, events, capabilities, and chain identifiers. The EVM and Vexanium packages derive their exported constants from that object.
+
+The matching machine-readable specification is stored at [`specs/wisp-provider-contract.json`](./specs/wisp-provider-contract.json). Validation fails if the JSON specification, core export, or package constants drift apart. Wisp Wallet independently synchronizes its local runtime contract from this specification.
+
+The full Vexanium wallet-facing contract is documented in [VEXANIUM-PROVIDER-V1.md](./VEXANIUM-PROVIDER-V1.md).
 
 ## Development
 
@@ -138,7 +142,7 @@ npm ci
 npm run validate
 ```
 
-`validate` runs a clean TypeScript build, provider/signing regression tests, and an npm package dry run for every workspace.
+`validate` runs a clean TypeScript build, provider/signing regression tests, canonical provider specification checks, and an npm package dry run for every workspace.
 
 WharfKit is kept at its latest published package versions. npm currently reports a low-severity advisory in WharfKit's transitive `elliptic` dependency; there is no patched WharfKit release to upgrade to. The suggested npm remediation is an incompatible downgrade and is intentionally not applied.
 
