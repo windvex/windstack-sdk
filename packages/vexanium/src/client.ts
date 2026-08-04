@@ -69,6 +69,20 @@ const DEFAULT_SYNC_OPTIONS: Required<VexaniumSessionSyncOptions> = {
   visibilityChange: true,
 };
 
+const CAPABILITY_METHODS: Readonly<Record<VexaniumCapability, readonly string[]>> = {
+  [VEXANIUM_CAPABILITIES.ACCOUNTS]: [
+    VEXANIUM_METHODS.REQUEST_ACCOUNTS,
+    VEXANIUM_METHODS.GET_ACCOUNTS,
+    VEXANIUM_METHODS.GET_CHAIN,
+  ],
+  [VEXANIUM_CAPABILITIES.SESSIONS]: [VEXANIUM_METHODS.DISCONNECT],
+  [VEXANIUM_CAPABILITIES.EXACT_TRANSACTION_SIGNING]: [VEXANIUM_METHODS.SIGN_TRANSACTION],
+  [VEXANIUM_CAPABILITIES.SIGNING_REQUEST]: [VEXANIUM_METHODS.SIGNING_REQUEST],
+  [VEXANIUM_CAPABILITIES.MESSAGE_SIGNING]: [VEXANIUM_METHODS.SIGN_MESSAGE],
+  [VEXANIUM_CAPABILITIES.DIGEST_SIGNING]: [VEXANIUM_METHODS.SIGN_DIGEST],
+  [VEXANIUM_CAPABILITIES.EVENTS]: [],
+};
+
 type Listener<TPayload> = (payload: TPayload) => void;
 type ClientListenerStore = Map<
   keyof VexaniumClientEventMap,
@@ -172,6 +186,19 @@ function assertSignTransactionParams(params: VexSignTransactionParams): void {
   }
 }
 
+function assertCapabilityMethods(response: VexaniumCapabilitiesResponse): void {
+  for (const capability of response.capabilities) {
+    for (const method of CAPABILITY_METHODS[capability]) {
+      if (!response.methods.includes(method)) {
+        throw new VexaniumProviderError(
+          VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+          `Provider declares ${capability} without required method ${method}`,
+        );
+      }
+    }
+  }
+}
+
 function addClientListener<TEvent extends keyof VexaniumClientEventMap>(
   listeners: ClientListenerStore,
   event: TEvent,
@@ -268,12 +295,21 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
         },
       }).then((response) => {
         assertVexaniumCapabilitiesResponse(response, requiredCapabilities);
+        assertCapabilityMethods(response);
         const info = requireProvider().providerInfo;
         for (const capability of response.capabilities) {
           if (!info.capabilities.includes(capability)) {
             throw new VexaniumProviderError(
               VEXANIUM_ERROR_CODES.INVALID_REQUEST,
               `Provider negotiated undeclared capability: ${capability}`,
+            );
+          }
+        }
+        for (const chainId of response.chains) {
+          if (!info.chains.some((declaredChainId) => sameVexaniumChain(chainId, declaredChainId))) {
+            throw new VexaniumProviderError(
+              VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+              `Provider negotiated undeclared chain: ${chainId}`,
             );
           }
         }
@@ -388,6 +424,14 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
     });
     assertVexaniumConnectResponse(rawResponse);
 
+    const info = requireProvider().providerInfo;
+    if (!info.chains.some((chainId) => sameVexaniumChain(chainId, rawResponse.chainId))) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+        `Wallet connected to undeclared chain: ${rawResponse.chainId}`,
+      );
+    }
+
     if (params.chainId && !sameVexaniumChain(rawResponse.chainId, params.chainId)) {
       throw new VexaniumProviderError(
         VEXANIUM_ERROR_CODES.UNSUPPORTED_CHAIN,
@@ -448,7 +492,7 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
   };
 
   const handleChainChanged = (chainId: VexaniumProviderEventMap["chainChanged"]): void => {
-    if (typeof chainId !== "string" || !chainId) return;
+    if (!isVexaniumChainId(chainId)) return;
     if (session) {
       session = {
         ...session,

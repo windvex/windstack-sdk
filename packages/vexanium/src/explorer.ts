@@ -36,7 +36,7 @@ export function buildExplorerTokenUrl(contract: string, symbol?: string, options
     return evmRoutes(options.baseUrl).token(contract);
   }
   return symbol
-    ? `${nativeBase(options.baseUrl)}/token/${encodePath(contract)}-${encodePath(symbol)}`
+    ? `${nativeBase(options.baseUrl)}/tokens/${encodePath(contract)}/${encodePath(symbol)}`
     : `${nativeBase(options.baseUrl)}/token/${encodePath(contract)}`;
 }
 

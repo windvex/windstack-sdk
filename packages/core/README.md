@@ -10,13 +10,14 @@ npm install @windstack/core
 
 `WISP_PROVIDER_CONTRACT` is the runtime single source used by the WindStack EVM
 and Vexanium packages for provider identity, method names, discovery events,
-chain identifiers, protocol version, and capabilities.
+chain identifiers, protocol version, capabilities, and provider error codes.
 
 ```ts
 import { WISP_PROVIDER_CONTRACT } from "@windstack/core";
 
 console.log(WISP_PROVIDER_CONTRACT.vex.standard); // VexaniumProvider
 console.log(WISP_PROVIDER_CONTRACT.evm.chainIdHex); // 0x1a50
+console.log(WISP_PROVIDER_CONTRACT.errors.userRejected); // 4001
 ```
 
 The machine-readable repository specification at
@@ -49,7 +50,7 @@ import {
 } from "@windstack/core";
 ```
 
-`normalizeProviderError()` preserves numeric provider error codes. `WispEventEmitter` provides typed `on`, `off`, `once`, and listener cleanup methods for SDK packages.
+`WISP_ERROR_CODES` is derived from the provider contract. `normalizeProviderError()` preserves numeric provider error codes. `WispEventEmitter` provides typed `on`, `off`, `once`, and listener cleanup methods for SDK packages.
 
 ## License
 

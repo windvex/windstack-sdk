@@ -23,6 +23,7 @@ import {
   VEXANIUM_PROVIDER_VERSION,
   VexaniumProviderError,
   buildExplorerAccountUrl,
+  buildExplorerTokenUrl,
   buildExplorerTxUrl,
   createVexaniumClient,
   formatAsset,
@@ -104,6 +105,7 @@ runtimeWindow.addEventListener("eip6963:requestProvider", () => {
 let discovered = await discoverEVMProviders(0);
 assert.equal(discovered.length, 1);
 assert.equal(Object.isFrozen(discovered[0].info), true);
+assert.equal(Object.isFrozen(discovered[0]), true);
 assert.equal(await getEVMProvider(0), firstProvider);
 
 const lateProvider = makeEIP1193Provider("0x1a50");
@@ -153,6 +155,14 @@ assert.equal(vexEvm.explorerUrl, "https://explorer.windcrypto.com/evm");
 assert.equal(vexEvm.routes.home, "https://explorer.windcrypto.com/evm");
 assert.equal(vexEvm.routes.tx("0xabc"), "https://explorer.windcrypto.com/evm/tx/0xabc");
 assert.equal(vexEvm.routes.account("0x123"), "https://explorer.windcrypto.com/evm/address/0x123");
+assert.equal(
+  vexNative.routes.token("vex.token", "VEX"),
+  "https://explorer.windcrypto.com/tokens/vex.token/VEX",
+);
+assert.equal(
+  buildExplorerTokenUrl("vex.token", "VEX"),
+  "https://explorer.windcrypto.com/tokens/vex.token/VEX",
+);
 assert.equal(buildExplorerTxUrl("0xabc", { target: "evm" }), vexEvm.routes.tx("0xabc"));
 assert.equal(buildExplorerAccountUrl("0x123", { target: "evm" }), vexEvm.routes.account("0x123"));
 assert.equal(isVexaniumScope(VEXANIUM_MAINNET_SCOPE), true);

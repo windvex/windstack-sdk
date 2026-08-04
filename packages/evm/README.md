@@ -19,6 +19,7 @@ client.on("accountsChanged", (nextAccounts) => {
 ```
 
 `connect()` calls `eth_requestAccounts`. `getAccounts()` calls the silent `eth_accounts` method.
+`EVM_METHODS` exposes the canonical MetaMask-compatible method names implemented by Wisp, while `VEX_EVM_CHAIN_ID`, `VEX_EVM_CHAIN_ID_HEX`, and `VEX_EVM_SCOPE` expose the VEX EVM network identifiers.
 
 ## Chain requests
 

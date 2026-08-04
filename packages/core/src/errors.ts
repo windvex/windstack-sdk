@@ -1,13 +1,21 @@
+import { WISP_PROVIDER_CONTRACT } from "./provider-contract.js";
+
+const { errors } = WISP_PROVIDER_CONTRACT;
+
 export const WISP_ERROR_CODES = {
-  USER_REJECTED: 4001,
-  UNAUTHORIZED: 4100,
-  UNSUPPORTED_METHOD: 4200,
-  DISCONNECTED: 4900,
-  CHAIN_DISCONNECTED: 4901,
-  REQUEST_PENDING: -32002,
-  METHOD_NOT_FOUND: -32601,
-  INVALID_PARAMS: -32602,
-  INTERNAL_ERROR: -32603,
+  USER_REJECTED: errors.userRejected,
+  UNAUTHORIZED: errors.unauthorized,
+  UNSUPPORTED_METHOD: errors.unsupportedMethod,
+  DISCONNECTED: errors.disconnected,
+  CHAIN_DISCONNECTED: errors.chainDisconnected,
+  REQUEST_PENDING: errors.requestPending,
+  UNSUPPORTED_CHAIN: errors.unsupportedChain,
+  UNSUPPORTED_CAPABILITY: errors.unsupportedCapability,
+  INCOMPATIBLE_VERSION: errors.incompatibleVersion,
+  INVALID_REQUEST: errors.invalidRequest,
+  METHOD_NOT_FOUND: errors.methodNotFound,
+  INVALID_PARAMS: errors.invalidParams,
+  INTERNAL_ERROR: errors.internalError,
 } as const;
 
 export type WispErrorCode = (typeof WISP_ERROR_CODES)[keyof typeof WISP_ERROR_CODES];

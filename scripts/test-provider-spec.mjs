@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
+  WISP_ERROR_CODES,
   WISP_PROVIDER_CONTRACT,
 } from "../packages/core/dist/index.js";
 import {
@@ -9,6 +10,9 @@ import {
   EIP6963_REQUEST_PROVIDER_EVENT,
   EVM_METHODS,
   EVM_PROVIDER_GLOBAL,
+  VEX_EVM_CHAIN_ID,
+  VEX_EVM_CHAIN_ID_HEX,
+  VEX_EVM_SCOPE,
   WISP_EVM_PROVIDER_RDNS,
 } from "../packages/evm/dist/index.js";
 import {
@@ -34,8 +38,10 @@ const contract = JSON.parse(
 assert.deepEqual(contract, WISP_PROVIDER_CONTRACT);
 assert.equal(contract.schemaVersion, 1);
 assert.equal(contract.provider.name, "Wisp");
+assert.equal(contract.provider.marker, "isWispWallet");
 assert.equal(contract.provider.rdns, WISP_PROVIDER_RDNS);
 assert.equal(contract.provider.rdns, WISP_EVM_PROVIDER_RDNS);
+assert.deepEqual(Object.values(contract.errors), Object.values(WISP_ERROR_CODES));
 
 assert.equal(contract.vex.global, VEXANIUM_PROVIDER_GLOBAL);
 assert.equal(contract.vex.standard, VEXANIUM_PROVIDER_STANDARD);
@@ -54,8 +60,9 @@ assert.equal(
 );
 
 assert.equal(contract.evm.global, EVM_PROVIDER_GLOBAL);
-assert.equal(contract.evm.chainId, 6736);
-assert.equal(contract.evm.chainIdHex, "0x1a50");
+assert.equal(contract.evm.chainId, VEX_EVM_CHAIN_ID);
+assert.equal(contract.evm.chainIdHex, VEX_EVM_CHAIN_ID_HEX);
+assert.equal(contract.evm.scope, VEX_EVM_SCOPE);
 assert.deepEqual(Object.values(contract.evm.methods), Object.values(EVM_METHODS));
 assert.equal(
   contract.evm.events.requestProvider,

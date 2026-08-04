@@ -1,4 +1,5 @@
 import {
+  VEXANIUM_CAPABILITIES,
   VEXANIUM_PROVIDER_MAJOR_VERSION,
   VEXANIUM_PROVIDER_STANDARD,
   VEXANIUM_PROVIDER_VERSION,
@@ -28,6 +29,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isVexaniumCapability(value: unknown): value is VexaniumCapability {
+  return isNonEmptyString(value) && (
+    Object.values(VEXANIUM_CAPABILITIES) as readonly string[]
+  ).includes(value);
 }
 
 function allUnique(values: unknown[]): boolean {
@@ -79,10 +86,12 @@ export function isVexaniumProviderInfo(value: unknown): value is VexaniumProvide
     isNonEmptyString(value.version) &&
     parseMajor(value.version) !== null &&
     Array.isArray(value.chains) &&
+    value.chains.length > 0 &&
     value.chains.every(isVexaniumChainId) &&
     allUnique(value.chains) &&
     Array.isArray(value.capabilities) &&
-    value.capabilities.every(isNonEmptyString) &&
+    value.capabilities.length > 0 &&
+    value.capabilities.every(isVexaniumCapability) &&
     allUnique(value.capabilities) &&
     isSafeIcon(value.icon)
   );
@@ -113,7 +122,7 @@ export function assertVexaniumCapabilitiesResponse(
     value.standard !== VEXANIUM_PROVIDER_STANDARD ||
     !isNonEmptyString(value.version) ||
     !Array.isArray(value.capabilities) ||
-    !value.capabilities.every(isNonEmptyString) ||
+    !value.capabilities.every(isVexaniumCapability) ||
     !Array.isArray(value.chains) ||
     !value.chains.every(isVexaniumChainId) ||
     !Array.isArray(value.methods) ||
@@ -153,7 +162,7 @@ export function assertVexaniumConnectResponse(value: unknown): asserts value is 
     !Array.isArray(value.accounts) ||
     value.accounts.length === 0 ||
     !Array.isArray(value.capabilities) ||
-    !value.capabilities.every(isNonEmptyString) ||
+    !value.capabilities.every(isVexaniumCapability) ||
     !allUnique(value.capabilities)
   ) {
     throw new VexaniumProviderError(

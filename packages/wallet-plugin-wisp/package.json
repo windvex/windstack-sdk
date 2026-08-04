@@ -1,6 +1,6 @@
 {
   "name": "@windstack/wallet-plugin-wisp",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "WharfKit SessionKit wallet plugin for exact Vexanium transaction signing with Wisp.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,8 +23,8 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "0.6.1",
-    "@windstack/vexanium": "0.6.1"
+    "@windstack/core": "0.6.2",
+    "@windstack/vexanium": "0.6.2"
   },
   "peerDependencies": {
     "@wharfkit/antelope": "^1.2.0",

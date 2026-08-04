@@ -5,10 +5,11 @@ by WindStack SDK packages and the Wisp Wallet provider runtime.
 
 It defines only standards-facing values:
 
-- Wisp provider identity (`name` and reverse-DNS identifier)
+- Wisp provider identity (`name`, reverse-DNS identifier, and compatibility marker)
+- Shared EIP-1193/Vexanium provider error codes
 - VexaniumProvider version, chain identifiers, capabilities, methods, and
   discovery events
-- EIP-1193 method names, EIP-6963 discovery events, and VEX EVM chain identifiers
+- EIP-1193 method names, EIP-6963 discovery events, and VEX EVM chain identifiers/scope
 
 Wallet-specific message transport identifiers are intentionally excluded. Wisp
 keeps those private fields in its local runtime contract while synchronizing the

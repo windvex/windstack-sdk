@@ -129,6 +129,7 @@ const value = formatAsset(asset.amount, asset.precision, asset.symbol);
 ```
 
 Explorer URL builders encode path segments. `mapExplorerTransaction` maps common node and indexer response shapes into the explorer view model while preserving the raw response. It does not decode, rebuild, or serialize an Antelope transaction.
+Native token URLs use Wind Explorer's canonical `/tokens/:contract/:symbol` route when both identifiers are known.
 
 ## Provider Authors
 

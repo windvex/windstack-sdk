@@ -1,3 +1,4 @@
+import { WISP_PROVIDER_CONTRACT } from "@windstack/core";
 import { VEXANIUM_MAINNET_CHAIN_ID, VEXANIUM_MAINNET_SCOPE } from "./constants.js";
 import type { VexaniumCaip2ChainId, VexaniumFullChainId } from "./types.js";
 
@@ -68,6 +69,7 @@ export type VexaniumEvmChainConfig = {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "");
 const encodePath = (value: string | number): string => encodeURIComponent(String(value));
+const { evm } = WISP_PROVIDER_CONTRACT;
 
 export function createVexaniumExplorerRoutes(baseUrl: string): WindstackExplorerRoutes {
   const base = trimTrailingSlash(baseUrl);
@@ -77,7 +79,9 @@ export function createVexaniumExplorerRoutes(baseUrl: string): WindstackExplorer
     block: (idOrHeight) => `${base}/block/${encodePath(idOrHeight)}`,
     account: (account) => `${base}/account/${encodePath(account)}`,
     token: (contract, symbol) =>
-      symbol ? `${base}/token/${encodePath(contract)}-${encodePath(symbol)}` : `${base}/token/${encodePath(contract)}`,
+      symbol
+        ? `${base}/tokens/${encodePath(contract)}/${encodePath(symbol)}`
+        : `${base}/token/${encodePath(contract)}`,
     producer: (producer) => `${base}/producer/${encodePath(producer)}`,
     action: (globalSequence) => `${base}/action/${encodePath(globalSequence)}`,
   };
@@ -134,8 +138,8 @@ export const vexEvm = {
   displayName: "Vexanium EVM",
   shortName: "VEX EVM",
   environment: "mainnet",
-  chainId: 6736,
-  chainIdHex: "0x1a50",
+  chainId: evm.chainId,
+  chainIdHex: evm.chainIdHex,
   rpcUrl: "https://api.windcrypto.com/rpc",
   apiUrl: "https://api.windcrypto.com/v3/evm",
   statsUrl: "https://api.windcrypto.com/v3/evm/stats",

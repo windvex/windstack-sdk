@@ -1,6 +1,6 @@
 {
   "name": "@windstack/session",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Optional unified multichain session facade for Wind Stack EVM, Solana, and Vexanium clients.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,10 +23,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "0.6.1",
-    "@windstack/evm": "0.6.1",
-    "@windstack/solana": "0.6.1",
-    "@windstack/vexanium": "0.6.1"
+    "@windstack/core": "0.6.2",
+    "@windstack/evm": "0.6.2",
+    "@windstack/solana": "0.6.2",
+    "@windstack/vexanium": "0.6.2"
   },
   "sideEffects": false,
   "keywords": [

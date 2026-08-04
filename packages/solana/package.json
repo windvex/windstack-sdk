@@ -1,6 +1,6 @@
 {
   "name": "@windstack/solana",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Solana provider client for Wisp Wallet-compatible dApps.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "0.6.1"
+    "@windstack/core": "0.6.2"
   },
   "sideEffects": false,
   "keywords": [

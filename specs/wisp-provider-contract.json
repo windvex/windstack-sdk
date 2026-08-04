@@ -2,7 +2,23 @@
   "schemaVersion": 1,
   "provider": {
     "name": "Wisp",
-    "rdns": "com.wisp.wallet"
+    "rdns": "com.wisp.wallet",
+    "marker": "isWispWallet"
+  },
+  "errors": {
+    "userRejected": 4001,
+    "unauthorized": 4100,
+    "unsupportedMethod": 4200,
+    "disconnected": 4900,
+    "chainDisconnected": 4901,
+    "requestPending": -32002,
+    "unsupportedChain": -32004,
+    "unsupportedCapability": -32005,
+    "incompatibleVersion": -32006,
+    "invalidRequest": -32600,
+    "methodNotFound": -32601,
+    "invalidParams": -32602,
+    "internalError": -32603
   },
   "vex": {
     "global": "vexanium",
@@ -39,12 +55,23 @@
     "global": "ethereum",
     "chainId": 6736,
     "chainIdHex": "0x1a50",
+    "scope": "eip155:6736",
     "methods": {
       "requestAccounts": "eth_requestAccounts",
       "getAccounts": "eth_accounts",
+      "getCoinbase": "eth_coinbase",
       "getChainId": "eth_chainId",
+      "getNetworkVersion": "net_version",
+      "requestPermissions": "wallet_requestPermissions",
+      "getPermissions": "wallet_getPermissions",
       "switchChain": "wallet_switchEthereumChain",
-      "addChain": "wallet_addEthereumChain"
+      "addChain": "wallet_addEthereumChain",
+      "signMessage": "personal_sign",
+      "signTypedData": "eth_signTypedData",
+      "signTypedDataV3": "eth_signTypedData_v3",
+      "signTypedDataV4": "eth_signTypedData_v4",
+      "signTransaction": "eth_signTransaction",
+      "sendTransaction": "eth_sendTransaction"
     },
     "events": {
       "requestProvider": "eip6963:requestProvider",
