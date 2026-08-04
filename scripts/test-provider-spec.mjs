@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
+  WISP_PROVIDER_CONTRACT,
+} from "../packages/core/dist/index.js";
+import {
   EIP6963_ANNOUNCE_PROVIDER_EVENT,
   EIP6963_REQUEST_PROVIDER_EVENT,
   EVM_METHODS,
@@ -28,6 +31,7 @@ const contract = JSON.parse(
   ),
 );
 
+assert.deepEqual(contract, WISP_PROVIDER_CONTRACT);
 assert.equal(contract.schemaVersion, 1);
 assert.equal(contract.provider.name, "Wisp");
 assert.equal(contract.provider.rdns, WISP_PROVIDER_RDNS);
