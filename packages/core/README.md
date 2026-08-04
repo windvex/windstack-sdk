@@ -6,6 +6,23 @@ Shared provider types and browser-safe utilities for the Wind Stack SDK.
 npm install @windstack/core
 ```
 
+## Provider contract
+
+`WISP_PROVIDER_CONTRACT` is the runtime single source used by the WindStack EVM
+and Vexanium packages for provider identity, method names, discovery events,
+chain identifiers, protocol version, and capabilities.
+
+```ts
+import { WISP_PROVIDER_CONTRACT } from "@windstack/core";
+
+console.log(WISP_PROVIDER_CONTRACT.vex.standard); // VexaniumProvider
+console.log(WISP_PROVIDER_CONTRACT.evm.chainIdHex); // 0x1a50
+```
+
+The machine-readable repository specification at
+`specs/wisp-provider-contract.json` is regression-tested against this export.
+Wisp Wallet synchronizes its provider runtime from that specification.
+
 ## dApp metadata
 
 `resolveDappMetadata()` combines explicit values with the current document title, description, URL, and icons. URLs are restricted to safe web/image schemes.
