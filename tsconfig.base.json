@@ -1,10 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "lib": [
-      "ES2020",
-      "DOM"
-    ],
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -19,24 +16,18 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "paths": {
-      "@windstack/core": [
-        "./packages/core/dist/index.d.ts"
-      ],
-      "@windstack/evm": [
-        "./packages/evm/dist/index.d.ts"
-      ],
-      "@windstack/solana": [
-        "./packages/solana/dist/index.d.ts"
-      ],
-      "@windstack/vexanium": [
-        "./packages/vexanium/dist/index.d.ts"
-      ],
-      "@windstack/session": [
-        "./packages/session/dist/index.d.ts"
-      ],
-      "@windstack/wallet-plugin-wisp": [
-        "./packages/wallet-plugin-wisp/dist/index.d.ts"
-      ]
+      "@windstack/core": ["./packages/core/dist/index.d.ts"],
+      "@windstack/evm": ["./packages/evm/dist/index.d.ts"],
+      "@windstack/solana": ["./packages/solana/dist/index.d.ts"],
+      "@windstack/vexanium": ["./packages/vexanium/dist/index.d.ts"],
+      "@windstack/wallet-plugin-wisp": ["./packages/wallet-plugin-wisp/dist/index.d.ts"],
+      "@windstack/crypto": ["./packages/crypto/dist/index.d.ts"],
+      "@windstack/abi": ["./packages/abi/dist/index.d.ts"],
+      "@windstack/rpc": ["./packages/rpc/dist/index.d.ts"],
+      "@windstack/contract": ["./packages/contract/dist/index.d.ts"],
+      "@windstack/account": ["./packages/account/dist/index.d.ts"],
+      "@windstack/antelope": ["./packages/antelope/dist/index.d.ts"],
+      "@windstack/session": ["./packages/session/dist/index.d.ts"]
     }
   }
 }

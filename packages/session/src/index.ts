@@ -1,3 +1,8 @@
-export { createWispSessionClient } from "./client.js";
-export { createSessionId, isEVMScope, isSolanaScope, isVexaniumScope } from "./scopes.js";
-export type { WispInvokeArgs, WispSessionClient, WispSessionClientOptions } from "./types.js";
+/**
+ * WindStack Antelope SDK
+ * Created by Gilang Ramadan
+ * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+ * SPDX-License-Identifier: MIT
+ */
+export * from "./native.js";
+export * from "./compat.js";

@@ -1,0 +1,18 @@
+{
+  "name": "@windstack/antelope",
+  "version": "1.0.0",
+  "description": "Modern zero-WharfKit Antelope SDK: transactions, TAPOS, signing, contracts, accounts and RPC.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "README.md", "LICENSE", "package.json"],
+  "scripts": { "build": "tsc -p tsconfig.json", "prepack": "npm run build" },
+  "dependencies": { "@windstack/account": "1.0.0", "@windstack/abi": "1.0.0", "@windstack/contract": "1.0.0", "@windstack/crypto": "1.0.0", "@windstack/rpc": "1.0.0" },
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Gilang Ramadan",
+  "repository": { "type": "git", "url": "git+https://github.com/windvex/windstack-sdk.git", "directory": "packages/antelope" },
+  "publishConfig": { "access": "public" },
+  "engines": { "node": ">=20.19.0" }
+}
