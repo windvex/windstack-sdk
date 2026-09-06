@@ -13,7 +13,8 @@ import { RpcClient, type GetBlockResponse, type RpcClientOptions } from "@windst
 export * from "@windstack/account";
 export * from "@windstack/abi";
 export * from "@windstack/contract";
-export * from "@windstack/crypto";
+export { PrivateKey, PublicKey, Signature, concatBytes, sha256Digest } from "@windstack/crypto";
+export type { KeyType } from "@windstack/crypto";
 export * from "@windstack/rpc";
 
 export type Action = ContractAction;
