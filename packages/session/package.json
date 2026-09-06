@@ -9,6 +9,16 @@
   "files": ["dist", "README.md", "LICENSE", "package.json"],
   "scripts": { "build": "tsc -p tsconfig.json", "prepack": "npm run build" },
   "dependencies": { "@windstack/antelope": "1.0.0" },
+  "peerDependencies": {
+    "@windstack/evm": ">=0.6.2",
+    "@windstack/solana": ">=0.6.2",
+    "@windstack/vexanium": ">=0.6.2"
+  },
+  "peerDependenciesMeta": {
+    "@windstack/evm": { "optional": true },
+    "@windstack/solana": { "optional": true },
+    "@windstack/vexanium": { "optional": true }
+  },
   "sideEffects": false,
   "license": "MIT",
   "author": "Gilang Ramadan",
