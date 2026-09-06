@@ -1,33 +1,15 @@
 # @windstack/session
 
-Optional application-level session facade for EVM, Solana, and Vexanium providers.
+WindStack native Antelope session orchestration. It provides a small SessionKit-style abstraction over `@windstack/antelope` without WharfKit.
 
-Use this package only when one application needs a common `connect`, `invoke`, and `disconnect` interface across chain families. A VEX Native-only app should use WharfKit SessionKit with `@windstack/wallet-plugin-wisp` instead.
-
-```bash
-npm install @windstack/session
-```
+Created by **Gilang Ramadan**.
 
 ```ts
-import { createWispSessionClient } from "@windstack/session";
+import { SessionKit } from "@windstack/session";
 
-const client = await createWispSessionClient({
-  dapp: { name: "My App", url: "https://app.example" },
-});
-
-const session = await client.connect([
-  "eip155:6736",
-  "antelope:f9f432b1851b5c179d2091a96f593aa",
-]);
-
-await client.invoke({
-  scope: "eip155:6736",
-  request: { method: "eth_chainId" },
-});
+const kit = new SessionKit({ chains: [{ id: "...", url: "https://api.example" }], walletPlugins: [myWalletPlugin] });
+const session = await kit.login();
+await session.transact({ actions: [action] });
 ```
 
-A session accepts at most one scope per chain family. The EVM scope must match the provider's active chain; the facade will not report an account as authorized on a different chain.
-
-## License
-
-MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.
+MIT © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.

@@ -1,18 +1,17 @@
 {
-  "name": "@windstack/session",
+  "name": "@windstack/rpc",
   "version": "1.0.0",
-  "description": "Native Antelope session and wallet-plugin orchestration for WindStack.",
+  "description": "Typed, fault-tolerant Antelope node RPC client using Web-standard fetch and AbortSignal.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist", "README.md", "LICENSE", "package.json"],
   "scripts": { "build": "tsc -p tsconfig.json", "prepack": "npm run build" },
-  "dependencies": { "@windstack/antelope": "1.0.0" },
   "sideEffects": false,
   "license": "MIT",
   "author": "Gilang Ramadan",
-  "repository": { "type": "git", "url": "git+https://github.com/windvex/windstack-sdk.git", "directory": "packages/session" },
+  "repository": { "type": "git", "url": "git+https://github.com/windvex/windstack-sdk.git", "directory": "packages/rpc" },
   "publishConfig": { "access": "public" },
   "engines": { "node": ">=20.19.0" }
 }

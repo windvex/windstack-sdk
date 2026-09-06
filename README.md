@@ -1,151 +1,66 @@
-# Wind Stack SDK
+# WindStack SDK
 
-TypeScript packages used by Wind Stack applications and Wisp Wallet integrations.
+Modern TypeScript SDKs for Antelope/Vexanium, Wisp Wallet, EVM, and Solana.
 
-The SDK keeps each chain integration separate. VEX Native applications use WharfKit SessionKit and the Wisp wallet plugin. EVM applications use the standard EIP-1193 provider interface, with EIP-6963 discovery when a wallet supports it.
+**Created by Gilang Ramadan** · Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI · MIT.
 
-## Packages
+## Native Antelope v1
 
-| Package | Use it for |
+The new Antelope stack is built from protocol specifications and Web-standard APIs; it is **not a WharfKit fork**.
+
+| Package | Purpose |
 | --- | --- |
-| `@windstack/core` | Provider contract, errors, events, dApp metadata, and shared types |
-| `@windstack/evm` | EIP-1193 requests and EIP-6963 wallet discovery |
-| `@windstack/solana` | Wisp-compatible Solana provider requests |
-| `@windstack/vexanium` | Vexanium provider access, chain metadata, VSR, and explorer helpers |
-| `@windstack/wallet-plugin-wisp` | Wisp integration for WharfKit SessionKit |
-| `@windstack/session` | An optional facade for apps that need more than one chain family |
+| `@windstack/crypto` | K1/R1 private keys, public keys, recoverable signatures, Antelope encodings |
+| `@windstack/abi` | ABI binary codec, names/assets/symbols, structs, aliases, variants |
+| `@windstack/rpc` | Typed nodeos RPC with timeout/failover/AbortSignal |
+| `@windstack/contract` | ABI-aware actions, tables and ABI cache |
+| `@windstack/account` | Account, token balance and system-action helpers |
+| `@windstack/antelope` | TAPOS, transaction serialization, digest, signing, broadcast, unified client |
+| `@windstack/session` | Native SessionKit-style wallet/session orchestration |
 
-All published packages are ESM and require Node.js 18 or newer.
-
-## VEX Native
-
-Install the Vexanium package, the wallet plugin, and WharfKit:
+The v1 native package graph does not depend on `@wharfkit/*`, `elliptic`, `bn.js`, `crypto-browserify`, or Node Buffer APIs. Crypto primitives use current Noble packages (`@noble/curves` and `@noble/hashes`). Noble v2 is ESM-only, so Node.js **20.19+** is required when running directly on Node.
 
 ```bash
-npm install @windstack/vexanium @windstack/wallet-plugin-wisp \
-  @wharfkit/session @wharfkit/antelope @wharfkit/signing-request
+npm install @windstack/antelope @windstack/session
 ```
 
 ```ts
-import { SessionKit } from "@wharfkit/session";
-import { WispWalletPlugin } from "@windstack/wallet-plugin-wisp";
-import { vexNative } from "@windstack/vexanium";
+import { AntelopeClient } from "@windstack/antelope";
 
-const sessionKit = new SessionKit({
-  appName: "My Vexanium App",
-  chains: [{ id: vexNative.chainId, url: vexNative.rpcUrl }],
-  walletPlugins: [new WispWalletPlugin()],
-});
-
-const { session } = await sessionKit.login();
-
-await session.transact({
-  action: {
-    account: "vex.token",
-    name: "transfer",
-    authorization: [session.permissionLevel],
-    data: {
-      from: session.actor,
-      to: "receiver",
-      quantity: "1.0000 VEX",
-      memo: "",
-    },
-  },
-});
+const client = new AntelopeClient({ endpoints: ["https://api.windcrypto.com"] });
+const token = client.contract("vex.token");
+const action = await token.action("transfer", {
+  from: "alice",
+  to: "bob",
+  quantity: "1.0000 VEX",
+  memo: "WindStack",
+}, ["alice@active"]);
 ```
 
-SessionKit resolves the signer, ABI data, TAPOS, and transaction. `WispWalletPlugin` sends the resulting serialized bytes to `vex_signTransaction` without rebuilding the transaction.
+## Existing packages
 
-### Direct provider access
-
-Use the lower-level client when SessionKit is not responsible for the flow:
-
-```ts
-import { createVexaniumClient, vexNative } from "@windstack/vexanium";
-
-const client = await createVexaniumClient({
-  dapp: {
-    name: "My Vexanium App",
-    url: "https://app.example",
-    icon: "https://app.example/icon.png",
-  },
-});
-
-let accounts = await client.getAccounts();
-if (accounts.length === 0) {
-  accounts = await client.connect({ chainId: vexNative.chainId });
-}
-```
-
-`getAccounts()` is a silent read. `connect()` may open the wallet approval screen.
-
-### Portable requests
-
-Vexanium Signing Requests use the `vsr:` URI scheme. The payload is handled by WharfKit's Signing Request library. Existing `esr:` input is validated by WharfKit and forwarded without rewriting the URI or encoded transaction.
-
-```ts
-import { createSigningRequest, vexNative } from "@windstack/vexanium";
-
-const request = await createSigningRequest({
-  chainId: vexNative.chainId,
-  broadcast: true,
-  action: {
-    account: "vex.token",
-    name: "transfer",
-    authorization: [{ actor: "alice", permission: "active" }],
-    data: {
-      from: "alice",
-      to: "bob",
-      quantity: "1.0000 VEX",
-      memo: "",
-    },
-  },
-});
-```
-
-Use VSR for QR codes, links, and other portable requests. Do not wrap a transaction that SessionKit has already resolved; the wallet plugin signs those exact bytes directly.
-
-## VEX EVM
-
-VEX EVM uses chain ID `6736` (`0x1a50`) and 18 decimals for its native VEX balance. Its public JSON-RPC endpoint is `https://api.windcrypto.com/rpc`, and its explorer starts at `https://explorer.windcrypto.com/evm`. Indexed EVM data is available at `https://api.windcrypto.com/v3/evm`, including the live stats endpoint at `https://api.windcrypto.com/v3/evm/stats`.
-
-Use `vexEvm.rpcUrl` for JSON-RPC and `wallet_addEthereumChain`. The REST stats endpoint is for indexed network statistics, not provider requests.
-
-For an injected EVM wallet:
-
-```ts
-import { createEVMClient } from "@windstack/evm";
-
-const client = await createEVMClient();
-const accounts = await client.connect();
-const chainId = await client.getChainId();
-
-if (chainId !== "0x1a50") {
-  await client.switchChain("0x1a50");
-}
-```
-
-## Provider Contract
-
-Vexanium wallets expose `window.vexanium` and identify themselves through `providerInfo`. The SDK checks the provider shape, negotiates protocol version `1.x`, and verifies declared capabilities before connect or signing calls.
-
-`WISP_PROVIDER_CONTRACT` from `@windstack/core` is the runtime single source for shared Wisp/Vexanium and EVM provider identity, methods, events, capabilities, and chain identifiers. The EVM and Vexanium packages derive their exported constants from that object.
-
-The matching machine-readable specification is stored at [`specs/wisp-provider-contract.json`](./specs/wisp-provider-contract.json). Validation fails if the JSON specification, core export, or package constants drift apart. Wisp Wallet independently synchronizes its local runtime contract from this specification.
-
-The full Vexanium wallet-facing contract is documented in [VEXANIUM-PROVIDER-V1.md](./VEXANIUM-PROVIDER-V1.md).
+`@windstack/core`, `@windstack/evm`, `@windstack/solana`, `@windstack/vexanium`, and `@windstack/wallet-plugin-wisp` remain in this monorepo for compatibility. The legacy Vexanium/WharfKit integration is not a dependency of the seven native Antelope v1 packages above.
 
 ## Development
 
 ```bash
-npm ci
+npm install
+npm run validate:native
 npm run validate
 ```
 
-`validate` runs a clean TypeScript build, provider/signing regression tests, canonical provider specification checks, and an npm package dry run for every workspace.
+## Publish native packages from VPS
 
-WharfKit is kept at its latest published package versions. npm currently reports a low-severity advisory in WharfKit's transitive `elliptic` dependency; there is no patched WharfKit release to upgrade to. The suggested npm remediation is an incompatible downgrade and is intentionally not applied.
+Authenticate to npm first (`npm whoami`). Then:
+
+```bash
+npm install
+npm run release:dry-run
+npm run release:npm
+```
+
+`release:npm` publishes only the seven native packages, in dependency order.
 
 ## License
 
-MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.
+MIT. Created by Gilang Ramadan; copyright PT WIND KRIPTOGRAFI TEKNOLOGI.

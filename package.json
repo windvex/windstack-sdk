@@ -1,38 +1,30 @@
 {
   "name": "windstack-sdk",
-  "version": "0.6.2",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
+  "workspaces": ["packages/*"],
   "scripts": {
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo",
-    "build": "tsc -b packages/core packages/evm packages/solana packages/vexanium packages/wallet-plugin-wisp packages/session",
-    "typecheck": "tsc -b packages/core packages/evm packages/solana packages/vexanium packages/wallet-plugin-wisp packages/session --pretty",
+    "build:native": "tsc -b packages/crypto packages/abi packages/rpc packages/contract packages/account packages/antelope packages/session",
+    "build": "tsc -b packages/core packages/evm packages/solana packages/crypto packages/abi packages/rpc packages/contract packages/account packages/antelope packages/vexanium packages/wallet-plugin-wisp packages/session",
+    "typecheck": "npm run build",
+    "pack:native": "npm pack --dry-run -w @windstack/crypto -w @windstack/abi -w @windstack/rpc -w @windstack/contract -w @windstack/account -w @windstack/antelope -w @windstack/session",
     "pack:dry-run": "npm pack --dry-run --workspaces",
-    "test": "node scripts/test-signing.mjs && node scripts/test-provider-contract.mjs && node scripts/test-provider-spec.mjs && node scripts/test-sdk-behavior.mjs",
-    "validate": "npm run clean && npm run typecheck && npm run build && npm test && npm run pack:dry-run",
-    "prepublishOnly": "npm run validate",
-    "test:signing": "node scripts/test-signing.mjs",
-    "test:provider": "node scripts/test-provider-contract.mjs && node scripts/test-provider-spec.mjs",
-    "test:provider-spec": "node scripts/test-provider-spec.mjs"
+    "test": "node scripts/test-signing.mjs && node scripts/test-provider-contract.mjs && node scripts/test-provider-spec.mjs && node scripts/test-sdk-behavior.mjs && node scripts/test-native-antelope.mjs",
+    "test:native": "node scripts/test-native-antelope.mjs",
+    "validate:native": "npm run clean && npm run build:native && npm run test:native && npm run pack:native",
+    "validate": "npm run clean && npm run build && npm test && npm run pack:dry-run",
+    "release:dry-run": "npm run validate:native",
+    "release:npm": "npm publish -w @windstack/crypto --access public && npm publish -w @windstack/abi --access public && npm publish -w @windstack/rpc --access public && npm publish -w @windstack/contract --access public && npm publish -w @windstack/account --access public && npm publish -w @windstack/antelope --access public && npm publish -w @windstack/session --access public"
   },
-  "devDependencies": {
-    "typescript": "^7.0.2"
-  },
-  "engines": {
-    "node": ">=18"
-  },
+  "devDependencies": { "typescript": "^7.0.2" },
+  "engines": { "node": ">=20.19.0" },
   "license": "MIT",
-  "author": "PT WIND KRIPTOGRAFI TEKNOLOGI",
-  "description": "TypeScript SDK packages for Wind Stack, Wisp Wallet, Wind Explorer, and Vexanium dApps.",
+  "author": "Gilang Ramadan",
+  "contributors": ["PT WIND KRIPTOGRAFI TEKNOLOGI"],
+  "description": "Modern TypeScript SDK packages for WindStack, Wisp Wallet, Vexanium and Antelope applications.",
   "homepage": "https://github.com/windvex/windstack-sdk#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/windvex/windstack-sdk.git"
-  },
-  "bugs": {
-    "url": "https://github.com/windvex/windstack-sdk/issues"
-  }
+  "repository": { "type": "git", "url": "git+https://github.com/windvex/windstack-sdk.git" },
+  "bugs": { "url": "https://github.com/windvex/windstack-sdk/issues" }
 }
