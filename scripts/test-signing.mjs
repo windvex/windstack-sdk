@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { bytesToHex } from "../packages/abi/dist/index.js";
 import { PrivateKey, sha256Digest } from "../packages/crypto/dist/index.js";
 import { SigningRequest } from "../packages/signing-request/dist/index.js";
@@ -137,6 +138,52 @@ parseSigningRequest(customCompressedVsr, { zlib: customZlib });
 
 assert.equal(customDeflateCalls, 1);
 assert.equal(customInflateCalls, 1);
+
+const vexTokenAbi = JSON.parse(
+  await readFile(new URL("../test/fixtures/vexanium/vex.token.abi.json", import.meta.url), "utf8"),
+);
+const originalFetch = globalThis.fetch;
+let abiFetchCalls = 0;
+globalThis.fetch = async (input, init) => {
+  abiFetchCalls += 1;
+  assert.equal(String(input), "https://api.windcrypto.com/v1/chain/get_abi");
+  assert.equal(init?.method, "POST");
+  assert.deepEqual(JSON.parse(String(init?.body)), { account_name: "vex.token" });
+  return new Response(
+    JSON.stringify({
+      account_name: "vex.token",
+      abi: vexTokenAbi,
+    }),
+    {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    },
+  );
+};
+try {
+  const structuredVsr = await createSigningRequest({
+    chainId: VEXANIUM_MAINNET_CHAIN_ID,
+    action: {
+      account: "vex.token",
+      name: "transfer",
+      authorization: [{ actor: "alice", permission: "active" }],
+      data: {
+        from: "alice",
+        to: "bob",
+        quantity: "1.0000 VEX",
+        memo: "WindStack",
+      },
+    },
+  });
+  const structuredRequest = parseSigningRequest(structuredVsr);
+  assert.equal(structuredRequest.data.request.type, "action");
+  assert.equal(structuredRequest.data.request.value.account, "vex.token");
+  assert.equal(structuredRequest.data.request.value.name, "transfer");
+  assert.ok(structuredRequest.data.request.value.data.length > 0);
+  assert.equal(abiFetchCalls, 1);
+} finally {
+  globalThis.fetch = originalFetch;
+}
 
 const client = await createVexaniumClient({ provider, autoSync: false });
 await client.signSigningRequest({ request: esr, broadcast: false });
