@@ -1,7 +1,7 @@
 {
   "name": "@windstack/antelope",
   "version": "1.0.0",
-  "description": "Modern zero-WharfKit Antelope SDK: transactions, TAPOS, signing, contracts, accounts and RPC.",
+  "description": "Antelope transaction, signing, contract, account, and RPC client for WindStack applications.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
