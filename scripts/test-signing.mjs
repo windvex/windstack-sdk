@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { Bytes, Checksum256, PrivateKey, Serializer, Transaction } from "@wharfkit/antelope";
-import { SigningRequest } from "@wharfkit/signing-request";
+import { bytesToHex } from "../packages/abi/dist/index.js";
+import { PrivateKey, sha256Digest } from "../packages/crypto/dist/index.js";
+import { SigningRequest } from "../packages/signing-request/dist/index.js";
 import { deflateRaw, inflateRaw } from "pako";
 import {
   ESR_SCHEME,
@@ -19,8 +20,9 @@ import {
 } from "../packages/vexanium/dist/index.js";
 import { WispWalletPlugin } from "../packages/wallet-plugin-wisp/dist/index.js";
 
-const privateKey = PrivateKey.generate("K1");
-const signature = String(privateKey.signDigest(Checksum256.hash(Bytes.from("00"))));
+const scalarOne = Uint8Array.from({ length: 32 }, (_, index) => (index === 31 ? 1 : 0));
+const privateKey = PrivateKey.fromBytes("K1", scalarOne);
+const signature = privateKey.signDigest(sha256Digest(Uint8Array.of(0))).toString();
 const calls = [];
 const methods = Object.values(VEXANIUM_METHODS);
 
@@ -63,8 +65,7 @@ const provider = {
   },
 };
 
-// Portable signing request: canonical VSR output, ESR interoperability input.
-const portableTransaction = Transaction.from({
+const portableTransaction = {
   expiration: "2026-07-14T12:00:00",
   ref_block_num: 1,
   ref_block_prefix: 2,
@@ -74,21 +75,22 @@ const portableTransaction = Transaction.from({
   context_free_actions: [],
   actions: [],
   transaction_extensions: [],
+};
+const nativeRequest = await SigningRequest.create({
+  chainId: VEXANIUM_MAINNET_CHAIN_ID,
+  transaction: portableTransaction,
 });
-const portableBytes = Serializer.encode({ object: portableTransaction }).array;
-const wharfRequest = SigningRequest.fromTransaction(VEXANIUM_MAINNET_CHAIN_ID, portableBytes);
-const canonicalVsr = encodeSigningRequest(wharfRequest, {
+const canonicalVsr = encodeSigningRequest(nativeRequest, {
   compress: false,
   slashes: true,
 });
-const esr = wharfRequest.encode(false, true, ESR_SCHEME);
+const esr = nativeRequest.encode(false, true, "esr");
 
 assert.ok(canonicalVsr.startsWith(`${VSR_SCHEME}//`));
 assert.ok(esr.startsWith(`${ESR_SCHEME}//`));
-assert.equal(parseSigningRequest(canonicalVsr).encode(false, true), esr);
-assert.equal(parseSigningRequest(esr).encode(false, true), esr);
+assert.equal(parseSigningRequest(canonicalVsr).encode(false, true, "esr"), esr);
+assert.equal(parseSigningRequest(esr).encode(false, true, "esr"), esr);
 
-// Compressed portable requests work without app-level zlib configuration.
 const compressedSigningInput = {
   chainId: VEXANIUM_MAINNET_CHAIN_ID,
   transaction: portableTransaction,
@@ -107,8 +109,8 @@ const compressedPayload = Buffer.from(
 
 assert.notEqual(compressedPayload[0] & 0x80, 0);
 assert.equal(
-  parseSigningRequest(compressedVsr).encode(false, true),
-  parseSigningRequest(uncompressedVsr).encode(false, true),
+  parseSigningRequest(compressedVsr).encode(false, true, "esr"),
+  parseSigningRequest(uncompressedVsr).encode(false, true, "esr"),
 );
 
 let customDeflateCalls = 0;
@@ -143,7 +145,6 @@ const portableCalls = calls.filter((call) => call.method === VEXANIUM_METHODS.SI
 assert.equal(portableCalls.length, 1);
 assert.equal(portableCalls[0].params.request, esr);
 
-// Native WindStack session plugin path: exact serialized transaction bytes only.
 calls.length = 0;
 const pluginClient = {
   async connectOne() {
@@ -152,7 +153,7 @@ const pluginClient = {
       actor: "windstack",
       permission: "active",
       permissionLevel: "windstack@active",
-      publicKey: privateKey.toPublic().toString(),
+      publicKey: privateKey.toPublicKey().toString(),
     };
   },
   async signTransaction(params) {
@@ -181,7 +182,7 @@ assert.equal(
   calls.some((call) => call.method === VEXANIUM_METHODS.SIGNING_REQUEST),
   false,
 );
-assert.equal(exactCalls[0].params.serializedTransaction, Bytes.from(exactBytes).hexString);
+assert.equal(exactCalls[0].params.serializedTransaction, bytesToHex(exactBytes));
 assert.equal(exactCalls[0].params.chainId, VEXANIUM_MAINNET_CHAIN_ID);
 assert.equal(exactCalls[0].params.account, "windstack");
 assert.equal(exactCalls[0].params.permission, "active");
