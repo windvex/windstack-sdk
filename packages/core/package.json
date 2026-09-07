@@ -25,14 +25,11 @@
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "windcrypto",
-    "wind-crypto",
+    "vexanium",
     "wisp-wallet",
-    "wisp",
     "wallet",
     "provider",
-    "typescript",
-    "web3"
+    "typescript"
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
