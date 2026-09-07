@@ -193,5 +193,81 @@ assert.throws(
   /Unsupported signing-request protocol version/,
 );
 
+const revision2IdentityUri = "esr://AgABAwACJWh0dHBzOi8vY2guYW5jaG9yLmxpbmsvMTIzNC00NTY3LTg5MDAA";
+const revision2Identity = SigningRequest.from(revision2IdentityUri);
+assert.equal(revision2Identity.version, 2);
+assert.equal(revision2Identity.isIdentity, true);
+assert.equal(revision2Identity.data.request.type, "identity");
+assert.equal(revision2Identity.data.request.value.scope, undefined);
+assert.equal(revision2Identity.encode(false, true, "esr"), revision2IdentityUri);
+const revision2Resolved = await resolveSigningRequest(revision2Identity, {
+  actor: "windstack",
+  permission: "active",
+  abiProvider,
+});
+assert.equal(revision2Resolved.transaction.expiration, "1970-01-01T00:00:00");
+assert.equal(revision2Resolved.transaction.ref_block_num, 0);
+assert.equal(revision2Resolved.transaction.ref_block_prefix, 0);
+assert.deepEqual(revision2Resolved.transaction.actions[0].authorization, [
+  { actor: "windstack", permission: "active" },
+]);
+const revision2IdentityData = new AbiSerializer(SIGNING_REQUEST_ABI).decode(
+  "permission_level",
+  Uint8Array.from(
+    revision2Resolved.transaction.actions[0].data
+      .slice(2)
+      .match(/.{2}/g)
+      .map((value) => Number.parseInt(value, 16)),
+  ),
+);
+assert.deepEqual(revision2IdentityData, { actor: "windstack", permission: "active" });
+
+const legacyPermissionRequest = await SigningRequest.create(
+  {
+    chainId: VEX_CHAIN_ID,
+    action: {
+      account: "vex.token",
+      name: "transfer",
+      authorization: [
+        {
+          actor: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
+          permission: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
+        },
+      ],
+      data: {
+        from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
+        to: "receiver",
+        quantity: "1.0000 VEX",
+        memo: "legacy placeholder",
+      },
+    },
+  },
+  { abiProvider },
+);
+const legacyPermissionResolved = await resolveSigningRequest(legacyPermissionRequest, {
+  actor: "windstack",
+  permission: "active",
+  abiProvider,
+  tapos: {
+    expiration: "2026-09-07T04:00:00",
+    refBlockNum: 1,
+    refBlockPrefix: 2,
+  },
+});
+assert.deepEqual(legacyPermissionResolved.transaction.actions[0].authorization, [
+  { actor: "windstack", permission: "active" },
+]);
+
+const exposed = request.data;
+exposed.callback = "https://mutated.invalid";
+exposed.info.push({ key: "mutated", value: "00" });
+if (exposed.request.type === "action") exposed.request.value.data = "00";
+assert.notEqual(request.data.callback, exposed.callback);
+assert.equal(request.getInfo("mutated"), null);
+assert.notEqual(
+  request.data.request.type === "action" ? request.data.request.value.data : "",
+  "00",
+);
+
 assert.equal(bytesToHex(resolved.digest).length, 64);
 console.log("Native signing-request protocol tests: PASS");

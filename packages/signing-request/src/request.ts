@@ -8,7 +8,7 @@ import { AbiSerializer, bytesToHex, hexToBytes, nameToBigInt } from "@windstack/
 import { PrivateKey, PublicKey, Signature, concatBytes, sha256Digest } from "@windstack/crypto";
 import { decodeBase64Url, encodeBase64Url } from "./base64url.js";
 import { pakoCompressionProvider, type CompressionProvider } from "./compression.js";
-import { SIGNING_REQUEST_ABI } from "./schema.js";
+import { SIGNING_REQUEST_ABI, SIGNING_REQUEST_ABI_V2 } from "./schema.js";
 import type {
   SigningRequestAction,
   SigningRequestActionInput,
@@ -39,7 +39,12 @@ export const SIGNING_REQUEST_PLACEHOLDER_PERMISSION = "............2";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const serializer = new AbiSerializer(SIGNING_REQUEST_ABI);
+const serializerV2 = new AbiSerializer(SIGNING_REQUEST_ABI_V2);
 const REQUEST_SIGNATURE_WIRE_BYTES = 74;
+
+function serializerForVersion(version: number): AbiSerializer {
+  return version === 2 ? serializerV2 : serializer;
+}
 const CHAIN_IDS_INFO_KEY = "chain_ids";
 
 function validateName(value: string, label: string): string {
@@ -278,21 +283,79 @@ async function createPayload(
   return { type: "identity", value: normalizeIdentity(args.identity!) };
 }
 
-function cloneData(data: SigningRequestData): SigningRequestData {
-  return structuredClone(data);
+function clonePermissionLevel(value: SigningRequestPermissionLevel): SigningRequestPermissionLevel {
+  return { actor: value.actor, permission: value.permission };
 }
 
-function toAbiData(data: SigningRequestData): Record<string, unknown> {
+function cloneAction(value: SigningRequestAction): SigningRequestAction {
+  return {
+    account: value.account,
+    name: value.name,
+    authorization: value.authorization.map(clonePermissionLevel),
+    data: value.data,
+  };
+}
+
+function cloneTransaction(value: SigningRequestTransaction): SigningRequestTransaction {
+  return {
+    expiration: value.expiration,
+    ref_block_num: value.ref_block_num,
+    ref_block_prefix: value.ref_block_prefix,
+    max_net_usage_words: value.max_net_usage_words,
+    max_cpu_usage_ms: value.max_cpu_usage_ms,
+    delay_sec: value.delay_sec,
+    context_free_actions: value.context_free_actions.map(cloneAction),
+    actions: value.actions.map(cloneAction),
+    transaction_extensions: value.transaction_extensions.map((extension) => ({ ...extension })),
+  };
+}
+
+function clonePayload(value: SigningRequestPayload): SigningRequestPayload {
+  switch (value.type) {
+    case "action":
+      return { type: value.type, value: cloneAction(value.value) };
+    case "action[]":
+      return { type: value.type, value: value.value.map(cloneAction) };
+    case "transaction":
+      return { type: value.type, value: cloneTransaction(value.value) };
+    case "identity":
+      return {
+        type: value.type,
+        value: {
+          ...(value.value.scope !== undefined ? { scope: value.value.scope } : {}),
+          permission: value.value.permission
+            ? clonePermissionLevel(value.value.permission)
+            : (value.value.permission ?? null),
+        },
+      };
+  }
+}
+
+function cloneData(data: SigningRequestData): SigningRequestData {
+  return {
+    chainId: { ...data.chainId },
+    request: clonePayload(data.request),
+    flags: data.flags,
+    callback: data.callback,
+    info: data.info.map((pair) => ({ ...pair })),
+  };
+}
+
+function toAbiData(data: SigningRequestData, version: number): Record<string, unknown> {
+  const requestValue =
+    version === 2 && data.request.type === "identity"
+      ? { permission: data.request.value.permission ?? null }
+      : data.request.value;
   return {
     chain_id: { type: data.chainId.type, value: data.chainId.value },
-    req: { type: data.request.type, value: data.request.value },
+    req: { type: data.request.type, value: requestValue },
     flags: data.flags,
     callback: data.callback,
     info: data.info,
   };
 }
 
-function fromAbiData(value: unknown): SigningRequestData {
+function fromAbiData(value: unknown, version: number): SigningRequestData {
   if (!value || typeof value !== "object") throw new TypeError("Invalid signing-request payload");
   const record = value as Record<string, unknown>;
   const chain = record.chain_id as { type?: unknown; value?: unknown };
@@ -310,11 +373,22 @@ function fromAbiData(value: unknown): SigningRequestData {
     chain.type === "chain_alias"
       ? { type: "chain_alias", value: Number(chain.value) }
       : { type: "chain_id", value: String(chain.value).toLowerCase() };
+  const requestType = String(request.type) as SigningRequestPayload["type"];
+  const requestValue =
+    version === 2 && requestType === "identity"
+      ? {
+          permission:
+            request.value && typeof request.value === "object"
+              ? ((request.value as { permission?: SigningRequestPermissionLevel | null })
+                  .permission ?? null)
+              : null,
+        }
+      : request.value;
   return {
     chainId,
     request: {
-      type: request.type,
-      value: request.value,
+      type: requestType,
+      value: requestValue,
     } as SigningRequestPayload,
     flags: Number(record.flags),
     callback: String(record.callback ?? ""),
@@ -438,16 +512,17 @@ export class SigningRequest {
       throw new RangeError("Signing-request payload is too large");
     }
 
+    const bodySerializer = serializerForVersion(version);
     let data: SigningRequestData;
     let requestSignature: SigningRequestSignature | null = null;
     try {
-      data = fromAbiData(serializer.decode("signing_request", payload));
+      data = fromAbiData(bodySerializer.decode("signing_request", payload), version);
     } catch (unsignedError) {
       if (payload.length <= REQUEST_SIGNATURE_WIRE_BYTES) throw unsignedError;
       const body = payload.slice(0, -REQUEST_SIGNATURE_WIRE_BYTES);
       const signatureBytes = payload.slice(-REQUEST_SIGNATURE_WIRE_BYTES);
-      data = fromAbiData(serializer.decode("signing_request", body));
-      const decodedSignature = serializer.decode("request_signature", signatureBytes) as {
+      data = fromAbiData(bodySerializer.decode("signing_request", body), version);
+      const decodedSignature = bodySerializer.decode("request_signature", signatureBytes) as {
         signer: string;
         signature: string;
       };
@@ -546,7 +621,10 @@ export class SigningRequest {
   }
 
   serializeBody(): Uint8Array {
-    return serializer.encode("signing_request", toAbiData(this.#data));
+    return serializerForVersion(this.version).encode(
+      "signing_request",
+      toAbiData(this.#data, this.version),
+    );
   }
 
   serializePayload(): Uint8Array {

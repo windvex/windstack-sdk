@@ -132,6 +132,8 @@ assert.throws(
   /bigint or a decimal string/,
 );
 assert.throws(() => serializer.encode("uint8", 256), /uint8/);
+assert.throws(() => serializer.encode("bytes", null), /hexadecimal or Uint8Array/);
+assert.throws(() => serializer.encode("bytes", { length: 2 }), /hexadecimal or Uint8Array/);
 assert.throws(() => parseAsset("01.0000 VEX"), /Invalid asset/);
 assert.throws(() => serializer.decode("bool", Uint8Array.of(2)), /Invalid bool/);
 assert.throws(() => serializer.decode("uint64", new Uint8Array(7)), /Unexpected end/);

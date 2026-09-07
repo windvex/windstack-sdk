@@ -312,6 +312,11 @@ export class AccountClient {
     if (new Set(normalized).size !== normalized.length) {
       throw new TypeError("Producer voting cannot contain duplicate accounts");
     }
+    normalized.sort((left, right) => {
+      const a = nameToBigInt(left);
+      const b = nameToBigInt(right);
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
     return this.systemAction(
       "voteproducer",
       { voter: this.name, proxy: "", producers: normalized },

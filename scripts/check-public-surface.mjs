@@ -59,10 +59,17 @@ for (const directory of packageDirectories) {
     `${manifest.name} must define between 5 and 12 npm keywords`,
   );
   const normalized = manifest.keywords.map((keyword) => String(keyword).trim().toLowerCase());
-  assert.equal(new Set(normalized).size, normalized.length, `${manifest.name} has duplicate keywords`);
+  assert.equal(
+    new Set(normalized).size,
+    normalized.length,
+    `${manifest.name} has duplicate keywords`,
+  );
   assert.ok(normalized.includes("windstack"), `${manifest.name} keywords must include windstack`);
   for (const keyword of normalized) {
-    assert.ok(packageKeywordRules.some((pattern) => pattern.test(keyword)), `${manifest.name} has unsupported keyword ${keyword}`);
+    assert.ok(
+      packageKeywordRules.some((pattern) => pattern.test(keyword)),
+      `${manifest.name} has unsupported keyword ${keyword}`,
+    );
   }
 }
 
@@ -80,4 +87,6 @@ for (const heading of [
   assert.ok(readme.includes(heading), `README.md is missing ${heading}`);
 }
 
-console.log(`Public surface check passed for ${packageDirectories.length} packages and ${markdownFiles.length} Markdown files`);
+console.log(
+  `Public surface check passed for ${packageDirectories.length} packages and ${markdownFiles.length} Markdown files`,
+);

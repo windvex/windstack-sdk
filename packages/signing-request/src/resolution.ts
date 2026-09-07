@@ -20,7 +20,7 @@ import {
   SIGNING_REQUEST_PLACEHOLDER_PERMISSION,
   type SigningRequest,
 } from "./request.js";
-import { SIGNING_REQUEST_ABI } from "./schema.js";
+import { SIGNING_REQUEST_ABI, SIGNING_REQUEST_ABI_V2 } from "./schema.js";
 import type {
   ResolvedSigningRequest,
   SigningRequestAbiProvider,
@@ -34,6 +34,7 @@ import type {
 } from "./types.js";
 
 const requestSerializer = new AbiSerializer(SIGNING_REQUEST_ABI);
+const requestSerializerV2 = new AbiSerializer(SIGNING_REQUEST_ABI_V2);
 const MAX_PLACEHOLDER_DEPTH = 100;
 
 const STANDARD_CHAIN_ALIASES: Readonly<Record<number, string>> = Object.freeze({
@@ -204,7 +205,8 @@ function resolvePermissionLevel(
   return {
     actor: value.actor === SIGNING_REQUEST_PLACEHOLDER_ACTOR ? signer.actor : value.actor,
     permission:
-      value.permission === SIGNING_REQUEST_PLACEHOLDER_PERMISSION
+      value.permission === SIGNING_REQUEST_PLACEHOLDER_PERMISSION ||
+      value.permission === SIGNING_REQUEST_PLACEHOLDER_ACTOR
         ? signer.permission
         : value.permission,
   };
@@ -264,11 +266,14 @@ function toNativeTransaction(transaction: SigningRequestTransaction): Transactio
 }
 
 function createIdentityTransaction(
+  version: number,
   identity: SigningRequestIdentity,
   signer: SigningRequestPermissionLevel,
   tapos: SigningRequestTapos | undefined,
 ): SigningRequestTransaction {
-  if (!tapos) throw new TypeError("Identity proof resolution requires an expiration context");
+  if (version > 2 && !tapos) {
+    throw new TypeError("Revision 3 identity proof resolution requires an expiration context");
+  }
   if (
     identity.permission &&
     (identity.permission.actor !== signer.actor ||
@@ -278,14 +283,17 @@ function createIdentityTransaction(
       "Selected signer does not match the permission requested by the identity request",
     );
   }
-  const data = bytesToHex(
-    requestSerializer.encode("identity", {
-      scope: identity.scope,
-      permission: signer,
-    }),
-  );
+  const serializer = version === 2 ? requestSerializerV2 : requestSerializer;
+  const identityValue =
+    version === 2
+      ? { permission: signer }
+      : {
+          scope: validateName(identity.scope ?? "", "Identity scope"),
+          permission: signer,
+        };
+  const data = bytesToHex(serializer.encode("identity", identityValue));
   return {
-    expiration: tapos.expiration,
+    expiration: version === 2 ? "1970-01-01T00:00:00" : tapos!.expiration,
     ref_block_num: 0,
     ref_block_prefix: 0,
     max_net_usage_words: 0,
@@ -318,7 +326,7 @@ export async function resolveSigningRequest(
   let transaction: SigningRequestTransaction;
 
   if (payload.type === "identity") {
-    transaction = createIdentityTransaction(payload.value, signer, options.tapos);
+    transaction = createIdentityTransaction(request.version, payload.value, signer, options.tapos);
   } else if (payload.type === "action" || payload.type === "action[]") {
     const actions = payload.type === "action" ? [payload.value] : payload.value;
     transaction = {

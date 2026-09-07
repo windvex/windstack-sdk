@@ -66,13 +66,7 @@ try {
     manifests.push(manifest);
     run(
       "npm",
-      [
-        "pack",
-        "--workspace",
-        manifest.name,
-        "--pack-destination",
-        tarballsDirectory,
-      ],
+      ["pack", "--workspace", manifest.name, "--pack-destination", tarballsDirectory],
       root,
     );
     await access(path.join(tarballsDirectory, tarballFilename(manifest.name, manifest.version)));
@@ -104,7 +98,11 @@ try {
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const packageNames = ${JSON.stringify(manifests.map((manifest) => manifest.name), null, 2)};
+const packageNames = ${JSON.stringify(
+    manifests.map((manifest) => manifest.name),
+    null,
+    2,
+  )};
 
 for (const name of packageNames) {
   const module = await import(name);

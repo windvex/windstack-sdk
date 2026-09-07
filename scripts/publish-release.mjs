@@ -147,15 +147,7 @@ for (const { manifest } of releaseEntries) {
   }
 
   console.log(`Publishing ${name}@${version}...`);
-  run("npm", [
-    "publish",
-    "--workspace",
-    name,
-    "--access",
-    "public",
-    "--registry",
-    registry,
-  ]);
+  run("npm", ["publish", "--workspace", name, "--access", "public", "--registry", registry]);
   await waitForPublishedVersion(name, version);
 }
 

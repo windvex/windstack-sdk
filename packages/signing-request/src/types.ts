@@ -48,7 +48,8 @@ export type SigningRequestTransactionInput = Omit<
 };
 
 export type SigningRequestIdentity = {
-  scope: string;
+  /** Revision 3 scope. Revision 2 identity requests do not carry this field. */
+  scope?: string;
   permission?: SigningRequestPermissionLevel | null;
 };
 

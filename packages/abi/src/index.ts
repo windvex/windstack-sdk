@@ -789,11 +789,14 @@ export class AbiSerializer {
         writer.writeString(value);
         return;
       case "bytes":
-        writer.writeVarBytes(
-          typeof value === "string"
-            ? hexToBytes(value)
-            : assertHexBytes(value, (value as Uint8Array).length, type),
-        );
+        if (typeof value === "string") {
+          writer.writeVarBytes(hexToBytes(value));
+          return;
+        }
+        if (!(value instanceof Uint8Array)) {
+          throw new TypeError("bytes expects hexadecimal or Uint8Array");
+        }
+        writer.writeVarBytes(value);
         return;
       case "checksum160":
         writer.writeBytes(assertHexBytes(value, 20, type));

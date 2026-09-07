@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { AbiSerializer, hexToBytes } from "../packages/abi/dist/index.js";
+import { AbiSerializer, hexToBytes, nameToBigInt } from "../packages/abi/dist/index.js";
 import { AccountClient } from "../packages/account/dist/index.js";
 import { AbiCache, Contract, ContractKit } from "../packages/contract/dist/index.js";
 import { PrivateKey } from "../packages/crypto/dist/index.js";
@@ -127,6 +127,16 @@ for (const action of actions) {
 assert.equal(actions[1].name, "delegatebw");
 assert.equal(actions[8].name, "sellram");
 assert.equal(actions[14].name, "regproxy");
+
+const unorderedProducers = ["bob", "alice"];
+const sortedVote = await account.voteProducers(unorderedProducers);
+const decodedVote = systemSerializer.decodeAction("voteproducer", hexToBytes(sortedVote.data));
+const expectedProducerOrder = [...unorderedProducers].sort((left, right) => {
+  const a = nameToBigInt(left);
+  const b = nameToBigInt(right);
+  return a < b ? -1 : a > b ? 1 : 0;
+});
+assert.deepEqual(decodedVote.producers, expectedProducerOrder);
 
 assert.throws(() => account.voteProducers(["alice", "alice"]), /duplicate/);
 assert.throws(
