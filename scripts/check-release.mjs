@@ -262,7 +262,11 @@ for (const file of markdownFiles) {
 }
 
 const lock = await readJson("package-lock.json");
-assert.equal(lock.version, rootPackage.version, "package-lock root version must match package.json");
+assert.equal(
+  lock.version,
+  rootPackage.version,
+  "package-lock root version must match package.json",
+);
 assert.equal(
   lock.packages?.[""]?.version,
   rootPackage.version,
