@@ -37,13 +37,11 @@
     "wisp-wallet",
     "provider",
     "wallet",
-    "dapp",
     "antelope",
     "vsr",
-    "typescript",
     "esr",
     "signing-request",
-    "vexanium-provider"
+    "typescript"
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
