@@ -1,0 +1,53 @@
+{
+  "name": "@windstack/signing-request",
+  "version": "1.0.0",
+  "description": "Portable Vexanium and Antelope signing requests with action, transaction, identity, callback, and protocol interoperability support.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@windstack/abi": "1.0.0",
+    "@windstack/antelope": "1.0.0",
+    "@windstack/crypto": "1.0.0",
+    "@windstack/rpc": "1.0.0",
+    "pako": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/pako": "^2.0.4"
+  },
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Gilang Ramadan",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/windvex/windstack-sdk.git",
+    "directory": "packages/signing-request"
+  },
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/signing-request#readme",
+  "bugs": {
+    "url": "https://github.com/windvex/windstack-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}
