@@ -4,7 +4,7 @@
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
  */
-import { RpcClient } from "@windstack/rpc";
+import { RpcClient, type FetchLike } from "@windstack/rpc";
 import {
   RpcSigningRequestAbiProvider,
   SigningRequest,
@@ -22,8 +22,16 @@ import type {
   VexSigningRequestZlibProvider,
 } from "./types.js";
 
+const runtimeFetch: FetchLike = (input, init) => {
+  const fetchImplementation = globalThis.fetch;
+  if (typeof fetchImplementation !== "function") {
+    throw new TypeError("A fetch implementation is required to resolve Vexanium contract ABIs");
+  }
+  return fetchImplementation(input, init);
+};
+
 const defaultAbiProvider = new RpcSigningRequestAbiProvider(
-  new RpcClient({ endpoints: vexNative.rpcUrl }),
+  new RpcClient({ endpoints: vexNative.rpcUrl, fetch: runtimeFetch }),
 );
 
 function compressionProvider(zlib?: VexSigningRequestZlibProvider): CompressionProvider {
