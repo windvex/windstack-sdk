@@ -28,15 +28,13 @@
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "windcrypto",
-    "wind-crypto",
+    "vexanium",
+    "vex-evm",
     "wisp-wallet",
-    "wisp",
     "evm",
     "eip-1193",
     "eip-6963",
-    "ethereum",
-    "web3"
+    "typescript"
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
