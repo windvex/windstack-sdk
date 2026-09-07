@@ -42,8 +42,8 @@ jobs:
         run: npm run build
       - name: Run regression tests
         run: npm test
-      - name: Check native package tarballs
-        run: npm run pack:native
+      - name: Check all package tarballs
+        run: npm run pack:dry-run
       - name: Audit all dependencies
         run: npm audit
       - name: Audit native production dependencies
