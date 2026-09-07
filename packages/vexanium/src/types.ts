@@ -1,3 +1,9 @@
+/**
+ * WindStack Antelope SDK
+ * Created by Gilang Ramadan
+ * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+ * SPDX-License-Identifier: MIT
+ */
 import type {
   DappMetadata,
   DappMetadataInput,
@@ -9,7 +15,8 @@ import type {
 import type {
   SigningRequestCreateArguments,
   SigningRequestEncodingOptions,
-} from "@wharfkit/signing-request";
+  SigningRequestParseOptions,
+} from "@windstack/signing-request";
 import { VEXANIUM_CAPABILITIES, VEXANIUM_PROVIDER_STANDARD } from "./constants.js";
 
 export type VexaniumFullChainId = string;
@@ -163,18 +170,27 @@ export type VexaniumClientOptions = {
 };
 
 export type CanonicalSigningRequestUri = `vsr:${string}`;
-/** VSR is canonical; ESR is accepted for Antelope interoperability. */
+/** VSR is canonical; ESR is accepted for Antelope protocol interoperability. */
 export type VexSigningRequestUri = string;
 
-export type VexSigningRequestCreateInput = SigningRequestCreateArguments;
-export type VexSigningRequestCreateOptions = SigningRequestEncodingOptions & {
-  compress?: boolean;
-  slashes?: boolean;
+export type VexSigningRequestZlibProvider = {
+  deflateRaw(data: Uint8Array): Uint8Array;
+  inflateRaw(data: Uint8Array): Uint8Array;
 };
-export type VexSigningRequestParseOptions = Pick<
+
+export type VexSigningRequestCreateInput = SigningRequestCreateArguments;
+export type VexSigningRequestCreateOptions = Omit<
   SigningRequestEncodingOptions,
-  "abiProvider" | "zlib"
->;
+  "scheme" | "compressionProvider"
+> & {
+  zlib?: VexSigningRequestZlibProvider;
+};
+export type VexSigningRequestParseOptions = Omit<
+  SigningRequestParseOptions,
+  "compressionProvider"
+> & {
+  zlib?: VexSigningRequestZlibProvider;
+};
 
 /** Portable Vexanium Signing Request parameters for QR/deep-link/external wallet flows. */
 export type VexSigningRequestParams = DappRequestMetadataParams & {
