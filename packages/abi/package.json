@@ -25,6 +25,15 @@
     "@windstack/crypto": "1.0.0"
   },
   "sideEffects": false,
+  "keywords": [
+    "windstack",
+    "vexanium",
+    "antelope",
+    "abi",
+    "serialization",
+    "binary",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "Gilang Ramadan",
   "repository": {
