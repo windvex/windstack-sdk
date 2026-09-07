@@ -107,6 +107,45 @@ function sortForPublish(entries) {
   return ordered;
 }
 
+async function resolveNpmToken() {
+  const environmentToken = process.env.NPM_TOKEN?.trim();
+  if (environmentToken) return environmentToken;
+
+  const userconfig = execFileSync("npm", ["config", "get", "userconfig"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  if (!userconfig) throw new Error("Unable to resolve npm user configuration");
+
+  const npmrc = await readFile(userconfig, "utf8");
+  const match = npmrc.match(/^\/\/registry\.npmjs\.org\/:_authToken=(.+)$/m);
+  if (!match) throw new Error("npm registry token is not configured");
+
+  let token = match[1].trim();
+  const variable = token.match(/^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/);
+  if (variable) token = process.env[variable[1]]?.trim() ?? "";
+  if (!token) throw new Error("npm registry token resolved to an empty value");
+  return token;
+}
+
+async function verifyRegistryAuthentication() {
+  const token = await resolveNpmToken();
+  let response;
+  try {
+    response = await fetch(new URL("-/whoami", registry), {
+      headers: { authorization: `Bearer ${token}` },
+      redirect: "error",
+    });
+  } catch (error) {
+    throw new Error(`Unable to reach npm registry authentication endpoint: ${error.message}`);
+  }
+
+  if (response.status !== 200) {
+    throw new Error(`npm registry authentication failed with HTTP ${response.status}`);
+  }
+  console.log("npm registry authentication accepted.");
+}
+
 function publishedVersion(name, version) {
   const result = run(
     "npm",
@@ -136,7 +175,7 @@ console.log(
   `WindStack publish order:\n${releaseEntries.map(({ manifest }) => `- ${manifest.name}@${manifest.version}`).join("\n")}`,
 );
 
-run("npm", ["whoami"]);
+await verifyRegistryAuthentication();
 run("npm", ["run", "release:dry-run"]);
 
 for (const { manifest } of releaseEntries) {
