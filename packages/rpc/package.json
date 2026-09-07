@@ -22,6 +22,15 @@
     "prepack": "npm run build"
   },
   "sideEffects": false,
+  "keywords": [
+    "windstack",
+    "vexanium",
+    "antelope",
+    "rpc",
+    "nodeos",
+    "fetch",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "Gilang Ramadan",
   "repository": {
