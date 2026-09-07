@@ -1,28 +1,27 @@
-# WindCrypto WharfKit Migration Inventory
+# WindStack Consumer Migration Guide
 
 ## Overview
 
-The inventory below records active source trees discovered under `/root/windcrypto`. Backups, recovery extracts, generated output, lockfiles, logs, and documentation-only references are excluded from migration decisions.
+This guide tracks known WindCrypto applications that can move to WindStack SDK 1.0.0. It separates SDK-level capabilities from application-specific work so migrations can be completed without broad search-and-replace changes.
 
-| Repository | Representative files | Current API | WindStack replacement | Risk | Status |
-| --- | --- | --- | --- | --- | --- |
-| `windstack-sdk` | `packages/vexanium/src/{accounts,asset,client,validation}.ts` | Antelope names, assets, signatures and checksums | `@windstack/abi`, `@windstack/crypto` and local value helpers | Low | Migrated and tested |
-| `windstack-sdk` | `packages/wallet-plugin-wisp/src/WispWalletPlugin.ts` | WharfKit SessionKit plugin | `@windstack/session` `WalletPlugin` and `Signer` | Medium | Migrated and tested |
-| `windstack-sdk` | `packages/vexanium/src/signing-request.ts` | SigningRequest encode, parse and compression | Existing compatibility adapter | High | Retained; native protocol replacement is not yet justified |
-| `wisp-wallet` | `src/modules/dapp/services/{antelopeDappService,antelopeSigningRequestShared,serializedVexTransactionDecoder}.ts`, `apps/extension/src/background/signing/*` | SigningRequest, identity proof, ABI cache, transaction decode/sign | Native ABI/crypto/RPC plus a future complete signing-request module | High | Pending signing-request and identity-proof parity |
-| `wisp-wallet-telegram` | `src/modules/dapp/services/{antelopeDappService,antelopeSigningRequestShared,serializedVexTransactionDecoder}.ts` | SigningRequest, identity proof, ABI cache, transaction decode/sign | Native ABI/crypto/RPC plus a future complete signing-request module | High | Pending signing-request and identity-proof parity |
-| `explorer-wind` | `src/features/wallet/context/WindWalletContext.tsx`, `src/features/msig/proposalModel.ts`, `src/lib/{publicKey,windAbiProvider,windVsr}.ts` | SessionKit, packed transactions, ABI and VSR | `@windstack/session`, `@windstack/contract`, `@windstack/crypto`; VSR remains at compatibility boundary | High | Pending controlled application migration |
-| `wind-swap-v2` | `src/lib/{actions,signing}.ts`, `src/features/wallet/WindWalletProvider.tsx` | APIClient, ABI cache and action types | `@windstack/rpc`, `@windstack/contract`, `@windstack/session` | Medium | Pending repository test baseline |
-| `wisp-tip-bot/server` | `src/antelope/{rpc,signer,tip-contract.gateway,tip-contract.reader}.ts`, `src/app/create-app.ts` | API client, ContractKit, serializer and transaction signing | `@windstack/rpc`, `@windstack/contract`, `@windstack/crypto`, `@windstack/antelope` | Medium | Pending contract-specific migration and tests |
-| `wind-realms` | `server/src/{auth/auth.service,game/vex-chain.client}.ts`, `src/auth/AuthProvider.tsx` | Key verification, API client, serialization and transactions | `@windstack/crypto`, `@windstack/abi`, `@windstack/rpc`, `@windstack/antelope` | Medium | Pending coordinated client/server migration |
-| `wisp-backend` | `src/services/{rewards,partnerCampaignRewardsAdapter,vexAccountCreation}.service.js` | Keys, signatures, checksums and account transactions | `@windstack/crypto`, `@windstack/account`, `@windstack/antelope` | Medium | Pending transaction API adaptation |
-| `wind-wallet-web-vue` | `src/js/{nodes,wallet,chain-state}.js`, transaction and REX pages | APIClient, ContractKit, AccountKit-style resources, values and VSR | Native seven-package stack; VSR stays at compatibility boundary | High | Pending staged wallet migration |
-| `wallet/wind-wallet-web-vue` | Same wallet modules and pages in the maintained fork | APIClient, ContractKit, value types and VSR | Native seven-package stack; VSR stays at compatibility boundary | High | Pending fork ownership decision |
-| `wallet/wind-wallet-react-heroui-tanstack-fork-v3-flow-aligned` | `src/features/{chain,transactions,wallet}` | ABI cache, API client, keys, values and transactions | Native seven-package stack | Medium | Pending application completion and tests |
-| `wisp-dapp-examples` | `react-vite/src/lib/wispNative.ts`, `vue-vite/src/lib/wispNative.ts` | APIClient and ABI cache | `@windstack/rpc` and `@windstack/contract` | Low | Pending release-consumer installation test |
-| `evm-miner-vexanium-src` and `contracts/vex-evm-wind/miner` | `src/miner.ts` | Session, private-key wallet and resource helpers | `PrivateKeySigner`, `AntelopeClient`; specialized PowerUp/resource logic stays application-side | High | Pending operational transaction fixtures |
+| Repository | Main requirement | WindStack replacement | Status |
+| --- | --- | --- | --- |
+| `windstack-sdk` | Vexanium values, signing requests and wallet sessions | Native WindStack packages | Migrated and tested |
+| `wisp-wallet` | VSR/ESR, identity flow, ABI resolution and transaction signing | `@windstack/signing-request`, `@windstack/contract`, `@windstack/antelope`, `@windstack/session` | SDK requirements complete; application migration ready after 1.0.0 publish |
+| `wisp-wallet-telegram` | VSR/ESR, identity flow, ABI resolution and transaction signing | `@windstack/signing-request`, `@windstack/contract`, `@windstack/antelope`, `@windstack/session` | SDK requirements complete; application migration ready after 1.0.0 publish |
+| `explorer-wind` | Wallet session, VSR, ABI and packed transaction handling | `@windstack/session`, `@windstack/signing-request`, `@windstack/contract`, `@windstack/crypto` | Ready for controlled migration; packed transaction convenience remains application-specific |
+| `wind-swap-v2` | RPC, ABI cache, actions and wallet sessions | `@windstack/rpc`, `@windstack/contract`, `@windstack/session` | Ready after 1.0.0 package installation and repository regression tests |
+| `wisp-tip-bot/server` | RPC, contract access, serialization and signing | `@windstack/rpc`, `@windstack/contract`, `@windstack/crypto`, `@windstack/antelope` | Ready after contract-specific regression tests |
+| `wind-realms` | Authentication signatures and chain transactions | `@windstack/crypto`, `@windstack/abi`, `@windstack/rpc`, `@windstack/antelope` | Ready for coordinated client/server migration |
+| `wisp-backend` | Rewards, account creation and signed transactions | `@windstack/crypto`, `@windstack/account`, `@windstack/antelope` | Ready for transaction API adaptation |
+| `wind-wallet-web-vue` | RPC, contracts, account resources, VSR and REX/resource flows | WindStack 1.0 packages | SDK core is ready; REX/PowerUp application flows require repository-local validation |
+| Maintained wallet forks | Wallet provider, values, VSR and transaction flows | WindStack 1.0 packages | Migrate only maintained source trees after ownership is confirmed |
+| `wisp-dapp-examples` | RPC and ABI cache | `@windstack/rpc`, `@windstack/contract` | Ready after 1.0.0 package installation |
+| Vexanium EVM miner services | Private signer and resource operations | `PrivateKeySigner`, `AntelopeClient`, account helpers | Core SDK ready; specialized operational logic remains application-specific |
 
-Direct replacement is intentionally deferred where an application depends on SigningRequest resolution, identity proofs, packed-transaction models, REX/resource abstractions, or application-specific transaction composition that the 1.0 public API does not claim to emulate. Those migrations require repository-local tests and must not be performed as a global import rewrite.
+The WindStack 1.0.0 package set now covers the recurring SDK-level requirements discovered during the consumer audit, including native VSR/ESR processing and wallet sessions. Remaining work belongs to application integration, regression testing, UI approval flows, or specialized transaction composition rather than missing core SDK primitives.
+
+Migration should be performed one repository at a time. Each consumer should update dependencies, migrate imports and public API usage, then pass its own typecheck, tests and production build before the previous dependency path is removed.
 
 ## License
 
