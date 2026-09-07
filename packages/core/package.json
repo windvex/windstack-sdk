@@ -1,7 +1,7 @@
 {
   "name": "@windstack/core",
-  "version": "0.6.2",
-  "description": "Shared provider primitives for Wind Stack SDK packages.",
+  "version": "1.0.0",
+  "description": "Shared provider primitives for WindStack SDK packages.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -50,6 +50,6 @@
     "registry": "https://registry.npmjs.org/"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19.0"
   }
 }
