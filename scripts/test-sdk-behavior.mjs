@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { Asset, Name } from "@wharfkit/antelope";
 import { resolveDappMetadata } from "../packages/core/dist/index.js";
 import {
   createEVMClient,
@@ -129,8 +128,8 @@ await evmClient.switchChain("0x1a50");
 
 assert.equal(parseAsset("-1.2345 VEX").amount, -12345n);
 assert.equal(formatAsset(-12345n, 4, "VEX"), "-1.2345 VEX");
-assert.equal(parseAsset("-1.2345 VEX").value, Asset.from("-1.2345 VEX").toString());
-assert.equal(Name.from(parsePermissionLevel("windstack").actor).toString(), "windstack");
+assert.equal(parseAsset("-1.2345 VEX").value, "-1.2345 VEX");
+assert.equal(parsePermissionLevel("windstack").actor, "windstack");
 assert.throws(() => parseAsset("01.00 VEX"));
 assert.deepEqual(parsePermissionLevel("windstack"), {
   actor: "windstack",
