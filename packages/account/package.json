@@ -27,6 +27,17 @@
     "@windstack/rpc": "1.0.0"
   },
   "sideEffects": false,
+  "keywords": [
+    "windstack",
+    "vexanium",
+    "antelope",
+    "vex",
+    "account",
+    "staking",
+    "ram",
+    "voting",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "Gilang Ramadan",
   "repository": {
