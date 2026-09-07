@@ -26,6 +26,16 @@
     "@noble/hashes": "^2.4.0"
   },
   "sideEffects": false,
+  "keywords": [
+    "windstack",
+    "vexanium",
+    "antelope",
+    "cryptography",
+    "secp256k1",
+    "p256",
+    "signatures",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "Gilang Ramadan",
   "repository": {
