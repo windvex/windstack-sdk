@@ -255,7 +255,7 @@ function emitClientEvent<TEvent extends keyof VexaniumClientEventMap>(
 export async function createVexaniumClient(
   options: VexaniumClientOptions = {},
 ): Promise<VexaniumClient> {
-  let provider: VexaniumProvider | null =
+  const provider: VexaniumProvider | null =
     options.provider ??
     (await getVexaniumProvider({
       timeoutMs: options.discoveryTimeoutMs,

@@ -17,7 +17,7 @@ import type {
   SigningRequestEncodingOptions,
   SigningRequestParseOptions,
 } from "@windstack/signing-request";
-import { VEXANIUM_CAPABILITIES, VEXANIUM_PROVIDER_STANDARD } from "./constants.js";
+import type { VEXANIUM_CAPABILITIES, VEXANIUM_PROVIDER_STANDARD } from "./constants.js";
 
 export type VexaniumFullChainId = string;
 export type VexaniumCaip2ChainId = `antelope:${string}`;

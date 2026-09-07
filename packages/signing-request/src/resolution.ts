@@ -14,7 +14,7 @@ import {
   type AbiVariant,
 } from "@windstack/abi";
 import { serializeTransaction, transactionDigest, type Transaction } from "@windstack/antelope";
-import { RpcClient } from "@windstack/rpc";
+import type { RpcClient } from "@windstack/rpc";
 import {
   SIGNING_REQUEST_PLACEHOLDER_ACTOR,
   SIGNING_REQUEST_PLACEHOLDER_PERMISSION,

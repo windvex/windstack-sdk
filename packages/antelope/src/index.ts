@@ -8,7 +8,7 @@ import { AccountClient, type AccountClientOptions } from "@windstack/account";
 import { BinaryWriter, bytesToHex, hexToBytes } from "@windstack/abi";
 import { AbiCache, Contract, type ContractAction } from "@windstack/contract";
 import {
-  PrivateKey,
+  type PrivateKey,
   PublicKey,
   Signature,
   concatBytes,

@@ -5,7 +5,13 @@
  * SPDX-License-Identifier: MIT
  */
 import { AbiSerializer, bytesToHex, hexToBytes, nameToBigInt } from "@windstack/abi";
-import { PrivateKey, PublicKey, Signature, concatBytes, sha256Digest } from "@windstack/crypto";
+import {
+  type PrivateKey,
+  type PublicKey,
+  Signature,
+  concatBytes,
+  sha256Digest,
+} from "@windstack/crypto";
 import { decodeBase64Url, encodeBase64Url } from "./base64url.js";
 import { pakoCompressionProvider, type CompressionProvider } from "./compression.js";
 import { SIGNING_REQUEST_ABI, SIGNING_REQUEST_ABI_V2 } from "./schema.js";

@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: MIT
  */
 import { AbiSerializer, bytesToHex, nameToBigInt, type Abi } from "@windstack/abi";
-import { RpcClient, type TableRowsRequest, type TableRowsResponse } from "@windstack/rpc";
+import type { RpcClient, TableRowsRequest, TableRowsResponse } from "@windstack/rpc";
 
 export type PermissionLevel = { actor: string; permission: string };
 export type ContractAction = {

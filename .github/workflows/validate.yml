@@ -30,6 +30,8 @@ jobs:
         run: npm ci
       - name: Check formatting
         run: npm run format:check
+      - name: Lint sources
+        run: npm run lint
       - name: Check release metadata
         run: npm run check:release
       - name: Check public package surface

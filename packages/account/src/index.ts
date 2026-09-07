@@ -7,7 +7,7 @@
 import { nameToBigInt } from "@windstack/abi";
 import { AbiCache, Contract, type ContractAction } from "@windstack/contract";
 import { PublicKey } from "@windstack/crypto";
-import { RpcClient } from "@windstack/rpc";
+import type { RpcClient } from "@windstack/rpc";
 
 export type AccountClientOptions = {
   tokenContract?: string;

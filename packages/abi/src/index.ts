@@ -620,12 +620,19 @@ export class AbiSerializer {
   #validateTypeReference(rawType: string, context: string): void {
     if (typeof rawType !== "string" || !rawType)
       throw new TypeError(`Missing ABI type for ${context}`);
-    if (rawType.endsWith("[]")) return this.#validateTypeReference(rawType.slice(0, -2), context);
+    if (rawType.endsWith("[]")) {
+      this.#validateTypeReference(rawType.slice(0, -2), context);
+      return;
+    }
     if (rawType.endsWith("?") || rawType.endsWith("$")) {
-      return this.#validateTypeReference(rawType.slice(0, -1), context);
+      this.#validateTypeReference(rawType.slice(0, -1), context);
+      return;
     }
     const type = this.resolveType(rawType);
-    if (type !== rawType) return this.#validateTypeReference(type, context);
+    if (type !== rawType) {
+      this.#validateTypeReference(type, context);
+      return;
+    }
     if (!PRIMITIVE_TYPES.has(type) && !this.#structs.has(type) && !this.#variants.has(type)) {
       throw new TypeError(`Unsupported ABI type ${type} referenced by ${context}`);
     }
