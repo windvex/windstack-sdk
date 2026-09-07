@@ -29,6 +29,8 @@ import type {
   ResolvedSigningRequest,
   SigningRequestAbiProvider,
   SigningRequestAction,
+  SigningRequestChain,
+  SigningRequestIdentity,
   SigningRequestPermissionLevel,
   SigningRequestResolveOptions,
   SigningRequestTapos,
@@ -61,15 +63,35 @@ function validateName(value: string, label: string): string {
 
 function validateChainId(value: string, label: string): string {
   const chainId = value.toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(chainId)) throw new TypeError(`${label} must be a 64-character chain id`);
+  if (!/^[0-9a-f]{64}$/.test(chainId)) {
+    throw new TypeError(`${label} must be a 64-character chain id`);
+  }
   return chainId;
+}
+
+function resolveSelector(
+  selector: SigningRequestChain,
+  aliasResolver?: (alias: number) => string | undefined,
+): string {
+  if (selector.type === "chain_id") {
+    return validateChainId(selector.value, "Signing-request chain id");
+  }
+  if (selector.value === 0) {
+    throw new TypeError("Chain alias 0 does not identify a concrete chain");
+  }
+  const resolved = aliasResolver?.(selector.value) ?? STANDARD_CHAIN_ALIASES[selector.value];
+  if (!resolved) throw new TypeError(`Unknown signing-request chain alias: ${selector.value}`);
+  return validateChainId(resolved, "Resolved chain id");
 }
 
 function resolveChainId(request: SigningRequest, options: SigningRequestResolveOptions): string {
   const selector = request.data.chainId;
   if (selector.type === "chain_id") {
-    const fixed = validateChainId(selector.value, "Request chain id");
-    if (options.selectedChainId && validateChainId(options.selectedChainId, "Selected chain id") !== fixed) {
+    const fixed = resolveSelector(selector, options.chainAliasResolver);
+    if (
+      options.selectedChainId &&
+      validateChainId(options.selectedChainId, "Selected chain id") !== fixed
+    ) {
       throw new TypeError("Selected chain does not match the signing request");
     }
     return fixed;
@@ -79,16 +101,25 @@ function resolveChainId(request: SigningRequest, options: SigningRequestResolveO
     if (!options.selectedChainId) {
       throw new TypeError("Multi-chain signing request requires selectedChainId");
     }
-    return validateChainId(options.selectedChainId, "Selected chain id");
+    const selected = validateChainId(options.selectedChainId, "Selected chain id");
+    const allowed = request.getAllowedChains();
+    if (allowed.length > 0) {
+      const allowedIds = allowed.map((chain) => resolveSelector(chain, options.chainAliasResolver));
+      if (!allowedIds.includes(selected)) {
+        throw new TypeError("Selected chain is not allowed by this multi-chain signing request");
+      }
+    }
+    return selected;
   }
 
-  const resolved = options.chainAliasResolver?.(selector.value) ?? STANDARD_CHAIN_ALIASES[selector.value];
-  if (!resolved) throw new TypeError(`Unknown signing-request chain alias: ${selector.value}`);
-  const chainId = validateChainId(resolved, "Resolved chain id");
-  if (options.selectedChainId && validateChainId(options.selectedChainId, "Selected chain id") !== chainId) {
+  const fixed = resolveSelector(selector, options.chainAliasResolver);
+  if (
+    options.selectedChainId &&
+    validateChainId(options.selectedChainId, "Selected chain id") !== fixed
+  ) {
     throw new TypeError("Selected chain does not match the signing request alias");
   }
-  return chainId;
+  return fixed;
 }
 
 class AbiPlaceholderResolver {
@@ -97,7 +128,7 @@ class AbiPlaceholderResolver {
   readonly #variants = new Map<string, AbiVariant>();
 
   constructor(
-    readonly abi: Abi,
+    abi: Abi,
     readonly actor: string,
     readonly permission: string,
   ) {
@@ -107,7 +138,9 @@ class AbiPlaceholderResolver {
   }
 
   replace(type: string, value: unknown, depth = 0): unknown {
-    if (depth > MAX_PLACEHOLDER_DEPTH) throw new RangeError("Signing-request placeholder nesting exceeds 100 levels");
+    if (depth > MAX_PLACEHOLDER_DEPTH) {
+      throw new RangeError("Signing-request placeholder nesting exceeds 100 levels");
+    }
     if (value === null || value === undefined) return value;
     if (type.endsWith("[]")) {
       if (!Array.isArray(value)) return value;
@@ -129,7 +162,9 @@ class AbiPlaceholderResolver {
       const output = { ...(value as Record<string, unknown>) };
       if (struct.base) {
         const base = this.replace(struct.base, output, depth + 1);
-        if (base && typeof base === "object" && !Array.isArray(base)) Object.assign(output, base);
+        if (base && typeof base === "object" && !Array.isArray(base)) {
+          Object.assign(output, base);
+        }
       }
       for (const field of struct.fields) {
         output[field.name] = this.replace(field.type, output[field.name], depth + 1);
@@ -145,7 +180,10 @@ class AbiPlaceholderResolver {
       }
       const record = value as { type?: unknown; value?: unknown };
       if (typeof record.type === "string") {
-        return { type: record.type, value: this.replace(record.type, record.value, depth + 1) };
+        return {
+          type: record.type,
+          value: this.replace(record.type, record.value, depth + 1),
+        };
       }
     }
     return value;
@@ -204,7 +242,11 @@ function hasNullHeader(transaction: SigningRequestTransaction): boolean {
       ? transaction.expiration
       : `${transaction.expiration}Z`,
   );
-  return expiration === 0 && transaction.ref_block_num === 0 && transaction.ref_block_prefix === 0;
+  return (
+    expiration === 0 &&
+    transaction.ref_block_num === 0 &&
+    transaction.ref_block_prefix === 0
+  );
 }
 
 function applyTapos(
@@ -230,18 +272,18 @@ function toNativeTransaction(transaction: SigningRequestTransaction): Transactio
 }
 
 function createIdentityTransaction(
-  request: SigningRequest,
+  identity: SigningRequestIdentity,
   signer: SigningRequestPermissionLevel,
   tapos: SigningRequestTapos | undefined,
 ): SigningRequestTransaction {
-  if (request.data.request.type !== "identity") throw new TypeError("Request is not an identity request");
   if (!tapos) throw new TypeError("Identity proof resolution requires an expiration context");
-  const identity = request.data.request.value;
   if (
     identity.permission &&
     (identity.permission.actor !== signer.actor || identity.permission.permission !== signer.permission)
   ) {
-    throw new TypeError("Selected signer does not match the permission requested by the identity request");
+    throw new TypeError(
+      "Selected signer does not match the permission requested by the identity request",
+    );
   }
   const data = bytesToHex(
     requestSerializer.encode("identity", {
@@ -278,30 +320,14 @@ export async function resolveSigningRequest(
     permission: validateName(options.permission, "Signer permission"),
   };
   const chainId = resolveChainId(request, options);
+  const requestData = request.getData();
+  const payload = requestData.request;
   let transaction: SigningRequestTransaction;
 
-  if (request.data.request.type === "identity") {
-    transaction = createIdentityTransaction(request, signer, options.tapos);
-  } else if (request.data.request.type === "action") {
-    transaction = {
-      expiration: "1970-01-01T00:00:00",
-      ref_block_num: 0,
-      ref_block_prefix: 0,
-      max_net_usage_words: 0,
-      max_cpu_usage_ms: 0,
-      delay_sec: 0,
-      context_free_actions: [],
-      actions: [
-        await resolveAction(
-          request.data.request.value,
-          signer,
-          options.abiProvider,
-          options.signal,
-        ),
-      ],
-      transaction_extensions: [],
-    };
-  } else if (request.data.request.type === "action[]") {
+  if (payload.type === "identity") {
+    transaction = createIdentityTransaction(payload.value, signer, options.tapos);
+  } else if (payload.type === "action" || payload.type === "action[]") {
+    const actions = payload.type === "action" ? [payload.value] : payload.value;
     transaction = {
       expiration: "1970-01-01T00:00:00",
       ref_block_num: 0,
@@ -311,14 +337,14 @@ export async function resolveSigningRequest(
       delay_sec: 0,
       context_free_actions: [],
       actions: await Promise.all(
-        request.data.request.value.map((action) =>
+        actions.map((action) =>
           resolveAction(action, signer, options.abiProvider, options.signal),
         ),
       ),
       transaction_extensions: [],
     };
   } else {
-    const source = request.data.request.value;
+    const source = payload.value;
     transaction = {
       ...source,
       context_free_actions: await Promise.all(
@@ -336,24 +362,26 @@ export async function resolveSigningRequest(
   }
 
   if (!request.isIdentity && hasNullHeader(transaction)) {
-    if (!options.tapos) throw new TypeError("Signing request with a null transaction header requires TAPOS");
+    if (!options.tapos) {
+      throw new TypeError("Signing request with a null transaction header requires TAPOS");
+    }
     transaction = applyTapos(transaction, options.tapos);
   }
 
   const serializedTransaction = serializeTransaction(toNativeTransaction(transaction));
   const digest = transactionDigest(chainId, serializedTransaction);
-  const requestUri = request.sourceUri ?? request.encode(false, false, "esr");
   return {
     chainId,
     signer,
     transaction,
     serializedTransaction,
     digest,
-    request: requestUri,
+    request: request.sourceUri ?? request.encode(false, false, "esr"),
     broadcast: request.isBroadcast,
     background: request.isBackground,
-    callback: request.data.callback,
+    callback: requestData.callback,
     isIdentity: request.isIdentity,
+    referenceBlockId: options.tapos?.refBlockId,
   };
 }
 
@@ -364,20 +392,37 @@ function blockPrefix(blockId: string): number {
 }
 
 function timestampSeconds(value: string): number {
-  const milliseconds = Date.parse(/(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`);
+  const milliseconds = Date.parse(
+    /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`,
+  );
   if (!Number.isFinite(milliseconds)) throw new TypeError(`Invalid chain timestamp: ${value}`);
   return Math.floor(milliseconds / 1000);
 }
 
 export class RpcSigningRequestAbiProvider implements SigningRequestAbiProvider {
+  readonly #cache = new Map<string, Abi>();
+
   constructor(readonly rpc: RpcClient) {}
 
   async getAbi(account: string, signal?: AbortSignal): Promise<Abi> {
+    const cached = this.#cache.get(account);
+    if (cached) return cached;
     const result = await this.rpc.getAbi(account, signal);
     if (!result.abi || typeof result.abi !== "object") {
       throw new TypeError(`RPC returned no ABI for ${account}`);
     }
-    return result.abi as Abi;
+    const abi = result.abi as Abi;
+    new AbiSerializer(abi);
+    this.#cache.set(account, abi);
+    return abi;
+  }
+
+  delete(account: string): void {
+    this.#cache.delete(account);
+  }
+
+  clear(): void {
+    this.#cache.clear();
   }
 }
 
@@ -388,15 +433,25 @@ export async function resolveSigningRequestWithRpc(
     expireSeconds?: number;
   },
 ): Promise<ResolvedSigningRequest> {
-  const expireSeconds = args.expireSeconds ?? 120;
-  if (!Number.isInteger(expireSeconds) || expireSeconds < 1 || expireSeconds > 3600) {
+  const {
+    rpc,
+    expireSeconds: requestedExpireSeconds = 120,
+    ...resolveOptions
+  } = args;
+  if (
+    !Number.isInteger(requestedExpireSeconds) ||
+    requestedExpireSeconds < 1 ||
+    requestedExpireSeconds > 3600
+  ) {
     throw new RangeError("expireSeconds must be an integer between 1 and 3600");
   }
-  const info = await args.rpc.getInfo(args.signal);
+  const info = await rpc.getInfo(resolveOptions.signal);
   const chainId = validateChainId(info.chain_id, "RPC chain id");
-  const block = await args.rpc.getBlock(info.last_irreversible_block_num, args.signal);
+  const block = await rpc.getBlock(info.last_irreversible_block_num, resolveOptions.signal);
   const tapos: SigningRequestTapos = {
-    expiration: new Date((timestampSeconds(info.head_block_time) + expireSeconds) * 1000)
+    expiration: new Date(
+      (timestampSeconds(info.head_block_time) + requestedExpireSeconds) * 1000,
+    )
       .toISOString()
       .replace(/\.000Z$/, ""),
     refBlockNum: block.block_num,
@@ -407,7 +462,7 @@ export async function resolveSigningRequestWithRpc(
     refBlockId: block.id,
   };
   return resolveSigningRequest(request, {
-    ...args,
+    ...resolveOptions,
     selectedChainId: chainId,
     tapos,
   });
