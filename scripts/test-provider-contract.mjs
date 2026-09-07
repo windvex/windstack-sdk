@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { Bytes, Checksum256, PrivateKey, Serializer, Transaction } from "@wharfkit/antelope";
-import { SigningRequest } from "@wharfkit/signing-request";
+import { PrivateKey, sha256Digest } from "../packages/crypto/dist/index.js";
+import { createSigningRequest as createPortableSigningRequest } from "../packages/signing-request/dist/index.js";
 import {
   VEXANIUM_CAPABILITIES,
   VEXANIUM_ERROR_CODES,
@@ -17,22 +17,23 @@ import {
 const capabilities = Object.values(VEXANIUM_CAPABILITIES);
 const methods = Object.values(VEXANIUM_METHODS);
 const privateKey = PrivateKey.generate("K1");
-const signature = String(privateKey.signDigest(Checksum256.hash(Bytes.from("00"))));
-const transaction = Transaction.from({
-  expiration: "2026-07-14T12:00:00",
-  ref_block_num: 1,
-  ref_block_prefix: 2,
-  max_net_usage_words: 0,
-  max_cpu_usage_ms: 0,
-  delay_sec: 0,
-  context_free_actions: [],
-  actions: [],
-  transaction_extensions: [],
-});
-const portableRequest = SigningRequest.fromTransaction(
-  VEXANIUM_MAINNET_CHAIN_ID,
-  Serializer.encode({ object: transaction }).array,
-).encode(false, true);
+const signature = privateKey.signDigest(sha256Digest(Uint8Array.of(0))).toString();
+const portableRequest = (
+  await createPortableSigningRequest({
+    chainId: VEXANIUM_MAINNET_CHAIN_ID,
+    transaction: {
+      expiration: "2026-07-14T12:00:00",
+      ref_block_num: 1,
+      ref_block_prefix: 2,
+      max_net_usage_words: 0,
+      max_cpu_usage_ms: 0,
+      delay_sec: 0,
+      context_free_actions: [],
+      actions: [],
+      transaction_extensions: [],
+    },
+  })
+).encode(false, true, "esr");
 const account = {
   actor: "windstack",
   permission: "active",
@@ -103,7 +104,6 @@ function makeProvider(overrides = {}) {
   return { provider, calls };
 }
 
-// providerInfo is mandatory and brand-neutral.
 assert.equal(isVexaniumProvider({ request: async () => null }), false);
 const { provider, calls } = makeProvider();
 assert.equal(isVexaniumProvider(provider), true);
@@ -137,12 +137,11 @@ const signCall = calls.find((call) => call.method === VEXANIUM_METHODS.SIGN_TRAN
 assert.equal(signCall.params.sessionId, "wallet-session-v1");
 assert.equal(signCall.params.serializedTransaction, "000102ff");
 
-// WharfKit-compatible ESR input is validated and forwarded without rewriting it.
+// ESR interoperability input is validated and forwarded without rewriting it.
 await client.signSigningRequest({ request: portableRequest, broadcast: false });
 const requestCall = calls.find((call) => call.method === VEXANIUM_METHODS.SIGNING_REQUEST);
 assert.equal(requestCall.params.request, portableRequest);
 
-// Incompatible provider major versions fail negotiation deterministically.
 const { provider: incompatibleProvider } = makeProvider({
   providerInfo: { version: "2.0.0" },
 });
@@ -157,7 +156,6 @@ await assert.rejects(
     error.code === VEXANIUM_ERROR_CODES.INCOMPATIBLE_VERSION,
 );
 
-// Required unsupported capabilities use a standard error code.
 const limitedCapabilities = [VEXANIUM_CAPABILITIES.ACCOUNTS];
 const { provider: limitedProvider } = makeProvider({
   providerInfo: { capabilities: limitedCapabilities },
@@ -182,7 +180,6 @@ await assert.rejects(
     error.code === VEXANIUM_ERROR_CODES.UNSUPPORTED_CAPABILITY,
 );
 
-// Wallet errors keep their standard code through the SDK boundary.
 const { provider: rejectingProvider } = makeProvider({
   request({ method }) {
     if (method === VEXANIUM_METHODS.GET_CAPABILITIES) {
