@@ -4,11 +4,14 @@
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
  */
+import { RpcClient } from "@windstack/rpc";
 import {
+  RpcSigningRequestAbiProvider,
   SigningRequest,
   pakoCompressionProvider,
   type CompressionProvider,
 } from "@windstack/signing-request";
+import { vexNative } from "./chains.js";
 import { ESR_SCHEME, VSR_SCHEME } from "./constants.js";
 import type {
   CanonicalSigningRequestUri,
@@ -18,6 +21,10 @@ import type {
   VexSigningRequestUri,
   VexSigningRequestZlibProvider,
 } from "./types.js";
+
+const defaultAbiProvider = new RpcSigningRequestAbiProvider(
+  new RpcClient({ endpoints: vexNative.rpcUrl }),
+);
 
 function compressionProvider(zlib?: VexSigningRequestZlibProvider): CompressionProvider {
   if (!zlib) return pakoCompressionProvider;
@@ -48,7 +55,7 @@ export async function createSigningRequest(
   options: VexSigningRequestCreateOptions = {},
 ): Promise<CanonicalSigningRequestUri> {
   const request = await SigningRequest.create(args, {
-    abiProvider: options.abiProvider,
+    abiProvider: options.abiProvider ?? defaultAbiProvider,
     maxDecodedBytes: options.maxDecodedBytes,
     signal: options.signal,
   });
