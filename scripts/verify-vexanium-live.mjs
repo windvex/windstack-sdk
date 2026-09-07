@@ -13,7 +13,9 @@ const EXPECTED_ABI = {
 const scalarOne = Uint8Array.from({ length: 32 }, (_, index) => (index === 31 ? 1 : 0));
 const privateKey = PrivateKey.fromBytes("K1", scalarOne);
 const publicKey = privateKey.toPublicKey().toString();
-const signature = privateKey.signDigest(sha256Digest(new TextEncoder().encode("WindStack Vexanium ABI"))).toString();
+const signature = privateKey
+  .signDigest(sha256Digest(new TextEncoder().encode("WindStack Vexanium ABI")))
+  .toString();
 
 async function post(path, body = {}) {
   const response = await fetch(`${RPC}${path}`, {
@@ -24,7 +26,10 @@ async function post(path, body = {}) {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(`Vexanium RPC ${path} failed with HTTP ${response.status}`);
+    const detail = payload?.error?.what ?? payload?.message;
+    throw new Error(
+      `Vexanium RPC ${path} failed with HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
+    );
   }
   return payload;
 }
@@ -53,7 +58,9 @@ function structuralAbi(abi) {
 }
 
 function structuralHash(abi) {
-  return createHash("sha256").update(stableStringify(structuralAbi(abi))).digest("hex");
+  return createHash("sha256")
+    .update(stableStringify(structuralAbi(abi)))
+    .digest("hex");
 }
 
 function makeSampler(abi) {
@@ -78,7 +85,8 @@ function makeSampler(abi) {
     if (rawType.endsWith("$")) return undefined;
 
     const type = resolve(rawType);
-    if (stack.includes(type)) throw new Error(`Recursive ABI type cannot be sampled: ${[...stack, type].join(" -> ")}`);
+    if (stack.includes(type))
+      throw new Error(`Recursive ABI type cannot be sampled: ${[...stack, type].join(" -> ")}`);
 
     const struct = structs.get(type);
     if (struct) {
@@ -161,7 +169,11 @@ function makeSampler(abi) {
 function validateAbi(contract, abi) {
   assert.ok(abi && typeof abi === "object", `${contract} returned no ABI`);
   assert.equal(abi.version, "eosio::abi/1.2", `${contract} ABI version changed`);
-  assert.equal(structuralHash(abi), EXPECTED_ABI[contract], `${contract} ABI changed since release audit`);
+  assert.equal(
+    structuralHash(abi),
+    EXPECTED_ABI[contract],
+    `${contract} ABI changed since release audit`,
+  );
 
   const serializer = new AbiSerializer(abi);
   const sample = makeSampler(abi);
@@ -188,9 +200,105 @@ const system = await post("/v1/chain/get_abi", { account_name: "vexcore" });
 validateAbi("vex.token", token.abi);
 validateAbi("vexcore", system.abi);
 
+const block = await post("/v1/chain/get_block", {
+  block_num_or_id: info.last_irreversible_block_num,
+});
+assert.equal(block.block_num, info.last_irreversible_block_num);
+assert.match(block.id, /^[0-9a-f]{64}$/i);
+
+const account = await post("/v1/chain/get_account", { account_name: "vexcore" });
+assert.equal(account.account_name, "vexcore");
+
+const rawAbi = await post("/v1/chain/get_raw_abi", { account_name: "vex.token" });
+assert.equal(rawAbi.account_name, "vex.token");
+assert.match(rawAbi.abi_hash, /^[0-9a-f]{64}$/i);
+
+const codeHash = await post("/v1/chain/get_code_hash", { account_name: "vex.token" });
+assert.equal(codeHash.account_name, "vex.token");
+assert.match(codeHash.code_hash, /^[0-9a-f]{64}$/i);
+
+const statRows = await post("/v1/chain/get_table_rows", {
+  json: true,
+  code: "vex.token",
+  scope: "VEX",
+  table: "stat",
+  limit: 1,
+});
+assert.match(statRows.rows[0]?.supply, / VEX$/);
+
+const scopes = await post("/v1/chain/get_table_by_scope", {
+  code: "vex.token",
+  table: "accounts",
+  limit: 1,
+});
+assert.ok(Array.isArray(scopes.rows));
+
+const balance = await post("/v1/chain/get_currency_balance", {
+  code: "vex.token",
+  account: "vexcore",
+  symbol: "VEX",
+});
+assert.ok(Array.isArray(balance));
+assert.ok(balance.every((value) => / VEX$/.test(value)));
+
+const stats = await post("/v1/chain/get_currency_stats", {
+  code: "vex.token",
+  symbol: "VEX",
+});
+assert.match(stats.VEX?.supply, / VEX$/);
+
+const expiration = new Date(`${info.head_block_time}Z`);
+expiration.setUTCSeconds(expiration.getUTCSeconds() + 60);
+const producers = await post("/v1/chain/get_table_rows", {
+  json: true,
+  code: "vexcore",
+  scope: "vexcore",
+  table: "producers",
+  limit: 1,
+});
+const actor = producers.rows[0]?.owner;
+assert.match(actor, /^[.1-5a-z]{1,12}$/);
+const actorAccount = await post("/v1/chain/get_account", { account_name: actor });
+const activePermission = actorAccount.permissions?.find(
+  (permission) => permission.perm_name === "active",
+);
+const activeKey = activePermission?.required_auth?.keys?.find(
+  (key) => key.weight >= activePermission.required_auth.threshold,
+)?.key;
+assert.equal(typeof activeKey, "string", `${actor} has no directly usable active key`);
+const transferData = new AbiSerializer(token.abi).encodeAction("transfer", {
+  from: actor,
+  to: actor,
+  quantity: "0.0001 VEX",
+  memo: "read-only required-key probe",
+});
+const requiredKeys = await post("/v1/chain/get_required_keys", {
+  transaction: {
+    expiration: expiration.toISOString().replace(/\.\d{3}Z$/, ""),
+    ref_block_num: block.block_num & 0xffff,
+    ref_block_prefix: block.ref_block_prefix,
+    max_net_usage_words: 0,
+    max_cpu_usage_ms: 0,
+    delay_sec: 0,
+    context_free_actions: [],
+    actions: [
+      {
+        account: "vex.token",
+        name: "transfer",
+        authorization: [{ actor, permission: "active" }],
+        data: Array.from(transferData, (byte) => byte.toString(16).padStart(2, "0")).join(""),
+      },
+    ],
+    transaction_extensions: [],
+  },
+  available_keys: [activeKey],
+});
+assert.deepEqual(requiredKeys.required_keys, [activeKey]);
+
 const tokenActions = new Set(token.abi.actions.map((item) => item.name));
 const tokenTables = new Set(token.abi.tables.map((item) => item.name));
-for (const name of ["transfer", "open", "close", "issue", "retire"]) assert.ok(tokenActions.has(name));
+for (const name of ["transfer", "open", "close", "issue", "retire"])
+  assert.ok(tokenActions.has(name));
 for (const name of ["accounts", "stat", "blacklist"]) assert.ok(tokenTables.has(name));
 
 const systemActions = new Set(system.abi.actions.map((item) => item.name));
@@ -213,10 +321,18 @@ for (const name of [
 ]) {
   assert.ok(systemActions.has(name), `vexcore is missing ${name}`);
 }
-for (const name of ["producers", "voters", "refunds", "userres", "delband", "rammarket", "instantund"]) {
+for (const name of [
+  "producers",
+  "voters",
+  "refunds",
+  "userres",
+  "delband",
+  "rammarket",
+  "instantund",
+]) {
   assert.ok(systemTables.has(name), `vexcore is missing table ${name}`);
 }
 
 console.log(
-  `Vexanium production ABI verified: ${token.abi.actions.length} vex.token actions, ${system.abi.actions.length} vexcore actions`,
+  `Vexanium read-only RPC and production ABI verified: ${token.abi.actions.length} vex.token actions, ${system.abi.actions.length} vexcore actions`,
 );

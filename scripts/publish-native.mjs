@@ -14,23 +14,43 @@ function run(command, args, options = {}) {
     stdio: options.capture ? "pipe" : "inherit",
   });
   if (result.status !== 0 && !options.allowFailure) {
-    throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}`);
+    throw new Error(
+      `${command} ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}`,
+    );
   }
   return result;
 }
 
 function requireCleanMain() {
-  const branch = execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
-  if (branch !== "main") throw new Error(`Release must run from main; current branch is ${branch || "detached"}`);
-  const status = execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim();
+  const branch = execFileSync("git", ["branch", "--show-current"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  if (branch !== "main")
+    throw new Error(`Release must run from main; current branch is ${branch || "detached"}`);
+  const status = execFileSync("git", ["status", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
   if (status) throw new Error("Release requires a clean working tree");
 }
 
 function publishedVersion(name, version) {
-  const result = run("npm", ["view", `${name}@${version}`, "version", "--json"], {
-    capture: true,
-    allowFailure: true,
-  });
+  const result = run(
+    "npm",
+    [
+      "view",
+      `${name}@${version}`,
+      "version",
+      "--json",
+      "--registry",
+      "https://registry.npmjs.org/",
+    ],
+    {
+      capture: true,
+      allowFailure: true,
+    },
+  );
   if (result.status === 0) {
     const parsed = JSON.parse(result.stdout || "null");
     return parsed === version;
@@ -45,7 +65,9 @@ run("npm", ["whoami"]);
 run("npm", ["run", "release:dry-run"]);
 
 for (const directory of packageDirectories) {
-  const manifest = JSON.parse(await readFile(path.join(root, "packages", directory, "package.json"), "utf8"));
+  const manifest = JSON.parse(
+    await readFile(path.join(root, "packages", directory, "package.json"), "utf8"),
+  );
   const { name, version } = manifest;
   if (publishedVersion(name, version)) {
     console.log(`${name}@${version} is already published; skipping.`);
@@ -53,7 +75,15 @@ for (const directory of packageDirectories) {
   }
 
   console.log(`Publishing ${name}@${version}...`);
-  run("npm", ["publish", "--workspace", name, "--access", "public"]);
+  run("npm", [
+    "publish",
+    "--workspace",
+    name,
+    "--access",
+    "public",
+    "--registry",
+    "https://registry.npmjs.org/",
+  ]);
 
   let verified = false;
   for (let attempt = 0; attempt < 6; attempt += 1) {
