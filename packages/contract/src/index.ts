@@ -15,10 +15,30 @@ export type ContractAction = {
   data: string;
 };
 export type AuthorizationInput = PermissionLevel | `${string}@${string}`;
+export type TableScope = string | number | bigint;
 
 function validateName(value: string, label: string): string {
   if (!value) throw new TypeError(`${label} is required`);
   nameToBigInt(value);
+  return value;
+}
+
+function normalizeTableScope(value: TableScope): string {
+  if (typeof value === "bigint") {
+    if (value < 0n || value > 0xffffffffffffffffn) {
+      throw new RangeError("Table scope integer must fit in uint64");
+    }
+    return value.toString();
+  }
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new RangeError("Numeric table scope must be a non-negative safe integer");
+    }
+    return String(value);
+  }
+  if (typeof value !== "string" || !value.trim()) {
+    throw new TypeError("Table scope must be a non-empty string or non-negative integer");
+  }
   return value;
 }
 
@@ -124,13 +144,20 @@ export class Contract {
 
   tableRows<T = Record<string, unknown>>(
     table: string,
-    scope: string = this.account,
+    scope: TableScope = this.account,
     options: Omit<TableRowsRequest, "code" | "scope" | "table"> = {},
     signal?: AbortSignal,
   ): Promise<TableRowsResponse<T>> {
     validateName(table, "Table name");
-    validateName(scope, "Table scope");
-    return this.rpc.getTableRows<T>({ code: this.account, scope, table, ...options }, signal);
+    return this.rpc.getTableRows<T>(
+      {
+        code: this.account,
+        scope: normalizeTableScope(scope),
+        table,
+        ...options,
+      },
+      signal,
+    );
   }
 }
 
