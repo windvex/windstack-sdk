@@ -141,6 +141,16 @@ function decodeModern(value: string, type: KeyType): Uint8Array {
   return data;
 }
 
+function decodeLegacyPublicKey(value: string, prefix: "EOS" | "VEX"): Uint8Array {
+  const decoded = base58Decode(value.slice(prefix.length));
+  if (decoded.length !== 37) throw new TypeError(`Invalid legacy ${prefix} public key length`);
+  const data = decoded.slice(0, -4);
+  if (!equalBytes(decoded.slice(-4), ripemdChecksum(data))) {
+    throw new TypeError(`Legacy ${prefix} public-key checksum mismatch`);
+  }
+  return data;
+}
+
 export class PublicKey {
   readonly type: KeyType;
   readonly #data: Uint8Array;
@@ -166,13 +176,10 @@ export class PublicKey {
       return new PublicKey(type, decodeModern(modern[2]!, type));
     }
     if (value.startsWith("EOS")) {
-      const decoded = base58Decode(value.slice(3));
-      if (decoded.length !== 37) throw new TypeError("Invalid legacy EOS public key length");
-      const data = decoded.slice(0, -4);
-      if (!equalBytes(decoded.slice(-4), ripemdChecksum(data))) {
-        throw new TypeError("Legacy EOS public-key checksum mismatch");
-      }
-      return new PublicKey("K1", data);
+      return new PublicKey("K1", decodeLegacyPublicKey(value, "EOS"));
+    }
+    if (value.startsWith("VEX")) {
+      return new PublicKey("K1", decodeLegacyPublicKey(value, "VEX"));
     }
     throw new TypeError("Unsupported Antelope public-key format");
   }
@@ -185,9 +192,9 @@ export class PublicKey {
     return `PUB_${this.type}_${encodeModern(this.#data, this.type)}`;
   }
 
-  toLegacyString(): string {
-    if (this.type !== "K1") throw new TypeError("Legacy EOS public keys only support K1");
-    return `EOS${base58Encode(concatBytes(this.#data, ripemdChecksum(this.#data)))}`;
+  toLegacyString(prefix: "EOS" | "VEX" = "EOS"): string {
+    if (this.type !== "K1") throw new TypeError("Legacy public keys only support K1");
+    return `${prefix}${base58Encode(concatBytes(this.#data, ripemdChecksum(this.#data)))}`;
   }
 
   equals(other: PublicKey): boolean {
