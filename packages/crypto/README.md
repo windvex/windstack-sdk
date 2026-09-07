@@ -2,9 +2,9 @@
 
 ## Overview
 
-`@windstack/crypto` provides Antelope-compatible K1 and R1 key handling for WindStack applications. It supports private keys, public keys, recoverable signatures, signature verification, public-key recovery, modern Antelope encodings, legacy EOS public keys, and legacy K1 WIF private keys.
+`@windstack/crypto` provides K1 and R1 key handling for WindStack and Vexanium applications. It supports private keys, public keys, recoverable signatures, signature verification, public-key recovery, current Antelope key encodings, and compatibility with older K1 key encodings used by existing Vexanium accounts and node software.
 
-The package uses Noble curve and hash primitives while keeping the public API based on `Uint8Array` and Antelope key formats.
+The public API is based on `Uint8Array`. Elliptic-curve and hashing primitives are provided by the Noble libraries.
 
 ## Installation
 
@@ -27,13 +27,13 @@ console.log(signature.verifyDigest(digest, publicKey));
 console.log(signature.recoverDigest(digest).equals(publicKey));
 ```
 
-K1 signatures are emitted in the canonical compact form required by Antelope-compatible chains. K1 public keys can also be converted to the legacy `EOS...` representation when interacting with older node software.
+K1 signatures are emitted in the canonical compact form required by Vexanium-compatible transaction signing. Existing K1 private and public keys can be imported through the compatibility parsers without changing their key material.
 
 ## Runtime
 
-The package is ESM-first and requires Node.js 20.19 or newer when used directly in Node.js. Browser and React Native environments must provide the secure randomness required by key generation. Existing keys can be imported with `PrivateKey.fromString()` or `PrivateKey.fromBytes()`.
+The package is ESM-first and requires Node.js 20.19 or newer when used directly in Node.js. Browser and React Native environments must provide secure platform randomness for key generation. Existing keys can be imported with `PrivateKey.fromString()` or `PrivateKey.fromBytes()`.
 
-Private keys should be stored and used through an appropriate secure storage or signing boundary. Application logs should never contain private-key material.
+Private keys should be held by an appropriate secure storage or signing boundary. Application logs should never contain private-key material.
 
 ## License
 
