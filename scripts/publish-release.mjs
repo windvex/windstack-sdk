@@ -152,18 +152,19 @@ async function verifyRegistryAuthentication() {
 async function publishedVersion(name, version) {
   let response;
   try {
-    response = await fetch(
-      `${registry}${encodeURIComponent(name)}/${encodeURIComponent(version)}`,
-      {
-        headers: { accept: "application/json", "cache-control": "no-cache" },
-      },
-    );
+    response = await fetch(`${registry}${encodeURIComponent(name)}`, {
+      headers: { accept: "application/json", "cache-control": "no-cache" },
+    });
   } catch (error) {
     throw new Error(`Unable to query npm for ${name}@${version}: ${error.message}`);
   }
-  if (response.status === 200) return true;
   if (response.status === 404) return false;
-  throw new Error(`Unable to query npm for ${name}@${version}: HTTP ${response.status}`);
+  if (response.status !== 200) {
+    throw new Error(`Unable to query npm for ${name}@${version}: HTTP ${response.status}`);
+  }
+
+  const packument = await response.json();
+  return Object.hasOwn(packument.versions ?? {}, version);
 }
 
 async function versionLifecycleStatus(name, version, token) {
