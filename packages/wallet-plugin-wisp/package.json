@@ -1,6 +1,6 @@
 {
   "name": "@windstack/wallet-plugin-wisp",
-  "version": "0.6.2",
+  "version": "1.0.0",
   "description": "WindStack session plugin for Vexanium transaction signing with Wisp Wallet.",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,9 +24,9 @@
   },
   "dependencies": {
     "@windstack/antelope": "1.0.0",
-    "@windstack/core": "0.6.2",
+    "@windstack/core": "1.0.0",
     "@windstack/session": "1.0.0",
-    "@windstack/vexanium": "0.6.2"
+    "@windstack/vexanium": "1.0.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -34,11 +34,11 @@
     "wisp",
     "wisp-wallet",
     "wallet-plugin",
-    "wharfkit",
-    "sessionkit",
+    "session",
+    "signing",
     "vexanium",
     "antelope",
-    "vaulta"
+    "typescript"
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
@@ -56,6 +56,6 @@
     "registry": "https://registry.npmjs.org/"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19.0"
   }
 }
