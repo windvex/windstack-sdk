@@ -16,9 +16,10 @@
     "pack:dry-run": "npm pack --dry-run --workspaces",
     "test": "node scripts/test-signing.mjs && node scripts/test-provider-contract.mjs && node scripts/test-provider-spec.mjs && node scripts/test-sdk-behavior.mjs && node scripts/test-native-antelope.mjs",
     "test:native": "node scripts/test-native-antelope.mjs",
+    "verify:vexanium": "node scripts/verify-vexanium-live.mjs",
     "validate:native": "npm run clean && npm run format:check && npm run check:release && npm run build:native && npm run test:native && npm run pack:native",
     "validate": "npm run clean && npm run format:check && npm run check:release && npm run build && npm test && npm run pack:dry-run",
-    "release:dry-run": "npm run validate:native",
+    "release:dry-run": "npm run validate:native && npm run verify:vexanium",
     "release:npm": "node scripts/publish-native.mjs"
   },
   "devDependencies": {
