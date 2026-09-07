@@ -6,6 +6,7 @@
  */
 import type { Abi } from "@windstack/abi";
 import type { Signature } from "@windstack/crypto";
+import type { CompressionProvider } from "./compression.js";
 
 export type SigningRequestScheme = "vsr" | "esr";
 export type SigningRequestPermissionLevel = { actor: string; permission: string };
@@ -87,6 +88,8 @@ export type SigningRequestInfoInput =
 export type SigningRequestCreateArguments = {
   chainId?: string;
   chainAlias?: number;
+  /** Optional allowed-chain list encoded into the standard `chain_ids` info field. */
+  allowedChains?: Array<string | number>;
   action?: SigningRequestActionInput;
   actions?: SigningRequestActionInput[];
   transaction?: SigningRequestTransactionInput;
@@ -99,6 +102,7 @@ export type SigningRequestCreateArguments = {
 
 export type SigningRequestEncodingOptions = {
   abiProvider?: SigningRequestAbiProvider;
+  compressionProvider?: CompressionProvider;
   compress?: boolean;
   slashes?: boolean;
   scheme?: SigningRequestScheme;
@@ -108,10 +112,8 @@ export type SigningRequestEncodingOptions = {
 
 export type SigningRequestParseOptions = Pick<
   SigningRequestEncodingOptions,
-  "maxDecodedBytes"
-> & {
-  compressionProvider?: import("./compression.js").CompressionProvider;
-};
+  "maxDecodedBytes" | "compressionProvider"
+>;
 
 export type SigningRequestTapos = {
   expiration: string;
@@ -141,6 +143,7 @@ export type ResolvedSigningRequest = {
   background: boolean;
   callback: string;
   isIdentity: boolean;
+  referenceBlockId?: string;
 };
 
 export type SigningRequestCallbackContext = {
