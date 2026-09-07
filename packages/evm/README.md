@@ -1,10 +1,18 @@
 # @windstack/evm
 
-Small EIP-1193 client with EIP-6963 discovery for browser wallets.
+## Overview
+
+`@windstack/evm` provides a browser client for EIP-1193 wallet providers with EIP-6963 provider discovery. It supports account access, chain queries, chain switching, chain registration, request forwarding, provider events, and VEX EVM network identifiers.
+
+The client prefers announced EIP-6963 providers and can use `window.ethereum` when no announced provider is available.
+
+## Installation
 
 ```bash
 npm install @windstack/core @windstack/evm
 ```
+
+## Usage
 
 ```ts
 import { createEVMClient } from "@windstack/evm";
@@ -14,30 +22,37 @@ const accounts = await client.connect();
 const chainId = await client.getChainId();
 
 client.on("accountsChanged", (nextAccounts) => {
-  // Update application state.
+  console.log(nextAccounts);
 });
+
+await client.switchChain("0x1a50");
 ```
 
-`connect()` calls `eth_requestAccounts`. `getAccounts()` calls the silent `eth_accounts` method.
-`EVM_METHODS` exposes the canonical MetaMask-compatible method names implemented by Wisp, while `VEX_EVM_CHAIN_ID`, `VEX_EVM_CHAIN_ID_HEX`, and `VEX_EVM_SCOPE` expose the VEX EVM network identifiers.
-
-## Chain requests
+VEX EVM can be registered with standard EIP-3085 chain metadata:
 
 ```ts
-await client.switchChain("0x1a50");
-
 await client.addChain({
   chainId: "0x1a50",
   chainName: "VEX EVM",
-  nativeCurrency: { name: "Vexanium", symbol: "VEX", decimals: 18 },
-  rpcUrls: ["https://rpc.example"],
+  nativeCurrency: {
+    name: "Vexanium",
+    symbol: "VEX",
+    decimals: 18,
+  },
+  rpcUrls: ["https://api.windcrypto.com/rpc"],
 });
 ```
 
-Chain IDs must be canonical `0x`-prefixed hexadecimal values. Chain metadata URLs must use HTTPS. Always verify an RPC endpoint's `eth_chainId` response before presenting it to users.
+## Security
 
-EIP-6963 announcements are retained for the lifetime of the page, as required by the specification. `window.ethereum` is only used as a fallback when no announced provider is available.
+Chain identifiers must use canonical `0x`-prefixed hexadecimal values. Applications should verify the chain ID returned by a newly supplied RPC endpoint before presenting that endpoint to users or requesting wallet registration.
+
+## Runtime
+
+The package targets browser environments with wallet providers. It forwards requests to the selected EIP-1193 provider and does not contain private-key storage or transaction-signing code of its own.
 
 ## License
 
-MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.
+MIT License.
+
+Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.
