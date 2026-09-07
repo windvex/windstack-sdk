@@ -6,5 +6,10 @@
     "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../abi" }, { "path": "../core" }, { "path": "../crypto" }]
+  "references": [
+    { "path": "../abi" },
+    { "path": "../core" },
+    { "path": "../crypto" },
+    { "path": "../signing-request" }
+  ]
 }
