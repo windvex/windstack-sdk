@@ -1,0 +1,62 @@
+name: Finalize session API naming
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/rename-session-api.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: ".nvmrc"
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm ci
+      - name: Rename session API
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          roots = [Path('packages'), Path('scripts'), Path('README.md'), Path('docs'), Path('specs'), Path('VEXANIUM-PROVIDER-V1.md')]
+          changed = []
+          for root in roots:
+              files = [root] if root.is_file() else list(root.rglob('*')) if root.exists() else []
+              for path in files:
+                  if not path.is_file() or path.name == 'check-public-surface.mjs':
+                      continue
+                  if path.suffix not in {'.ts', '.mjs', '.md', '.json'}:
+                      continue
+                  try:
+                      source = path.read_text()
+                  except UnicodeDecodeError:
+                      continue
+                  next_source = source.replace('SessionKit', 'SessionManager').replace('sessionKit', 'sessionManager')
+                  if next_source != source:
+                      path.write_text(next_source)
+                      changed.append(str(path))
+          if not changed:
+              raise SystemExit('No SessionKit references were found to rename')
+          print('\n'.join(changed))
+          PY
+      - name: Format repository
+        run: npm run format
+      - name: Commit rename
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages scripts README.md docs specs VEXANIUM-PROVIDER-V1.md
+          git commit -m "refactor: rename session API for WindStack 1.0"
+          git push origin HEAD:main
