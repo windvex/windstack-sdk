@@ -61,6 +61,7 @@ export type {
   VexSigningRequestParams,
   VexSigningRequestResult,
   VexSigningRequestUri,
+  VexSigningRequestZlibProvider,
   VexaniumAccount,
   VexaniumAccountsResponse,
   VexaniumCapabilitiesRequest,
