@@ -6,6 +6,9 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo",
+    "format": "biome format --write packages/*/src scripts package.json package-lock.json tsconfig.json tsconfig.base.json packages/*/package.json packages/*/tsconfig.json specs/wisp-provider-contract.json biome.json",
+    "format:check": "biome format packages/*/src scripts package.json package-lock.json tsconfig.json tsconfig.base.json packages/*/package.json packages/*/tsconfig.json specs/wisp-provider-contract.json biome.json",
+    "check:release": "node scripts/check-release.mjs",
     "build:native": "tsc -b packages/crypto packages/abi packages/rpc packages/contract packages/account packages/antelope packages/session",
     "build": "tsc -b packages/core packages/evm packages/solana packages/crypto packages/abi packages/rpc packages/contract packages/account packages/antelope packages/vexanium packages/wallet-plugin-wisp packages/session",
     "typecheck": "npm run build",
@@ -13,18 +16,28 @@
     "pack:dry-run": "npm pack --dry-run --workspaces",
     "test": "node scripts/test-signing.mjs && node scripts/test-provider-contract.mjs && node scripts/test-provider-spec.mjs && node scripts/test-sdk-behavior.mjs && node scripts/test-native-antelope.mjs",
     "test:native": "node scripts/test-native-antelope.mjs",
-    "validate:native": "npm run clean && npm run build:native && npm run test:native && npm run pack:native",
-    "validate": "npm run clean && npm run build && npm test && npm run pack:dry-run",
+    "validate:native": "npm run clean && npm run format:check && npm run check:release && npm run build:native && npm run test:native && npm run pack:native",
+    "validate": "npm run clean && npm run format:check && npm run check:release && npm run build && npm test && npm run pack:dry-run",
     "release:dry-run": "npm run validate:native",
-    "release:npm": "npm publish -w @windstack/crypto --access public && npm publish -w @windstack/abi --access public && npm publish -w @windstack/rpc --access public && npm publish -w @windstack/contract --access public && npm publish -w @windstack/account --access public && npm publish -w @windstack/antelope --access public && npm publish -w @windstack/session --access public"
+    "release:npm": "node scripts/publish-native.mjs"
   },
-  "devDependencies": { "typescript": "^7.0.2" },
-  "engines": { "node": ">=20.19.0" },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.12",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "license": "MIT",
   "author": "Gilang Ramadan",
   "contributors": ["PT WIND KRIPTOGRAFI TEKNOLOGI"],
-  "description": "Modern TypeScript SDK packages for WindStack, Wisp Wallet, Vexanium and Antelope applications.",
+  "description": "TypeScript SDK packages for WindStack applications across Antelope, Vexanium, EVM, Solana, and Wisp Wallet.",
   "homepage": "https://github.com/windvex/windstack-sdk#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/windvex/windstack-sdk.git" },
-  "bugs": { "url": "https://github.com/windvex/windstack-sdk/issues" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/windvex/windstack-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/windvex/windstack-sdk/issues"
+  }
 }
