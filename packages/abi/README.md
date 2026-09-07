@@ -14,27 +14,16 @@ npm install @windstack/abi
 
 ## Usage
 
+A serializer can be created from an ABI returned by a Vexanium RPC endpoint:
+
 ```ts
 import { AbiSerializer } from "@windstack/abi";
+import { RpcClient } from "@windstack/rpc";
 
-const abi = {
-  version: "eosio::abi/1.2",
-  structs: [
-    {
-      name: "transfer",
-      base: "",
-      fields: [
-        { name: "from", type: "name" },
-        { name: "to", type: "name" },
-        { name: "quantity", type: "asset" },
-        { name: "memo", type: "string" },
-      ],
-    },
-  ],
-  actions: [{ name: "transfer", type: "transfer" }],
-};
-
+const rpc = new RpcClient({ endpoints: "https://api.windcrypto.com" });
+const { abi } = await rpc.getAbi("vex.token");
 const serializer = new AbiSerializer(abi);
+
 const bytes = serializer.encodeAction("transfer", {
   from: "alice",
   to: "bob",
