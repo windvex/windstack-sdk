@@ -73,7 +73,16 @@ export type WispSession = {
 
 export type WispProviderLike<TEvents extends Record<string, unknown> = Record<string, unknown>> = {
   request<TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult>;
-  on?<TEvent extends keyof TEvents>(event: TEvent, handler: (payload: TEvents[TEvent]) => void): void;
-  off?<TEvent extends keyof TEvents>(event: TEvent, handler: (payload: TEvents[TEvent]) => void): void;
-  removeListener?<TEvent extends keyof TEvents>(event: TEvent, handler: (payload: TEvents[TEvent]) => void): void;
+  on?<TEvent extends keyof TEvents>(
+    event: TEvent,
+    handler: (payload: TEvents[TEvent]) => void,
+  ): void;
+  off?<TEvent extends keyof TEvents>(
+    event: TEvent,
+    handler: (payload: TEvents[TEvent]) => void,
+  ): void;
+  removeListener?<TEvent extends keyof TEvents>(
+    event: TEvent,
+    handler: (payload: TEvents[TEvent]) => void,
+  ): void;
 };

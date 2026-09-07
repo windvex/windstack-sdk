@@ -17,9 +17,7 @@ export {
   resolveDappRequestContext,
   sameDappRequestOrigin,
 } from "./metadata.js";
-export {
-  WISP_PROVIDER_CONTRACT,
-} from "./provider-contract.js";
+export { WISP_PROVIDER_CONTRACT } from "./provider-contract.js";
 export type { WispProviderContract } from "./provider-contract.js";
 export type { EventHandler, EventMap } from "./events.js";
 export type {

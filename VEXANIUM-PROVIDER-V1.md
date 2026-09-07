@@ -1,16 +1,18 @@
 # VexaniumProvider v1
 
+## Overview
+
+`VexaniumProvider` defines the browser-facing contract between a Vexanium dApp and a compatible wallet provider. It standardizes provider identity, capability negotiation, account access, exact transaction signing, portable signing requests, events, errors, discovery, and the security boundary used for wallet permissions.
+
 Protocol identifier: `VexaniumProvider`
 
 Protocol version: `1.0.0`
 
-SDK release implementing this contract: `0.6.0`
+Created by **Gilang Ramadan**.
 
-This document defines the wire contract between a dApp and an injected Vexanium wallet. Antelope transaction encoding and signing-request payloads remain defined by WharfKit and the Antelope protocol.
+## Provider object
 
-## 1. Provider object
-
-A compatible wallet provider MUST expose:
+A compatible provider exposes the following interface:
 
 ```ts
 interface VexaniumProvider {
@@ -22,10 +24,10 @@ interface VexaniumProvider {
 }
 ```
 
-`providerInfo` is mandatory and MUST include:
+`providerInfo` is required and contains the provider identity and supported Vexanium capabilities:
 
 ```ts
-{
+interface VexaniumProviderInfo {
   uuid: string;
   name: string;
   rdns: string;
@@ -37,19 +39,19 @@ interface VexaniumProvider {
 }
 ```
 
-A dApp MUST NOT invent missing provider identity. Discovery ignores providers that do not satisfy the v1 shape.
+A client must not invent missing provider identity. Providers that do not expose the required v1 shape are ignored during discovery.
 
-## 2. Version compatibility
+## Version compatibility
 
-The SDK and wallet negotiate semantic protocol versions through `vex_getCapabilities`.
+The client and wallet negotiate semantic protocol versions through `vex_getCapabilities`.
 
-For protocol v1, compatible implementations MUST share major version `1`. A `2.x` provider is not implicitly compatible with a `1.x` SDK.
+Implementations of protocol v1 must share major version `1`. A provider using another major version is not considered compatible unless a future specification explicitly defines that compatibility.
 
-## 3. Capabilities
+## Capabilities
 
-Defined v1 capability identifiers:
+Protocol v1 defines these capability identifiers:
 
-```txt
+```text
 vex.accounts
 vex.sessions
 vex.signTransaction
@@ -59,9 +61,9 @@ vex.signDigest
 vex.events
 ```
 
-A provider MUST declare static capabilities in `providerInfo.capabilities` and return negotiated capabilities from `vex_getCapabilities`.
+A provider declares its static capabilities in `providerInfo.capabilities` and returns the negotiated set from `vex_getCapabilities`.
 
-## 4. Capability negotiation
+## Capability negotiation
 
 Request:
 
@@ -88,11 +90,11 @@ Response:
 }
 ```
 
-The SDK rejects incompatible major versions and missing required capabilities before connect/sign flows continue.
+The client rejects an incompatible major version or a missing required capability before account or signing flows continue.
 
-## 5. Connect
+## Account access
 
-`vex_requestAccounts` is the interactive permission request.
+`vex_requestAccounts` is the interactive authorization request.
 
 Request:
 
@@ -119,11 +121,9 @@ Response:
 }
 ```
 
-The response is not an array and `sessionId` is mandatory.
+`sessionId` is required. `chainId` in a response is the complete 64-character Vexanium chain ID. A request may use either the complete chain ID or its `antelope:<32 hex characters>` CAIP-2 scope. Clients compare the two forms by their shared chain prefix.
 
-`chainId` in a response MUST be the 64-character Antelope chain ID. A request MAY use either that full ID or its `antelope:<32 hex characters>` CAIP-2 form. Wallets and clients MUST compare those two forms as the same chain when their prefixes match.
-
-`vex_getAccounts` is the silent restore/read path and returns:
+`vex_getAccounts` is the non-interactive restore/read path and returns:
 
 ```ts
 {
@@ -133,11 +133,9 @@ The response is not an array and `sessionId` is mandatory.
 }
 ```
 
-## 6. Signing paths
+## Exact transaction signing
 
-### Connected dApp / SessionKit
-
-`vex_signTransaction` signs the exact serialized Antelope transaction bytes resolved by SessionKit.
+`vex_signTransaction` signs the exact serialized Vexanium transaction supplied by the application or session layer.
 
 ```ts
 {
@@ -149,9 +147,9 @@ The response is not an array and `sessionId` is mandatory.
 }
 ```
 
-A wallet MUST NOT silently rebuild or mutate the transaction before signing.
+A wallet must not silently rebuild or alter the transaction before signing.
 
-`serializedTransaction` MUST contain non-empty, even-length hexadecimal bytes. `account` and `permission` MUST be valid Antelope names. A successful response contains at least one valid Antelope signature:
+`serializedTransaction` contains non-empty, even-length hexadecimal bytes. `account` and `permission` must be valid Antelope names. A successful response contains at least one valid signature:
 
 ```ts
 {
@@ -161,23 +159,25 @@ A wallet MUST NOT silently rebuild or mutate the transaction before signing.
 }
 ```
 
-### Portable Vexanium Signing Request
+## Vexanium Signing Requests
 
-`vex_signingRequest` is used for QR, deep-link, clipboard, or external wallet transport.
+`vex_signingRequest` is used for a request transported through a QR code, deep link, clipboard, or external wallet flow.
 
-Canonical Vexanium URI scheme:
+The canonical Vexanium URI scheme is:
 
-```txt
+```text
 vsr://...
 ```
 
-The payload format is compatible with WharfKit SigningRequest / ESR Revision 3. `esr://...` is accepted as interoperability input. The client validates either scheme with WharfKit and forwards the original URI without decoding, re-encoding, or replacing its scheme.
+The payload follows the compatible Antelope signing-request format used by existing ecosystem tooling. Compatible input using the established alternate URI scheme may be accepted for interoperability, while newly created Vexanium requests use `vsr:`.
 
-A signing-request response MUST include `signatures: string[]` and `broadcast: boolean`. A client MUST reject an empty or malformed signature list.
+A successful signing-request response contains `signatures: string[]` and `broadcast: boolean`. Empty or malformed signature lists are rejected.
 
-## 7. Standard errors
+## Errors
 
-```txt
+Protocol v1 defines these provider error codes:
+
+```text
 4001    USER_REJECTED
 4100    UNAUTHORIZED
 4200    UNSUPPORTED_METHOD
@@ -193,11 +193,13 @@ A signing-request response MUST include `signatures: string[]` and `broadcast: b
 -32603  INTERNAL_ERROR
 ```
 
-Errors MUST expose a numeric `code` and human-readable `message`. Optional `data` may provide structured context.
+Errors expose a numeric `code` and a human-readable `message`. Optional `data` may carry structured context.
 
-## 8. Events
+## Events
 
-```txt
+Compatible providers may emit:
+
+```text
 connect
 accountsChanged
 disconnect
@@ -205,19 +207,31 @@ chainChanged
 message
 ```
 
-`connect` uses the canonical connect response shape. `accountsChanged` uses the canonical accounts response shape.
+`connect` uses the canonical connection response shape. `accountsChanged` uses the canonical accounts response shape.
 
-## 9. Security boundary
+## Discovery
 
-`DappMetadata` is display metadata only. Wallet permission state MUST bind to an authoritative transport/runtime origin, such as the browser extension sender origin. A wallet MUST NOT trust a dApp-supplied `origin` field as the permission boundary.
+A provider may be exposed through `window.vexanium` or provider announcement events. Discovery uses:
 
-## 10. Discovery
-
-A provider may be discovered through `window.vexanium` or Vexanium provider announcement events. A discovered provider MUST expose valid mandatory `providerInfo`; the SDK does not invent provider metadata.
-
-Discovery uses these window events:
-
-```txt
+```text
 vexanium:requestProvider
 vexanium:announceProvider
 ```
+
+A discovered provider must expose valid mandatory `providerInfo` before it is accepted.
+
+## Security
+
+`DappMetadata` is display metadata only. Wallet permission state must bind to an authoritative runtime or transport origin, such as the browser extension sender origin. A wallet must not use an origin supplied by application content as the permission boundary.
+
+Exact transaction signing must preserve the bytes approved by the application and must not substitute a rebuilt transaction after user approval.
+
+## Runtime
+
+The specification is transport-oriented and does not require a specific UI framework, storage implementation, or signing backend. Implementations may use browser extensions, mobile wallet bridges, embedded providers, or other trusted transports as long as the observable provider contract remains compatible.
+
+## License
+
+MIT License.
+
+Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.

@@ -1,66 +1,83 @@
 # WindStack SDK
 
-Modern TypeScript SDKs for Antelope/Vexanium, Wisp Wallet, EVM, and Solana.
+WindStack provides TypeScript packages for Vexanium and Antelope applications, Wisp Wallet, EVM providers, and Solana providers.
 
-**Created by Gilang Ramadan** · Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI · MIT.
+Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.
 
-## Native Antelope v1
+## Overview
 
-The new Antelope stack is built from protocol specifications and Web-standard APIs; it is **not a WharfKit fork**.
+The Vexanium and Antelope packages are separated by responsibility so applications can install only the capabilities they need.
 
 | Package | Purpose |
 | --- | --- |
-| `@windstack/crypto` | K1/R1 private keys, public keys, recoverable signatures, Antelope encodings |
-| `@windstack/abi` | ABI binary codec, names/assets/symbols, structs, aliases, variants |
-| `@windstack/rpc` | Typed nodeos RPC with timeout/failover/AbortSignal |
-| `@windstack/contract` | ABI-aware actions, tables and ABI cache |
-| `@windstack/account` | Account, token balance and system-action helpers |
-| `@windstack/antelope` | TAPOS, transaction serialization, digest, signing, broadcast, unified client |
-| `@windstack/session` | Native SessionKit-style wallet/session orchestration |
+| `@windstack/crypto` | K1 and R1 keys, signatures, verification, recovery, and Vexanium-compatible key encoding |
+| `@windstack/abi` | ABI serialization and deserialization for actions, tables, structs, variants, and binary extensions |
+| `@windstack/rpc` | Chain RPC with endpoint failover, request timeouts, cancellation, and structured errors |
+| `@windstack/contract` | Contract ABI loading, action serialization, table queries, and shared ABI caching |
+| `@windstack/account` | VEX balances, transfers, staking, RAM, voting, producers, accounts, and permissions |
+| `@windstack/antelope` | TAPOS, transaction serialization, signing digests, required keys, signing, and broadcast |
+| `@windstack/session` | Wallet plugins, sessions, persistence, restore, and transaction orchestration |
 
-The v1 native package graph does not depend on `@wharfkit/*`, `elliptic`, `bn.js`, `crypto-browserify`, or Node Buffer APIs. Crypto primitives use current Noble packages (`@noble/curves` and `@noble/hashes`). Noble v2 is ESM-only, so Node.js **20.19+** is required when running directly on Node.
+Vexanium Mainnet is available as a first-class preset with the canonical chain ID, RPC endpoint, `vexcore` system contract, `vex.token` native token contract, `VEX` symbol, and precision `4`.
+
+Additional packages provide Wisp provider interfaces and chain-specific helpers for VEX Native, VEX EVM, and Solana wallet integrations.
+
+## Installation
+
+Install the high-level transaction client and session package:
 
 ```bash
 npm install @windstack/antelope @windstack/session
 ```
 
+Individual packages can also be installed independently.
+
+## Usage
+
 ```ts
-import { AntelopeClient } from "@windstack/antelope";
+import {
+  PrivateKey,
+  PrivateKeySigner,
+} from "@windstack/antelope";
+import {
+  VEXANIUM_MAINNET,
+  createVexaniumClient,
+} from "@windstack/antelope/vexanium";
 
-const client = new AntelopeClient({ endpoints: ["https://api.windcrypto.com"] });
-const token = client.contract("vex.token");
-const action = await token.action("transfer", {
-  from: "alice",
-  to: "bob",
-  quantity: "1.0000 VEX",
-  memo: "WindStack",
-}, ["alice@active"]);
+const client = createVexaniumClient();
+
+console.log(VEXANIUM_MAINNET.contracts.system); // vexcore
+console.log(VEXANIUM_MAINNET.contracts.token); // vex.token
+console.log(VEXANIUM_MAINNET.nativeToken.symbol); // VEX
+
+const signer = new PrivateKeySigner([
+  PrivateKey.fromString("PVT_K1_..."),
+]);
+
+const transfer = await client
+  .account("alice")
+  .transfer("bob", "1.0000 VEX", "WindStack");
+
+const result = await client.transact({
+  actions: [transfer],
+  signer,
+});
+
+console.log(result.response);
 ```
 
-## Existing packages
+Applications should keep private keys in an appropriate secure storage or signing service. Wallet integrations can provide their own `Signer` implementation so application code never receives private-key material.
 
-`@windstack/core`, `@windstack/evm`, `@windstack/solana`, `@windstack/vexanium`, and `@windstack/wallet-plugin-wisp` remain in this monorepo for compatibility. The legacy Vexanium/WharfKit integration is not a dependency of the seven native Antelope v1 packages above.
+## Runtime
 
-## Development
+The seven release packages are ESM-first and use Web-standard primitives such as `Uint8Array`, `TextEncoder`, `fetch`, `AbortController`, and secure platform randomness. Node.js 20.19 or newer is supported. Browser and React Native environments must provide the Web APIs used by the selected package.
 
-```bash
-npm install
-npm run validate:native
-npm run validate
-```
+K1 and R1 cryptographic operations are provided by the Noble libraries. The seven-package transaction stack does not depend on `elliptic`, `bn.js`, or Node.js crypto polyfills.
 
-## Publish native packages from VPS
-
-Authenticate to npm first (`npm whoami`). Then:
-
-```bash
-npm install
-npm run release:dry-run
-npm run release:npm
-```
-
-`release:npm` publishes only the seven native packages, in dependency order.
+Release validation checks package metadata, formatting, documentation, dependency boundaries, tests, package contents, and the current production ABIs for `vexcore` and `vex.token`.
 
 ## License
 
-MIT. Created by Gilang Ramadan; copyright PT WIND KRIPTOGRAFI TEKNOLOGI.
+MIT License.
+
+Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.

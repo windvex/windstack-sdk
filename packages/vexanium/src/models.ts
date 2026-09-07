@@ -8,7 +8,13 @@ export type VexaniumActionModel<TData = unknown> = {
   hexData?: string;
 };
 
-export type VexaniumTransactionStatus = "executed" | "soft_fail" | "hard_fail" | "delayed" | "expired" | "unknown";
+export type VexaniumTransactionStatus =
+  | "executed"
+  | "soft_fail"
+  | "hard_fail"
+  | "delayed"
+  | "expired"
+  | "unknown";
 
 export type VexaniumResourceUsage = {
   cpuUs?: number;

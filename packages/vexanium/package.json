@@ -23,9 +23,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@wharfkit/antelope": "^1.2.0",
     "@wharfkit/signing-request": "^3.4.0",
+    "@windstack/abi": "1.0.0",
     "@windstack/core": "0.6.2",
+    "@windstack/crypto": "1.0.0",
     "pako": "^2.2.0"
   },
   "sideEffects": false,
@@ -46,7 +47,7 @@
     "vexanium-provider"
   ],
   "license": "MIT",
-  "author": "PT WIND KRIPTOGRAFI TEKNOLOGI",
+  "author": "Gilang Ramadan",
   "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/vexanium#readme",
   "repository": {
     "type": "git",

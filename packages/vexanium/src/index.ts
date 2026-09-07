@@ -1,6 +1,10 @@
 import "./window.js";
 
-export { normalizeVexaniumAccount, normalizeVexaniumAccounts, parsePermissionLevel } from "./accounts.js";
+export {
+  normalizeVexaniumAccount,
+  normalizeVexaniumAccounts,
+  parsePermissionLevel,
+} from "./accounts.js";
 export { createVexaniumClient } from "./client.js";
 export {
   DEFAULT_PROVIDER_DISCOVERY_TIMEOUT_MS,

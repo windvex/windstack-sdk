@@ -19,13 +19,16 @@ const HEX_CHAIN_ID_PATTERN = /^0x(?:0|[1-9a-f][0-9a-f]*)$/i;
 
 function assertHexChainId(chainId: string): void {
   if (typeof chainId !== "string" || !HEX_CHAIN_ID_PATTERN.test(chainId)) {
-    throw invalidParams("EVM chainId must be a canonical 0x-prefixed hexadecimal integer", { chainId });
+    throw invalidParams("EVM chainId must be a canonical 0x-prefixed hexadecimal integer", {
+      chainId,
+    });
   }
 }
 
 function assertSecureUrls(values: string[] | undefined, field: string): void {
   if (!values) return;
-  if (!Array.isArray(values) || values.length === 0) throw invalidParams(`${field} must be a non-empty array`);
+  if (!Array.isArray(values) || values.length === 0)
+    throw invalidParams(`${field} must be a non-empty array`);
   for (const value of values) {
     try {
       const url = new URL(value);
@@ -39,7 +42,8 @@ function assertSecureUrls(values: string[] | undefined, field: string): void {
 }
 
 function assertAddChainParams(params: AddEthereumChainParameter): void {
-  if (typeof params !== "object" || params === null) throw invalidParams("Chain parameters are required");
+  if (typeof params !== "object" || params === null)
+    throw invalidParams("Chain parameters are required");
   assertHexChainId(params.chainId);
   assertSecureUrls(params.rpcUrls, "rpcUrls");
   assertSecureUrls(params.blockExplorerUrls, "blockExplorerUrls");
@@ -50,16 +54,17 @@ function assertAddChainParams(params: AddEthereumChainParameter): void {
   if (params.nativeCurrency && params.nativeCurrency.decimals < 0) {
     throw invalidParams("nativeCurrency.decimals must be a non-negative integer");
   }
-  if (params.nativeCurrency && (
-    !params.nativeCurrency.name?.trim() ||
-    !params.nativeCurrency.symbol?.trim()
-  )) {
+  if (
+    params.nativeCurrency &&
+    (!params.nativeCurrency.name?.trim() || !params.nativeCurrency.symbol?.trim())
+  ) {
     throw invalidParams("nativeCurrency name and symbol are required");
   }
 }
 
 export async function createEVMClient(options: EVMClientOptions = {}): Promise<EVMClient> {
-  let provider: EIP1193Provider | null = options.provider ?? await getEVMProvider(options.discoveryTimeoutMs);
+  let provider: EIP1193Provider | null =
+    options.provider ?? (await getEVMProvider(options.discoveryTimeoutMs));
 
   const requireProvider = (): EIP1193Provider => {
     provider = provider ?? getInjectedEVMProvider();
@@ -69,7 +74,9 @@ export async function createEVMClient(options: EVMClientOptions = {}): Promise<E
     return provider;
   };
 
-  const request = async <TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult> => {
+  const request = async <TResult = unknown, TParams = unknown>(
+    args: RequestArguments<TParams>,
+  ): Promise<TResult> => {
     try {
       return await requireProvider().request<TResult, TParams>(args);
     } catch (error) {
@@ -103,10 +110,16 @@ export async function createEVMClient(options: EVMClientOptions = {}): Promise<E
       assertAddChainParams(params);
       return await request({ method: EVM_METHODS.ADD_CHAIN, params: [params] });
     },
-    on<TEvent extends keyof EVMProviderEventMap>(event: TEvent, handler: (payload: EVMProviderEventMap[TEvent]) => void) {
+    on<TEvent extends keyof EVMProviderEventMap>(
+      event: TEvent,
+      handler: (payload: EVMProviderEventMap[TEvent]) => void,
+    ) {
       requireProvider().on(event, handler);
     },
-    off<TEvent extends keyof EVMProviderEventMap>(event: TEvent, handler: (payload: EVMProviderEventMap[TEvent]) => void) {
+    off<TEvent extends keyof EVMProviderEventMap>(
+      event: TEvent,
+      handler: (payload: EVMProviderEventMap[TEvent]) => void,
+    ) {
       const current = requireProvider();
       if (current.off) current.off(event, handler);
       else current.removeListener?.(event, handler);

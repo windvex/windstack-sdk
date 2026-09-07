@@ -17,11 +17,17 @@ export async function createSolanaClient(options: SolanaClientOptions = {}): Pro
 
   const requireProvider = (): SolanaProvider => {
     provider = provider ?? getInjectedSolanaProvider();
-    if (!provider?.request) throw new WispProviderError(WISP_ERROR_CODES.INTERNAL_ERROR, "No Solana provider is available");
+    if (!provider?.request)
+      throw new WispProviderError(
+        WISP_ERROR_CODES.INTERNAL_ERROR,
+        "No Solana provider is available",
+      );
     return provider;
   };
 
-  const request = async <TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult> => {
+  const request = async <TResult = unknown, TParams = unknown>(
+    args: RequestArguments<TParams>,
+  ): Promise<TResult> => {
     try {
       return await requireProvider().request<TResult, TParams>(args);
     } catch (error) {
@@ -31,7 +37,10 @@ export async function createSolanaClient(options: SolanaClientOptions = {}): Pro
 
   const assertBase64Transaction = (value: string): void => {
     if (value.length === 0 || value.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
-      throw new WispProviderError(WISP_ERROR_CODES.INVALID_PARAMS, "Transaction must be standard base64");
+      throw new WispProviderError(
+        WISP_ERROR_CODES.INVALID_PARAMS,
+        "Transaction must be standard base64",
+      );
     }
   };
 
@@ -73,10 +82,16 @@ export async function createSolanaClient(options: SolanaClientOptions = {}): Pro
     async disconnect() {
       await request({ method: SOLANA_METHODS.DISCONNECT });
     },
-    on<TEvent extends keyof SolanaProviderEventMap>(event: TEvent, handler: (payload: SolanaProviderEventMap[TEvent]) => void) {
+    on<TEvent extends keyof SolanaProviderEventMap>(
+      event: TEvent,
+      handler: (payload: SolanaProviderEventMap[TEvent]) => void,
+    ) {
       requireProvider().on?.(event, handler);
     },
-    off<TEvent extends keyof SolanaProviderEventMap>(event: TEvent, handler: (payload: SolanaProviderEventMap[TEvent]) => void) {
+    off<TEvent extends keyof SolanaProviderEventMap>(
+      event: TEvent,
+      handler: (payload: SolanaProviderEventMap[TEvent]) => void,
+    ) {
       const current = requireProvider();
       if (current.off) current.off(event, handler);
       else current.removeListener?.(event, handler);

@@ -1,26 +1,35 @@
-# WindStack provider specifications
+# WindStack Provider Specifications
 
-`wisp-provider-contract.json` is the canonical machine-readable contract shared
-by WindStack SDK packages and the Wisp Wallet provider runtime.
+## Overview
 
-It defines only standards-facing values:
+This directory contains machine-readable provider contracts shared by WindStack SDK packages and Wisp Wallet. The files define stable identifiers and protocol values that must remain consistent across provider implementations and client libraries.
 
-- Wisp provider identity (`name`, reverse-DNS identifier, and compatibility marker)
-- Shared EIP-1193/Vexanium provider error codes
-- VexaniumProvider version, chain identifiers, capabilities, methods, and
-  discovery events
-- EIP-1193 method names, EIP-6963 discovery events, and VEX EVM chain identifiers/scope
+## Provider contract
 
-Wallet-specific message transport identifiers are intentionally excluded. Wisp
-keeps those private fields in its local runtime contract while synchronizing the
-canonical sections from this file.
+`wisp-provider-contract.json` defines:
 
-Run the full WindStack validation before changing the specification:
+- Wisp provider identity and reverse-DNS identifier
+- Vexanium provider version and chain identifiers
+- Vexanium capabilities, methods, and discovery events
+- Shared provider error codes
+- VEX EVM chain identifiers
+- EIP-1193 method names
+- EIP-6963 discovery events
 
-```bash
-npm run validate
-```
+Wallet-private transport identifiers and runtime-only implementation details are not part of the shared contract.
 
-`test-provider-spec.mjs` fails when the JSON specification and exported SDK
-constants no longer match. Wisp Wallet independently checks its synchronized
-copy through `scripts/sync-windstack-provider-contract.mjs`.
+## Usage
+
+WindStack packages consume the specification through exported constants in `@windstack/core`. Wisp Wallet uses the same values for provider discovery and request handling so dApps receive a consistent provider contract across supported runtimes.
+
+Changes to the machine-readable contract must remain compatible with the public `VexaniumProvider` specification and the exported SDK constants.
+
+## Related specification
+
+`VEXANIUM-PROVIDER-V1.md` documents the browser-facing Vexanium provider interface, capability negotiation, account access, signing requests, events, errors, discovery, and permission security boundary.
+
+## License
+
+MIT License.
+
+Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.

@@ -1,7 +1,7 @@
 {
   "name": "@windstack/wallet-plugin-wisp",
   "version": "0.6.2",
-  "description": "WharfKit SessionKit wallet plugin for exact Vexanium transaction signing with Wisp.",
+  "description": "WindStack session plugin for Vexanium transaction signing with Wisp Wallet.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,18 +23,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
+    "@windstack/antelope": "1.0.0",
     "@windstack/core": "0.6.2",
+    "@windstack/session": "1.0.0",
     "@windstack/vexanium": "0.6.2"
-  },
-  "peerDependencies": {
-    "@wharfkit/antelope": "^1.2.0",
-    "@wharfkit/session": "^1.6.1",
-    "@wharfkit/signing-request": "^3.4.0"
-  },
-  "devDependencies": {
-    "@wharfkit/antelope": "^1.2.0",
-    "@wharfkit/session": "^1.6.1",
-    "@wharfkit/signing-request": "^3.4.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -49,7 +41,7 @@
     "vaulta"
   ],
   "license": "MIT",
-  "author": "PT WIND KRIPTOGRAFI TEKNOLOGI",
+  "author": "Gilang Ramadan",
   "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/wallet-plugin-wisp#readme",
   "repository": {
     "type": "git",

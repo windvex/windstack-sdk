@@ -24,8 +24,7 @@ export const WISP_PROVIDER_CONTRACT = {
     global: "vexanium",
     standard: "VexaniumProvider",
     version: "1.0.0",
-    chainId:
-      "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f",
+    chainId: "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f",
     scope: "antelope:f9f432b1851b5c179d2091a96f593aae",
     capabilities: [
       "vex.accounts",

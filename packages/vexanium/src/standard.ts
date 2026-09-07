@@ -18,10 +18,10 @@ import type {
 import { isVexaniumChainId, isVexaniumFullChainId } from "./validation.js";
 
 const SEMVER_PATTERN = new RegExp(
-  "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)" +
-  "(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+  "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)" + "(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
 );
-const RDNS_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+const RDNS_PATTERN =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -32,9 +32,10 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function isVexaniumCapability(value: unknown): value is VexaniumCapability {
-  return isNonEmptyString(value) && (
-    Object.values(VEXANIUM_CAPABILITIES) as readonly string[]
-  ).includes(value);
+  return (
+    isNonEmptyString(value) &&
+    (Object.values(VEXANIUM_CAPABILITIES) as readonly string[]).includes(value)
+  );
 }
 
 function allUnique(values: unknown[]): boolean {
@@ -146,7 +147,9 @@ export function assertVexaniumCapabilitiesResponse(
   }
 }
 
-export function assertVexaniumConnectResponse(value: unknown): asserts value is VexaniumConnectResponse {
+export function assertVexaniumConnectResponse(
+  value: unknown,
+): asserts value is VexaniumConnectResponse {
   if (!isRecord(value)) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_REQUEST,

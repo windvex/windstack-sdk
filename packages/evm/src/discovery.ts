@@ -7,14 +7,11 @@ import {
   EVM_PROVIDER_GLOBAL,
   WISP_EVM_PROVIDER_RDNS,
 } from "./constants.js";
-import type {
-  EIP1193Provider,
-  EIP6963ProviderDetail,
-  EIP6963ProviderInfo,
-} from "./types.js";
+import type { EIP1193Provider, EIP6963ProviderDetail, EIP6963ProviderInfo } from "./types.js";
 
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const RDNS_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+const RDNS_PATTERN =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 
 type ProviderRegistry = {
   details: EIP6963ProviderDetail[];
@@ -82,7 +79,9 @@ function getProviderRegistry(runtimeWindow: RuntimeWindow): ProviderRegistry {
 
 function assertDiscoveryTimeout(timeoutMs: number): void {
   if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
-    throw invalidParams("EVM discovery timeout must be a non-negative finite number", { timeoutMs });
+    throw invalidParams("EVM discovery timeout must be a non-negative finite number", {
+      timeoutMs,
+    });
   }
 }
 

@@ -1,4 +1,8 @@
-import type { VexaniumActionModel, VexaniumTransactionModel, VexaniumTransactionStatus } from "./models.js";
+import type {
+  VexaniumActionModel,
+  VexaniumTransactionModel,
+  VexaniumTransactionStatus,
+} from "./models.js";
 import type { VexaniumPermissionLevel } from "./types.js";
 
 export type ExplorerActionLike = {
@@ -33,9 +37,12 @@ export type ExplorerTransactionLike = {
   signatures?: unknown;
 };
 
-const asString = (value: unknown, fallback = ""): string => (typeof value === "string" ? value : fallback);
-const asNumber = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
-const asOptionalString = (value: unknown): string | undefined => typeof value === "string" ? value : undefined;
+const asString = (value: unknown, fallback = ""): string =>
+  typeof value === "string" ? value : fallback;
+const asNumber = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) ? value : undefined;
+const asOptionalString = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
 
 function normalizeStatus(value: unknown): VexaniumTransactionStatus {
   switch (value) {
@@ -63,7 +70,9 @@ function normalizeAuthorization(value: unknown): VexaniumPermissionLevel[] {
     .filter((item): item is VexaniumPermissionLevel => Boolean(item));
 }
 
-export function mapExplorerAction<TData = unknown>(input: ExplorerActionLike): VexaniumActionModel<TData> {
+export function mapExplorerAction<TData = unknown>(
+  input: ExplorerActionLike,
+): VexaniumActionModel<TData> {
   const source = input.act && typeof input.act === "object" ? input.act : input;
   return {
     account: asString(source.account),
@@ -74,7 +83,9 @@ export function mapExplorerAction<TData = unknown>(input: ExplorerActionLike): V
   };
 }
 
-export function mapExplorerTransaction<TActionData = unknown>(input: ExplorerTransactionLike): VexaniumTransactionModel<TActionData> {
+export function mapExplorerTransaction<TActionData = unknown>(
+  input: ExplorerTransactionLike,
+): VexaniumTransactionModel<TActionData> {
   const actionSource = Array.isArray(input.actions)
     ? input.actions
     : Array.isArray(input.action_traces)
@@ -84,11 +95,11 @@ export function mapExplorerTransaction<TActionData = unknown>(input: ExplorerTra
         : [];
 
   const netWords = asNumber(input.net_usage_words);
-  const netBytes = asNumber(input.net_usage_bytes) ?? (netWords === undefined ? undefined : netWords * 8);
+  const netBytes =
+    asNumber(input.net_usage_bytes) ?? (netWords === undefined ? undefined : netWords * 8);
   const cpuUs = asNumber(input.cpu_usage_us);
-  const resourceUsage = cpuUs === undefined && netBytes === undefined
-    ? undefined
-    : { cpuUs, netBytes };
+  const resourceUsage =
+    cpuUs === undefined && netBytes === undefined ? undefined : { cpuUs, netBytes };
 
   return {
     id: asString(input.id ?? input.trx_id ?? input.transaction_id),
@@ -96,7 +107,9 @@ export function mapExplorerTransaction<TActionData = unknown>(input: ExplorerTra
     blockNum: asNumber(input.blockNum ?? input.block_num),
     blockTime: asOptionalString(input.blockTime ?? input.block_time),
     producer: asOptionalString(input.producer),
-    actions: actionSource.map((action) => mapExplorerAction<TActionData>(action as ExplorerActionLike)),
+    actions: actionSource.map((action) =>
+      mapExplorerAction<TActionData>(action as ExplorerActionLike),
+    ),
     resourceUsage,
     console: asOptionalString(input.console),
     returnValue: input.returnValue ?? input.return_value,

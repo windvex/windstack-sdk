@@ -1,38 +1,41 @@
 # @windstack/vexanium
 
-Vexanium provider client, chain metadata, signing requests, and explorer helpers.
+## Overview
+
+`@windstack/vexanium` provides Vexanium network metadata, browser wallet-provider access, Vexanium Signing Requests, session observation, asset helpers, and Wind Explorer URL utilities.
+
+VEX Native configuration exposed by this package uses:
+
+- Chain ID: `f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f`
+- RPC and API: `https://api.windcrypto.com`
+- System contract: `vexcore`
+- Native token contract: `vex.token`
+- Native symbol: `VEX`
+- Precision: `4`
+
+The package also exposes VEX EVM metadata for chain ID `6736` (`0x1a50`) and the WindStack EVM endpoints.
+
+## Installation
 
 ```bash
 npm install @windstack/vexanium
 ```
 
-The package uses the current WharfKit Antelope and Signing Request libraries. It does not define a second transaction serializer.
+## Usage
 
-## Network Metadata
+### Network metadata
 
 ```ts
 import { vexEvm, vexNative } from "@windstack/vexanium";
+
+console.log(vexNative.chainId);
+console.log(vexNative.contracts.system); // vexcore
+console.log(vexNative.contracts.token); // vex.token
+console.log(vexNative.token.symbol); // VEX
+console.log(vexEvm.chainId); // 6736
 ```
 
-VEX Native:
-
-- Chain ID: `f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f`
-- CAIP-2 scope: `antelope:f9f432b1851b5c179d2091a96f593aa`
-- RPC/API base: `https://api.windcrypto.com`
-- Token: `VEX`, precision 4
-
-VEX EVM:
-
-- Chain ID: `6736` (`0x1a50`)
-- Native currency: `VEX`, 18 decimals
-- JSON-RPC: `https://api.windcrypto.com/rpc`
-- Indexed data API: `https://api.windcrypto.com/v3/evm`
-- Live stats: `https://api.windcrypto.com/v3/evm/stats`
-- Explorer: `https://explorer.windcrypto.com/evm`
-
-Use `vexEvm.rpcUrl` with JSON-RPC clients and `wallet_addEthereumChain`. The indexed API remains a separate REST service.
-
-## Connect
+### Wallet connection
 
 ```ts
 import { createVexaniumClient, vexNative } from "@windstack/vexanium";
@@ -51,28 +54,20 @@ if (accounts.length === 0) {
 }
 ```
 
-The client discovers providers announced on the page or exposed as `window.vexanium`. `providerInfo` is required, so the SDK never invents a wallet name for an unknown provider.
-
-`getAccounts()` checks an existing permission without prompting. `connect()` requests permission and creates an in-memory session mirror. Provider events and browser focus/visibility changes keep that mirror in sync.
+`getAccounts()` reads an existing wallet permission without opening a connection prompt. `connect()` requests wallet authorization for the selected Vexanium chain. Provider events and browser visibility changes keep the local session view synchronized with the wallet.
 
 ```ts
 const unsubscribe = client.subscribeSession(({ session, reason }) => {
-  updateWalletState(session, reason);
+  console.log(session, reason);
 });
 
 unsubscribe();
 client.destroy();
 ```
 
-## SessionKit
+### Exact transaction signing
 
-For a normal VEX Native dApp, use `@windstack/wallet-plugin-wisp`. SessionKit resolves the transaction and the plugin forwards the exact serialized bytes to the provider.
-
-```bash
-npm install @windstack/wallet-plugin-wisp @wharfkit/session
-```
-
-Direct exact-byte signing is also available:
+Applications that already have serialized Vexanium transaction bytes can request signatures without rebuilding the transaction:
 
 ```ts
 const result = await client.signTransaction({
@@ -81,16 +76,22 @@ const result = await client.signTransaction({
   account: "alice",
   permission: "active",
 });
+
+console.log(result.signatures);
 ```
 
-The client validates the full chain ID, serialized hex, Antelope names, and returned signatures before accepting the result.
+The client validates the full Vexanium chain ID, serialized hexadecimal payload, account and permission names, and returned signatures before accepting a result.
 
-## Vexanium Signing Requests
+### Vexanium Signing Requests
 
-Use VSR for a request that must travel through a QR code, link, clipboard, or external wallet.
+VSR is available for portable requests that need to move through QR codes, links, the clipboard, or an external wallet flow.
 
 ```ts
-import { createSigningRequest, parseSigningRequest, vexNative } from "@windstack/vexanium";
+import {
+  createSigningRequest,
+  parseSigningRequest,
+  vexNative,
+} from "@windstack/vexanium";
 
 const uri = await createSigningRequest({
   chainId: vexNative.chainId,
@@ -103,38 +104,40 @@ const uri = await createSigningRequest({
       from: "alice",
       to: "bob",
       quantity: "1.0000 VEX",
-      memo: "",
+      memo: "WindStack",
     },
   },
-}, { compress: true });
+});
 
 const request = parseSigningRequest(uri);
 ```
 
-New requests are encoded as `vsr:`. When `compress: true` is used, the SDK supplies its built-in zlib implementation for both encoding and parsing. Existing `esr:` input is accepted because the payload is parsed by WharfKit's Signing Request implementation. A custom `options.zlib` provider can still be supplied for specialized runtimes.
-
-## Utilities
+### Explorer and asset utilities
 
 ```ts
 import {
   buildExplorerAccountUrl,
   buildExplorerTxUrl,
   formatAsset,
-  mapExplorerTransaction,
   parseAsset,
 } from "@windstack/vexanium";
 
-const asset = parseAsset("-1.2500 VEX");
+const asset = parseAsset("1.2500 VEX");
 const value = formatAsset(asset.amount, asset.precision, asset.symbol);
+const accountUrl = buildExplorerAccountUrl("gvexa");
+const transactionUrl = buildExplorerTxUrl("transaction-id");
 ```
 
-Explorer URL builders encode path segments. `mapExplorerTransaction` maps common node and indexer response shapes into the explorer view model while preserving the raw response. It does not decode, rebuild, or serialize an Antelope transaction.
-Native token URLs use Wind Explorer's canonical `/tokens/:contract/:symbol` route when both identifiers are known.
+## Runtime
 
-## Provider Authors
+The provider client targets browser applications with a compatible Vexanium wallet provider. Network metadata and utility functions can also be used in server-side applications.
 
-The wallet contract, methods, errors, events, and security boundary are documented in the repository's `VEXANIUM-PROVIDER-V1.md` file.
+Application metadata is display information. Wallet permissions must be bound to a trusted runtime or transport origin rather than an origin supplied by application content.
+
+For transaction construction, ABI serialization, RPC, contract actions, account operations, and signing, use the dedicated `@windstack/antelope` package family.
 
 ## License
 
-MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.
+MIT License.
+
+Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.

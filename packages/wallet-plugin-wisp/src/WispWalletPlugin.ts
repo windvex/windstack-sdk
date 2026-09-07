@@ -1,47 +1,76 @@
-import { Bytes, PermissionLevel, Signature } from "@wharfkit/antelope";
-import { AbstractWalletPlugin, WalletPluginMetadata } from "@wharfkit/session";
-import type {
-  LoginContext,
-  TransactContext,
-  WalletPluginConfig,
-  WalletPluginLoginResponse,
-  WalletPluginSignResponse,
-} from "@wharfkit/session";
-import type { ResolvedSigningRequest } from "@wharfkit/signing-request";
+/**
+ * WindStack Antelope SDK
+ * Created by Gilang Ramadan
+ * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+ * SPDX-License-Identifier: MIT
+ */
+import { bytesToHex, type SignRequest, type Signer } from "@windstack/antelope";
+import type { DappMetadataInput } from "@windstack/core";
+import type { WalletLoginContext, WalletLoginResult, WalletPlugin } from "@windstack/session";
 import {
-  VEXANIUM_MAINNET_CHAIN_ID,
   VEXANIUM_ERROR_CODES,
+  VEXANIUM_MAINNET_CHAIN_ID,
   WISP_PROVIDER_RDNS,
+  VexaniumProviderError,
   createVexaniumClient,
+  type VexaniumAccount,
   type VexaniumClient,
   type VexaniumProvider,
-  VexaniumProviderError,
-  type VexSignTransactionResult,
 } from "@windstack/vexanium";
-import type { DappMetadataInput } from "@windstack/core";
+
+export type WispWalletPluginMetadata = {
+  name?: string;
+  description?: string;
+  icon?: string;
+  homepage?: string;
+};
 
 export type WispWalletPluginOptions = {
   provider?: VexaniumProvider;
   client?: VexaniumClient;
-  metadata?: ConstructorParameters<typeof WalletPluginMetadata>[0];
+  metadata?: WispWalletPluginMetadata;
   dapp?: DappMetadataInput;
 };
 
-/**
- * WharfKit WalletPlugin for Wisp on Vexanium Mainnet.
- *
- * SessionKit owns the dApp session lifecycle. This plugin only adapts
- * SessionKit login/sign requests to the Wisp Vexanium provider.
- */
-export class WispWalletPlugin extends AbstractWalletPlugin {
+class WispSigner implements Signer {
+  constructor(
+    private readonly client: VexaniumClient,
+    private readonly account: VexaniumAccount,
+  ) {}
+
+  async getAvailableKeys(): Promise<readonly string[]> {
+    if (!this.account.publicKey) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+        "Wisp account identity must include a public key for required-key discovery",
+      );
+    }
+    return [this.account.publicKey];
+  }
+
+  async sign(request: SignRequest): Promise<readonly string[]> {
+    if (request.chainId !== VEXANIUM_MAINNET_CHAIN_ID) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+        `WispWalletPlugin cannot sign for unsupported chain: ${request.chainId}`,
+      );
+    }
+    const result = await this.client.signTransaction({
+      serializedTransaction: bytesToHex(request.serializedTransaction),
+      chainId: request.chainId,
+      account: this.account.actor,
+      permission: this.account.permission,
+    });
+    return result.signatures;
+  }
+}
+
+/** Native WindStack session plugin for Wisp on Vexanium Mainnet. */
+export class WispWalletPlugin implements WalletPlugin {
   readonly id = "wisp";
-  readonly config: WalletPluginConfig = {
-    requiresChainSelect: false,
-    requiresPermissionSelect: false,
-    requiresPermissionEntry: false,
-    supportedChains: [VEXANIUM_MAINNET_CHAIN_ID],
-  };
-  readonly metadata: WalletPluginMetadata;
+  readonly metadata: Readonly<
+    Required<Pick<WispWalletPluginMetadata, "name" | "description">> & WispWalletPluginMetadata
+  >;
 
   private readonly suppliedClient?: VexaniumClient;
   private readonly suppliedProvider?: VexaniumProvider;
@@ -49,11 +78,10 @@ export class WispWalletPlugin extends AbstractWalletPlugin {
   private clientPromise?: Promise<VexaniumClient>;
 
   constructor(options: WispWalletPluginOptions = {}) {
-    super();
     this.suppliedClient = options.client;
     this.suppliedProvider = options.provider;
     this.dapp = options.dapp;
-    this.metadata = new WalletPluginMetadata({
+    this.metadata = Object.freeze({
       name: "Wisp",
       description: "Connect and sign Vexanium transactions with Wisp.",
       ...options.metadata,
@@ -62,88 +90,66 @@ export class WispWalletPlugin extends AbstractWalletPlugin {
 
   private getClient(): Promise<VexaniumClient> {
     if (this.suppliedClient) return Promise.resolve(this.suppliedClient);
-
     this.clientPromise ??= createVexaniumClient({
       provider: this.suppliedProvider,
       providerRdns: this.suppliedProvider ? undefined : WISP_PROVIDER_RDNS,
       dapp: this.dapp,
     }).catch((error) => {
-      // A transient discovery failure must not permanently poison future login attempts.
       this.clientPromise = undefined;
       throw error;
     });
-
     return this.clientPromise;
   }
 
-  async login(context: LoginContext): Promise<WalletPluginLoginResponse> {
-    if (!context.chain) {
-      throw new VexaniumProviderError(
-        VEXANIUM_ERROR_CODES.INVALID_PARAMS,
-        "A SessionKit chain is required for Wisp login",
-      );
-    }
-
-    const chainId = context.chain.id.toString();
-    if (chainId !== VEXANIUM_MAINNET_CHAIN_ID) {
+  private assertChain(context: WalletLoginContext): void {
+    if (context.chain.id !== VEXANIUM_MAINNET_CHAIN_ID) {
       throw new VexaniumProviderError(
         VEXANIUM_ERROR_CODES.INVALID_PARAMS,
         `WispWalletPlugin supports Vexanium Mainnet only: ${VEXANIUM_MAINNET_CHAIN_ID}`,
-        { requestedChainId: chainId },
+        { requestedChainId: context.chain.id },
       );
     }
+  }
 
+  private loginResult(client: VexaniumClient, account: VexaniumAccount): WalletLoginResult {
+    return {
+      identity: {
+        actor: account.actor,
+        permission: account.permission,
+        publicKey: account.publicKey,
+      },
+      signer: new WispSigner(client, account),
+    };
+  }
+
+  async login(context: WalletLoginContext): Promise<WalletLoginResult> {
+    this.assertChain(context);
     const client = await this.getClient();
-    const account = await client.connectOne({ chainId });
-
-    return {
-      chain: context.chain.id,
-      permissionLevel: PermissionLevel.from(account.permissionLevel),
-    };
+    const account = await client.connectOne({ chainId: context.chain.id });
+    return this.loginResult(client, account);
   }
 
-  async sign(
-    resolved: ResolvedSigningRequest,
-    _context: TransactContext,
-  ): Promise<WalletPluginSignResponse> {
-    const chainId = resolved.chainId.toString();
-    if (chainId !== VEXANIUM_MAINNET_CHAIN_ID) {
-      throw new VexaniumProviderError(
-        VEXANIUM_ERROR_CODES.INVALID_PARAMS,
-        `WispWalletPlugin cannot sign for unsupported chain: ${chainId}`,
-      );
-    }
-
-    // SessionKit has already resolved placeholders, ABI data, TAPOS, signer, and chain.
-    // Sign these exact serialized bytes directly; do not re-wrap the transaction as ESR/VSR.
-    const result = await (await this.getClient()).signTransaction({
-      serializedTransaction: Bytes.from(resolved.serializedTransaction).hexString,
-      chainId,
-      account: resolved.signer.actor.toString(),
-      permission: resolved.signer.permission.toString(),
+  async restore(
+    context: WalletLoginContext & {
+      identity: { actor: string; permission: string; publicKey?: string };
+    },
+  ): Promise<WalletLoginResult | null> {
+    this.assertChain(context);
+    const client = await this.getClient();
+    const session = client.getSession();
+    if (!session) return null;
+    const account = session.accounts.find(
+      (item) =>
+        item.actor === context.identity.actor && item.permission === context.identity.permission,
+    );
+    if (!account) return null;
+    return this.loginResult(client, {
+      ...account,
+      publicKey: account.publicKey ?? context.identity.publicKey,
     });
-
-    return {
-      resolved,
-      signatures: parseSignatures(result),
-    };
   }
-}
 
-function parseSignatures(result: Pick<VexSignTransactionResult, "signatures">): Signature[] {
-  if (!Array.isArray(result.signatures) || result.signatures.length === 0) {
-    throw new VexaniumProviderError(
-      VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-      "Wisp returned no transaction signatures",
-    );
-  }
-  try {
-    return result.signatures.map((signature) => Signature.from(signature));
-  } catch (error) {
-    throw new VexaniumProviderError(
-      VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-      "Wisp returned an invalid Antelope signature",
-      error,
-    );
+  async logout(): Promise<void> {
+    await (await this.getClient()).disconnect();
   }
 }

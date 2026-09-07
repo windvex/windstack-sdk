@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - feat/native-antelope-sdk-v1
+      - audit/release-1.0.0-hardening
   pull_request:
 
 permissions:
@@ -25,11 +25,25 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version-file: ".nvmrc"
           package-manager-cache: false
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Validate native Antelope packages
-        run: npm run validate:native
-      - name: Validate full SDK
-        run: npm run validate
+        run: npm ci
+      - name: Check formatting
+        run: npm run format:check
+      - name: Check release metadata
+        run: npm run check:release
+      - name: Build native Antelope packages
+        run: npm run build:native
+      - name: Test native Antelope packages
+        run: npm run test:native
+      - name: Test Vexanium ABI fixtures
+        run: npm run test:vexanium-abi
+      - name: Build all packages
+        run: npm run build
+      - name: Run regression tests
+        run: npm test
+      - name: Check native package tarballs
+        run: npm run pack:native
+      - name: Audit native production dependencies
+        run: npm run audit:native

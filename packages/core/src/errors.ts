@@ -33,12 +33,13 @@ export class WispProviderError<TData = unknown> extends Error {
 }
 
 export function isWispProviderError(value: unknown): value is WispProviderError {
-  return value instanceof WispProviderError || (
-    typeof value === "object" &&
-    value !== null &&
-    "code" in value &&
-    typeof (value as { code: unknown }).code === "number" &&
-    Number.isInteger((value as { code: number }).code)
+  return (
+    value instanceof WispProviderError ||
+    (typeof value === "object" &&
+      value !== null &&
+      "code" in value &&
+      typeof (value as { code: unknown }).code === "number" &&
+      Number.isInteger((value as { code: number }).code))
   );
 }
 

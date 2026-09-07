@@ -13,8 +13,12 @@ export function isSolanaScope(value: unknown): value is SolanaScope {
   return typeof value === "string" && SOLANA_SCOPE_PATTERN.test(value);
 }
 
-export function normalizeSolanaAccount(value: unknown, fallbackScope: SolanaScope = DEFAULT_SOLANA_SCOPE): SolanaAccount {
-  if (!isSolanaScope(fallbackScope)) throw invalidParams("Invalid fallback Solana scope", fallbackScope);
+export function normalizeSolanaAccount(
+  value: unknown,
+  fallbackScope: SolanaScope = DEFAULT_SOLANA_SCOPE,
+): SolanaAccount {
+  if (!isSolanaScope(fallbackScope))
+    throw invalidParams("Invalid fallback Solana scope", fallbackScope);
   if (typeof value === "string" && isSolanaPublicKey(value)) {
     return { scope: fallbackScope, publicKey: value };
   }
@@ -33,7 +37,10 @@ export function normalizeSolanaAccount(value: unknown, fallbackScope: SolanaScop
   throw invalidParams("Invalid Solana account payload", value);
 }
 
-export function normalizeSolanaAccounts(value: unknown, fallbackScope: SolanaScope = DEFAULT_SOLANA_SCOPE): SolanaAccount[] {
+export function normalizeSolanaAccounts(
+  value: unknown,
+  fallbackScope: SolanaScope = DEFAULT_SOLANA_SCOPE,
+): SolanaAccount[] {
   if (!Array.isArray(value)) throw invalidParams("Invalid Solana accounts payload", value);
   return value.map((account) => normalizeSolanaAccount(account, fallbackScope));
 }
