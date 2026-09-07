@@ -4,7 +4,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const packageDirectories = ["crypto", "abi", "rpc", "contract", "account", "antelope", "session"];
+const packageDirectories = [
+  "crypto",
+  "abi",
+  "rpc",
+  "contract",
+  "account",
+  "antelope",
+  "signing-request",
+  "session",
+];
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 function run(command, args, options = {}) {
@@ -26,8 +35,9 @@ function requireCleanMain() {
     cwd: root,
     encoding: "utf8",
   }).trim();
-  if (branch !== "main")
+  if (branch !== "main") {
     throw new Error(`Release must run from main; current branch is ${branch || "detached"}`);
+  }
   const status = execFileSync("git", ["status", "--porcelain"], {
     cwd: root,
     encoding: "utf8",
@@ -46,10 +56,7 @@ function publishedVersion(name, version) {
       "--registry",
       "https://registry.npmjs.org/",
     ],
-    {
-      capture: true,
-      allowFailure: true,
-    },
+    { capture: true, allowFailure: true },
   );
   if (result.status === 0) {
     const parsed = JSON.parse(result.stdout || "null");
