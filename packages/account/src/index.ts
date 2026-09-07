@@ -356,7 +356,7 @@ export class AccountClient {
       {
         account: this.name,
         permission: validateName(permission, "Permission"),
-        parent: validateName(parent, "Parent permission"),
+        parent: validateOptionalName(parent, "Parent permission"),
         auth: authority,
         authorized_by: authorizedBy
           ? validateName(authorizedBy, "Authorized-by permission")
