@@ -33,6 +33,16 @@
     "@windstack/rpc": "1.0.0"
   },
   "sideEffects": false,
+  "keywords": [
+    "windstack",
+    "vexanium",
+    "antelope",
+    "transaction",
+    "signing",
+    "tapos",
+    "rpc",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "Gilang Ramadan",
   "repository": {
