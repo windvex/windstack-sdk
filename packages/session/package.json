@@ -25,6 +25,15 @@
     "@windstack/antelope": "1.0.0"
   },
   "sideEffects": false,
+  "keywords": [
+    "windstack",
+    "vexanium",
+    "antelope",
+    "wallet",
+    "session",
+    "wisp-wallet",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "Gilang Ramadan",
   "repository": {
