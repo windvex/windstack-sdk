@@ -71,6 +71,10 @@ const signer: Signer = {
 
 The built-in K1 signer uses the compatibility public-key representation expected by older Vexanium node software when resolving required keys. Applications can request current K1 public-key strings with `k1PublicKeyFormat: "modern"`.
 
+## Security
+
+The configured chain ID is checked before signing. Signer output is parsed, counted, recovered, and matched to the keys requested by the node before broadcast. Use `broadcast: false` when an application needs signed bytes without submission.
+
 ## Runtime
 
 The package is ESM-first and requires Node.js 20.19 or newer when used directly in Node.js. It uses Web-standard byte and networking APIs and does not require Node.js `Buffer` for transaction construction or signing.

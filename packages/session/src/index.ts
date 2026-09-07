@@ -5,4 +5,3 @@
  * SPDX-License-Identifier: MIT
  */
 export * from "./native.js";
-export * from "./compat.js";

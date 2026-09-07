@@ -43,11 +43,11 @@ export type SignRequest = {
   serializedTransaction: Uint8Array;
   serializedContextFreeData: Uint8Array;
   digest: Uint8Array;
-  requiredKeys: string[];
+  requiredKeys: readonly string[];
 };
 export interface Signer {
-  getAvailableKeys(): Promise<string[]>;
-  sign(request: SignRequest): Promise<Array<string | Signature>>;
+  getAvailableKeys(): Promise<readonly string[]>;
+  sign(request: SignRequest): Promise<readonly (string | Signature)[]>;
 }
 export type TransactArgs = {
   actions: Action[];
@@ -156,7 +156,7 @@ export function serializeContextFreeData(items: Uint8Array[]): Uint8Array {
 export function transactionDigest(
   chainId: string,
   serializedTransaction: Uint8Array,
-  contextFreeDataHash = new Uint8Array(32),
+  contextFreeDataHash: Uint8Array = new Uint8Array(32),
 ): Uint8Array {
   if (!/^[0-9a-f]{64}$/i.test(chainId)) {
     throw new TypeError("Antelope chain id must be exactly 64 hexadecimal characters");
@@ -182,6 +182,10 @@ export class PrivateKeySigner implements Signer {
 
   constructor(keys: PrivateKey[], options: PrivateKeySignerOptions = {}) {
     if (!keys.length) throw new TypeError("At least one private key is required");
+    const publicKeys = keys.map((key) => key.toPublicKey().toString());
+    if (new Set(publicKeys).size !== publicKeys.length) {
+      throw new TypeError("PrivateKeySigner cannot contain duplicate keys");
+    }
     this.#keys = [...keys];
     this.#k1PublicKeyFormat = options.k1PublicKeyFormat ?? "legacy";
   }
@@ -196,9 +200,7 @@ export class PrivateKeySigner implements Signer {
   }
 
   async sign(request: SignRequest): Promise<Signature[]> {
-    const keyMap = new Map(
-      this.#keys.map((key) => [key.toPublicKey().toString(), key] as const),
-    );
+    const keyMap = new Map(this.#keys.map((key) => [key.toPublicKey().toString(), key] as const));
     return request.requiredKeys.map((requiredKey) => {
       const normalized = PublicKey.fromString(requiredKey).toString();
       const key = keyMap.get(normalized);
@@ -310,9 +312,13 @@ export class AntelopeClient {
       digest,
       requiredKeys,
     });
-    const parsedSignatures = signed.map((value) =>
-      typeof value === "string" ? Signature.fromString(value) : value,
-    );
+    if (!Array.isArray(signed)) throw new TypeError("Signer returned an invalid signature list");
+    const parsedSignatures = signed.map((value) => {
+      if (typeof value === "string") return Signature.fromString(value);
+      if (!(value instanceof Signature))
+        throw new TypeError("Signer returned an invalid signature value");
+      return value;
+    });
     if (parsedSignatures.length !== requiredKeys.length) {
       throw new Error(
         `Signer returned ${parsedSignatures.length} signatures for ${requiredKeys.length} required keys`,

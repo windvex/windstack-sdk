@@ -45,6 +45,10 @@ A wallet plugin implements `login()` and returns a validated identity plus an An
 
 Stored session data contains identity and routing information, not private keys. Invalid or malformed stored data is ignored instead of being treated as a valid session.
 
+## Security
+
+Chain IDs, identities, plugin IDs, and signer interfaces are validated before a session becomes active. If persistence fails after wallet login, the plugin is logged out as a rollback. Logout clears local state even when wallet-side logout fails.
+
 ## Runtime
 
 The package is ESM-first and requires Node.js 20.19 or newer when used directly in Node.js. Browser and React Native applications can provide storage implementations appropriate for their security model.

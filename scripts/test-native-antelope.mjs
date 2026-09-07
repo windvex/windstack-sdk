@@ -1,23 +1,9 @@
 import assert from "node:assert/strict";
-import {
-  AbiSerializer,
-  bigIntToName,
-  nameToBigInt,
-} from "../packages/abi/dist/index.js";
-import {
-  AntelopeClient,
-  PrivateKeySigner,
-} from "../packages/antelope/dist/index.js";
-import {
-  PrivateKey,
-  PublicKey,
-  sha256Digest,
-} from "../packages/crypto/dist/index.js";
+import { AbiSerializer, bigIntToName, nameToBigInt } from "../packages/abi/dist/index.js";
+import { AntelopeClient, PrivateKeySigner } from "../packages/antelope/dist/index.js";
+import { PrivateKey, PublicKey, sha256Digest } from "../packages/crypto/dist/index.js";
 import { RpcClient } from "../packages/rpc/dist/index.js";
-import {
-  MemorySessionStorage,
-  SessionKit,
-} from "../packages/session/dist/index.js";
+import { MemorySessionStorage, SessionKit } from "../packages/session/dist/index.js";
 
 const scalarOne = Uint8Array.from({ length: 32 }, (_, index) => (index === 31 ? 1 : 0));
 const privateKey = PrivateKey.fromBytes("K1", scalarOne);
@@ -202,7 +188,10 @@ await storage.set("windstack:session", "{broken-json");
 const walletPlugin = {
   id: "test-wallet",
   async login() {
-    return { identity: { actor: "alice", permission: "active" }, signer: new PrivateKeySigner([privateKey]) };
+    return {
+      identity: { actor: "alice", permission: "active" },
+      signer: new PrivateKeySigner([privateKey]),
+    };
   },
 };
 const kit = new SessionKit({
