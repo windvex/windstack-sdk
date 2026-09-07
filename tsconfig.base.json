@@ -27,6 +27,7 @@
       "@windstack/contract": ["./packages/contract/dist/index.d.ts"],
       "@windstack/account": ["./packages/account/dist/index.d.ts"],
       "@windstack/antelope": ["./packages/antelope/dist/index.d.ts"],
+      "@windstack/signing-request": ["./packages/signing-request/dist/index.d.ts"],
       "@windstack/session": ["./packages/session/dist/index.d.ts"]
     }
   }
