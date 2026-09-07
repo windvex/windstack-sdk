@@ -51,14 +51,32 @@ export class MemorySessionStorage implements SessionStorage {
   }
 }
 
+function validateNonEmptyName(value: string, label: string): string {
+  if (typeof value !== "string" || !value) throw new TypeError(`${label} is required`);
+  nameToBigInt(value);
+  return value;
+}
+
 function validateIdentity(identity: SessionIdentity): SessionIdentity {
   if (!identity || typeof identity !== "object") throw new TypeError("Wallet returned no identity");
-  nameToBigInt(identity.actor);
-  nameToBigInt(identity.permission);
+  const actor = validateNonEmptyName(identity.actor, "Wallet identity actor");
+  const permission = validateNonEmptyName(identity.permission, "Wallet identity permission");
   if (identity.publicKey !== undefined && typeof identity.publicKey !== "string") {
     throw new TypeError("Wallet identity publicKey must be a string");
   }
-  return { ...identity };
+  return Object.freeze({ ...identity, actor, permission });
+}
+
+function validateSigner(signer: Signer): Signer {
+  if (
+    !signer ||
+    typeof signer !== "object" ||
+    typeof signer.getAvailableKeys !== "function" ||
+    typeof signer.sign !== "function"
+  ) {
+    throw new TypeError("Wallet returned an invalid signer");
+  }
+  return signer;
 }
 
 function validateChain(chain: SessionChain): SessionChain {
@@ -69,7 +87,36 @@ function validateChain(chain: SessionChain): SessionChain {
   if (!urls.length || urls.some((url) => typeof url !== "string" || !url.trim())) {
     throw new TypeError("Session chain requires at least one RPC URL");
   }
-  return { ...chain, id: chain.id.toLowerCase(), url: Array.isArray(chain.url) ? [...chain.url] : chain.url };
+  const contracts = chain.contracts
+    ? Object.freeze({
+        ...(chain.contracts.system
+          ? { system: validateNonEmptyName(chain.contracts.system, "System contract") }
+          : {}),
+        ...(chain.contracts.token
+          ? { token: validateNonEmptyName(chain.contracts.token, "Token contract") }
+          : {}),
+      })
+    : undefined;
+  return Object.freeze({
+    ...chain,
+    id: chain.id.toLowerCase(),
+    url: Array.isArray(chain.url) ? Object.freeze([...chain.url]) : chain.url,
+    contracts,
+  });
+}
+
+function validatePlugin(plugin: WalletPlugin): WalletPlugin {
+  if (
+    !plugin ||
+    typeof plugin !== "object" ||
+    typeof plugin.id !== "string" ||
+    !plugin.id.trim() ||
+    plugin.id !== plugin.id.trim() ||
+    typeof plugin.login !== "function"
+  ) {
+    throw new TypeError("Wallet plugins require a non-empty stable id and login function");
+  }
+  return plugin;
 }
 
 export class Session {
@@ -87,8 +134,8 @@ export class Session {
   }) {
     this.chain = validateChain(args.chain);
     this.identity = validateIdentity(args.identity);
-    this.walletPlugin = args.walletPlugin;
-    this.signer = args.signer;
+    this.walletPlugin = validatePlugin(args.walletPlugin);
+    this.signer = validateSigner(args.signer);
     this.client = new AntelopeClient({
       endpoints: this.chain.url,
       chainId: this.chain.id,
@@ -152,14 +199,18 @@ export class SessionKit {
     if (!options.chains.length) throw new TypeError("SessionKit requires at least one chain");
     if (!options.walletPlugins.length) throw new TypeError("SessionKit requires at least one wallet plugin");
     const chains = options.chains.map(validateChain);
+    const plugins = options.walletPlugins.map(validatePlugin);
     const chainIds = new Set(chains.map((chain) => chain.id));
     if (chainIds.size !== chains.length) throw new TypeError("SessionKit chain ids must be unique");
-    const pluginIds = new Set(options.walletPlugins.map((plugin) => plugin.id));
-    if (pluginIds.size !== options.walletPlugins.length || pluginIds.has("")) {
-      throw new TypeError("SessionKit wallet plugin ids must be non-empty and unique");
+    const pluginIds = new Set(plugins.map((plugin) => plugin.id));
+    if (pluginIds.size !== plugins.length) {
+      throw new TypeError("SessionKit wallet plugin ids must be unique");
     }
-    this.chains = chains;
-    this.walletPlugins = [...options.walletPlugins];
+    if (options.storageKey !== undefined && !options.storageKey.trim()) {
+      throw new TypeError("Session storage key must be non-empty");
+    }
+    this.chains = Object.freeze(chains);
+    this.walletPlugins = Object.freeze(plugins);
     this.appName = options.appName;
     this.storage = options.storage ?? new MemorySessionStorage();
     this.storageKey = options.storageKey ?? "windstack:session";
@@ -170,6 +221,9 @@ export class SessionKit {
   }
 
   async login(options: { chainId?: string; walletPluginId?: string } = {}): Promise<Session> {
+    if (this.#session) {
+      throw new Error("A wallet session is already active; logout before starting another session");
+    }
     const requestedChainId = options.chainId?.toLowerCase();
     const chain = requestedChainId
       ? this.chains.find((item) => item.id === requestedChainId)
@@ -185,17 +239,31 @@ export class SessionKit {
       chain,
       identity: validateIdentity(result.identity),
       walletPlugin: plugin,
-      signer: result.signer,
+      signer: validateSigner(result.signer),
     });
-    await this.storage.set(
-      this.storageKey,
-      JSON.stringify({ chainId: chain.id, walletPluginId: plugin.id, identity: session.identity }),
-    );
+    try {
+      await this.storage.set(
+        this.storageKey,
+        JSON.stringify({
+          chainId: chain.id,
+          walletPluginId: plugin.id,
+          identity: session.identity,
+        }),
+      );
+    } catch (error) {
+      if (plugin.logout) {
+        await plugin
+          .logout({ chain, appName: this.appName, identity: session.identity })
+          .catch(() => undefined);
+      }
+      throw error;
+    }
     this.#session = session;
     return session;
   }
 
   async restore(): Promise<Session | null> {
+    if (this.#session) return this.#session;
     const stored = await this.getStoredSession();
     if (!stored) return null;
     const chain = this.chains.find((item) => item.id === stored.chainId.toLowerCase());
@@ -211,14 +279,23 @@ export class SessionKit {
       chain,
       identity: validateIdentity(result.identity),
       walletPlugin: plugin,
-      signer: result.signer,
+      signer: validateSigner(result.signer),
     });
+    await this.storage.set(
+      this.storageKey,
+      JSON.stringify({
+        chainId: chain.id,
+        walletPluginId: plugin.id,
+        identity: session.identity,
+      }),
+    );
     this.#session = session;
     return session;
   }
 
   async logout(): Promise<void> {
     const session = this.#session;
+    let logoutError: unknown;
     try {
       if (session?.walletPlugin.logout) {
         await session.walletPlugin.logout({
@@ -227,10 +304,23 @@ export class SessionKit {
           identity: session.identity,
         });
       }
-    } finally {
-      this.#session = null;
-      await this.storage.remove(this.storageKey);
+    } catch (error) {
+      logoutError = error;
     }
+
+    this.#session = null;
+    let storageError: unknown;
+    try {
+      await this.storage.remove(this.storageKey);
+    } catch (error) {
+      storageError = error;
+    }
+
+    if (logoutError && storageError) {
+      throw new AggregateError([logoutError, storageError], "Wallet logout and session cleanup failed");
+    }
+    if (logoutError) throw logoutError;
+    if (storageError) throw storageError;
   }
 
   async getStoredSession(): Promise<StoredSession | null> {
@@ -240,14 +330,16 @@ export class SessionKit {
       const value = JSON.parse(raw) as Partial<StoredSession>;
       if (
         typeof value.chainId !== "string" ||
+        !/^[0-9a-f]{64}$/i.test(value.chainId) ||
         typeof value.walletPluginId !== "string" ||
+        !value.walletPluginId.trim() ||
         typeof value.identity !== "object" ||
         !value.identity
       ) {
         return null;
       }
       return {
-        chainId: value.chainId,
+        chainId: value.chainId.toLowerCase(),
         walletPluginId: value.walletPluginId,
         identity: validateIdentity(value.identity),
       };
