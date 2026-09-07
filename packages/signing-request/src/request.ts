@@ -51,11 +51,13 @@ export const SIGNING_REQUEST_PLACEHOLDER_ACTOR = "............1";
 export const SIGNING_REQUEST_PLACEHOLDER_PERMISSION = "............2";
 
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 const serializer = new AbiSerializer(SIGNING_REQUEST_ABI);
 const REQUEST_SIGNATURE_WIRE_BYTES = 74;
+const CHAIN_IDS_INFO_KEY = "chain_ids";
 
-function validateName(value: string, label: string, allowEmpty = false): string {
-  if (typeof value !== "string" || (!allowEmpty && value.length === 0)) {
+function validateName(value: string, label: string): string {
+  if (typeof value !== "string" || value.length === 0) {
     throw new TypeError(`${label} is required`);
   }
   nameToBigInt(value);
@@ -66,26 +68,32 @@ function normalizeHex(value: string | Uint8Array, label: string): string {
   if (value instanceof Uint8Array) return bytesToHex(value);
   if (typeof value !== "string") throw new TypeError(`${label} must be bytes or hexadecimal`);
   const normalized = value.startsWith("0x") ? value.slice(2) : value;
-  if (!/^(?:[0-9a-f]{2})*$/i.test(normalized)) throw new TypeError(`${label} must be valid hexadecimal`);
+  if (!/^(?:[0-9a-f]{2})*$/i.test(normalized)) {
+    throw new TypeError(`${label} must be valid hexadecimal`);
+  }
   return normalized.toLowerCase();
+}
+
+function normalizeChainValue(value: string | number, label: string): SigningRequestChain {
+  if (typeof value === "number") {
+    if (!Number.isInteger(value) || value < 0 || value > 255) {
+      throw new RangeError(`${label} alias must be an integer between 0 and 255`);
+    }
+    return { type: "chain_alias", value };
+  }
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/i.test(value)) {
+    throw new TypeError(`${label} must be a 64-character chain id or a numeric alias`);
+  }
+  return { type: "chain_id", value: value.toLowerCase() };
 }
 
 function normalizeChain(args: SigningRequestCreateArguments): SigningRequestChain {
   if (args.chainId !== undefined && args.chainAlias !== undefined) {
     throw new TypeError("Specify either chainId or chainAlias, not both");
   }
-  if (args.chainId !== undefined) {
-    const chainId = args.chainId.toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(chainId)) {
-      throw new TypeError("Signing-request chainId must be a 64-character hexadecimal chain id");
-    }
-    return { type: "chain_id", value: chainId };
-  }
+  if (args.chainId !== undefined) return normalizeChainValue(args.chainId, "Signing-request chain");
   if (args.chainAlias !== undefined) {
-    if (!Number.isInteger(args.chainAlias) || args.chainAlias < 0 || args.chainAlias > 255) {
-      throw new RangeError("Signing-request chainAlias must be an integer between 0 and 255");
-    }
-    return { type: "chain_alias", value: args.chainAlias };
+    return normalizeChainValue(args.chainAlias, "Signing-request chain");
   }
   throw new TypeError("Signing request requires chainId or chainAlias");
 }
@@ -129,6 +137,21 @@ async function normalizeAction(
   return { account, name, authorization, data };
 }
 
+function assertTransactionNumbers(transaction: SigningRequestTransactionInput): void {
+  const checks: Array<[number, number, string]> = [
+    [transaction.ref_block_num, 0xffff, "ref_block_num"],
+    [transaction.ref_block_prefix, 0xffffffff, "ref_block_prefix"],
+    [transaction.max_net_usage_words, 0xffffffff, "max_net_usage_words"],
+    [transaction.max_cpu_usage_ms, 0xff, "max_cpu_usage_ms"],
+    [transaction.delay_sec, 0xffffffff, "delay_sec"],
+  ];
+  for (const [value, max, label] of checks) {
+    if (!Number.isInteger(value) || value < 0 || value > max) {
+      throw new RangeError(`${label} must be an integer between 0 and ${max}`);
+    }
+  }
+}
+
 async function normalizeTransaction(
   transaction: SigningRequestTransactionInput,
   abiProvider: SigningRequestEncodingOptions["abiProvider"],
@@ -137,6 +160,10 @@ async function normalizeTransaction(
   if (!transaction || typeof transaction !== "object") {
     throw new TypeError("Signing-request transaction is required");
   }
+  if (!Array.isArray(transaction.actions)) {
+    throw new TypeError("Signing-request transaction actions must be an array");
+  }
+  assertTransactionNumbers(transaction);
   const contextFreeActions = await Promise.all(
     (transaction.context_free_actions ?? []).map((action) =>
       normalizeAction(action, abiProvider, signal),
@@ -185,7 +212,9 @@ function normalizeInfo(info: SigningRequestInfoInput | undefined): SigningReques
     : Object.entries(info);
   const seen = new Set<string>();
   return entries.map(([key, rawValue]) => {
-    if (typeof key !== "string" || !key.length) throw new TypeError("Signing-request info key cannot be empty");
+    if (typeof key !== "string" || !key.length) {
+      throw new TypeError("Signing-request info key cannot be empty");
+    }
     if (seen.has(key)) throw new TypeError(`Duplicate signing-request info key: ${key}`);
     seen.add(key);
     const value = rawValue instanceof Uint8Array
@@ -197,6 +226,35 @@ function normalizeInfo(info: SigningRequestInfoInput | undefined): SigningReques
   });
 }
 
+function normalizeAllowedChains(
+  allowedChains: Array<string | number> | undefined,
+  primaryChain: SigningRequestChain,
+  info: SigningRequestInfoPair[],
+): SigningRequestInfoPair[] {
+  if (allowedChains === undefined) return info;
+  if (primaryChain.type !== "chain_alias" || primaryChain.value !== 0) {
+    throw new TypeError("allowedChains is only valid for a multi-chain request using chainAlias 0");
+  }
+  if (!Array.isArray(allowedChains) || allowedChains.length === 0) {
+    throw new TypeError("allowedChains must contain at least one chain");
+  }
+  if (info.some((pair) => pair.key === CHAIN_IDS_INFO_KEY)) {
+    throw new TypeError("chain_ids info is managed by allowedChains and cannot be supplied twice");
+  }
+  const chains = allowedChains.map((chain, index) =>
+    normalizeChainValue(chain, `Allowed chain ${index}`),
+  );
+  const identities = chains.map((chain) => `${chain.type}:${chain.value}`);
+  if (new Set(identities).size !== identities.length) {
+    throw new TypeError("allowedChains cannot contain duplicate chains");
+  }
+  const encoded = serializer.encode(
+    "variant_id[]",
+    chains.map((chain) => ({ type: chain.type, value: chain.value })),
+  );
+  return [...info, { key: CHAIN_IDS_INFO_KEY, value: bytesToHex(encoded) }];
+}
+
 async function createPayload(
   args: SigningRequestCreateArguments,
   options: SigningRequestEncodingOptions,
@@ -205,7 +263,9 @@ async function createPayload(
     (value) => value !== undefined,
   );
   if (supplied.length !== 1) {
-    throw new TypeError("Signing request must contain exactly one action, actions, transaction, or identity request");
+    throw new TypeError(
+      "Signing request must contain exactly one action, actions, transaction, or identity request",
+    );
   }
   if (args.action) {
     return {
@@ -297,7 +357,11 @@ function validateFlags(data: SigningRequestData): void {
   }
 }
 
-function parseUri(uri: string): { scheme: SigningRequestScheme; payload: string; slashes: boolean } {
+function parseUri(uri: string): {
+  scheme: SigningRequestScheme;
+  payload: string;
+  slashes: boolean;
+} {
   if (typeof uri !== "string" || !uri.length || uri !== uri.trim()) {
     throw new TypeError("Invalid signing-request URI");
   }
@@ -312,11 +376,11 @@ function parseUri(uri: string): { scheme: SigningRequestScheme; payload: string;
 
 export class SigningRequest {
   readonly version: number;
-  readonly data: SigningRequestData;
-  readonly requestSignature: SigningRequestSignature | null;
   readonly sourceUri: string | null;
   readonly sourceScheme: SigningRequestScheme | null;
   readonly sourceSlashes: boolean;
+  readonly #data: SigningRequestData;
+  readonly #requestSignature: SigningRequestSignature | null;
 
   private constructor(args: {
     version: number;
@@ -335,8 +399,10 @@ export class SigningRequest {
     }
     validateFlags(args.data);
     this.version = args.version;
-    this.data = Object.freeze(cloneData(args.data));
-    this.requestSignature = args.requestSignature ?? null;
+    this.#data = cloneData(args.data);
+    this.#requestSignature = args.requestSignature
+      ? Object.freeze({ ...args.requestSignature })
+      : null;
     this.sourceUri = args.sourceUri ?? null;
     this.sourceScheme = args.sourceScheme ?? null;
     this.sourceSlashes = args.sourceSlashes ?? false;
@@ -351,15 +417,11 @@ export class SigningRequest {
     const flags =
       (args.broadcast ? SIGNING_REQUEST_FLAG_BROADCAST : 0) |
       (args.background ? SIGNING_REQUEST_FLAG_BACKGROUND : 0);
+    const chainId = normalizeChain(args);
+    const info = normalizeAllowedChains(args.allowedChains, chainId, normalizeInfo(args.info));
     return new SigningRequest({
       version: SIGNING_REQUEST_PROTOCOL_VERSION,
-      data: {
-        chainId: normalizeChain(args),
-        request,
-        flags,
-        callback,
-        info: normalizeInfo(args.info),
-      },
+      data: { chainId, request, flags, callback, info },
     });
   }
 
@@ -381,7 +443,9 @@ export class SigningRequest {
     const payload = compressed
       ? compression.inflate(encoded.slice(1), maxDecodedBytes)
       : encoded.slice(1);
-    if (payload.length > maxDecodedBytes) throw new RangeError("Signing-request payload is too large");
+    if (payload.length > maxDecodedBytes) {
+      throw new RangeError("Signing-request payload is too large");
+    }
 
     let data: SigningRequestData;
     let requestSignature: SigningRequestSignature | null = null;
@@ -412,30 +476,58 @@ export class SigningRequest {
     });
   }
 
+  get data(): SigningRequestData {
+    return cloneData(this.#data);
+  }
+
+  get requestSignature(): SigningRequestSignature | null {
+    return this.#requestSignature ? { ...this.#requestSignature } : null;
+  }
+
   get isBroadcast(): boolean {
-    return (this.data.flags & SIGNING_REQUEST_FLAG_BROADCAST) !== 0;
+    return (this.#data.flags & SIGNING_REQUEST_FLAG_BROADCAST) !== 0;
   }
 
   get isBackground(): boolean {
-    return (this.data.flags & SIGNING_REQUEST_FLAG_BACKGROUND) !== 0;
+    return (this.#data.flags & SIGNING_REQUEST_FLAG_BACKGROUND) !== 0;
   }
 
   get isIdentity(): boolean {
-    return this.data.request.type === "identity";
+    return this.#data.request.type === "identity";
   }
 
   getData(): SigningRequestData {
-    return cloneData(this.data);
+    return cloneData(this.#data);
   }
 
   getInfo(key: string): Uint8Array | null {
-    const pair = this.data.info.find((item) => item.key === key);
+    const pair = this.#data.info.find((item) => item.key === key);
     return pair ? hexToBytes(pair.value) : null;
   }
 
   getInfoText(key: string): string | null {
     const value = this.getInfo(key);
-    return value ? new TextDecoder().decode(value) : null;
+    return value ? decoder.decode(value) : null;
+  }
+
+  getAllowedChains(): SigningRequestChain[] {
+    const value = this.getInfo(CHAIN_IDS_INFO_KEY);
+    if (!value) return [];
+    const decoded = serializer.decode("variant_id[]", value);
+    if (!Array.isArray(decoded)) throw new TypeError("Invalid chain_ids signing-request info");
+    return decoded.map((item) => {
+      if (!item || typeof item !== "object") {
+        throw new TypeError("Invalid chain_ids signing-request entry");
+      }
+      const record = item as { type?: unknown; value?: unknown };
+      if (record.type === "chain_alias") {
+        return normalizeChainValue(Number(record.value), "Allowed chain");
+      }
+      if (record.type === "chain_id") {
+        return normalizeChainValue(String(record.value), "Allowed chain");
+      }
+      throw new TypeError("Invalid chain_ids signing-request selector");
+    });
   }
 
   getRequestDigest(): Uint8Array {
@@ -453,7 +545,7 @@ export class SigningRequest {
     const signature = privateKey.signDigest(this.getRequestDigest());
     return new SigningRequest({
       version: this.version,
-      data: this.data,
+      data: this.#data,
       requestSignature: { signer, signature },
       sourceScheme: this.sourceScheme,
       sourceSlashes: this.sourceSlashes,
@@ -461,33 +553,35 @@ export class SigningRequest {
   }
 
   verifyRequestSignature(publicKey: PublicKey): boolean {
-    return this.requestSignature?.signature.verifyDigest(this.getRequestDigest(), publicKey) ?? false;
+    return this.#requestSignature?.signature.verifyDigest(this.getRequestDigest(), publicKey) ?? false;
   }
 
   serializeBody(): Uint8Array {
-    return serializer.encode("signing_request", toAbiData(this.data));
+    return serializer.encode("signing_request", toAbiData(this.#data));
   }
 
   serializePayload(): Uint8Array {
     const body = this.serializeBody();
-    if (!this.requestSignature) return body;
+    if (!this.#requestSignature) return body;
     const signature = serializer.encode("request_signature", {
-      signer: this.requestSignature.signer,
-      signature: this.requestSignature.signature.toString(),
+      signer: this.#requestSignature.signer,
+      signature: this.#requestSignature.signature.toString(),
     });
     return concatBytes(body, signature);
   }
 
   encode(
     compress = false,
-    slashes = this.sourceSlashes,
-    scheme: SigningRequestScheme = this.sourceScheme ?? "esr",
+    slashes = false,
+    scheme: SigningRequestScheme = "esr",
     compressionProvider: CompressionProvider = pakoCompressionProvider,
   ): string {
     const raw = this.serializePayload();
     const payload = compress ? compressionProvider.deflate(raw) : raw;
     const header = this.version | (compress ? 0x80 : 0);
-    return `${scheme}:${slashes ? "//" : ""}${encodeBase64Url(concatBytes(Uint8Array.of(header), payload))}`;
+    return `${scheme}:${slashes ? "//" : ""}${encodeBase64Url(
+      concatBytes(Uint8Array.of(header), payload),
+    )}`;
   }
 }
 
