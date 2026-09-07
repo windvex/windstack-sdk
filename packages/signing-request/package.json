@@ -32,6 +32,16 @@
     "@types/pako": "^2.0.4"
   },
   "sideEffects": false,
+  "keywords": [
+    "windstack",
+    "vexanium",
+    "antelope",
+    "vsr",
+    "esr",
+    "signing-request",
+    "wallet",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "Gilang Ramadan",
   "repository": {
