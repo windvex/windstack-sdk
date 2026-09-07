@@ -1,11 +1,18 @@
 # @windstack/wallet-plugin-wisp
 
-WharfKit SessionKit wallet plugin for Wisp on Vexanium Mainnet.
+## Overview
+
+`@windstack/wallet-plugin-wisp` connects SessionKit applications to Wisp Wallet on Vexanium Mainnet. It handles wallet discovery, account authorization, exact transaction signing, chain validation, and conversion of wallet signatures into the format expected by the connected session.
+
+The plugin is restricted to Vexanium Mainnet and selects the Wisp provider identified by `com.wisp.wallet` unless a provider or client is supplied explicitly.
+
+## Installation
 
 ```bash
-npm install @windstack/wallet-plugin-wisp @windstack/vexanium \
-  @wharfkit/session @wharfkit/antelope @wharfkit/signing-request
+npm install @windstack/wallet-plugin-wisp
 ```
+
+## Usage
 
 ```ts
 import { SessionKit } from "@wharfkit/session";
@@ -29,18 +36,24 @@ await session.transact({
       from: session.actor,
       to: "receiver",
       quantity: "1.0000 VEX",
-      memo: "",
+      memo: "WindStack",
     },
   },
 });
 ```
 
-SessionKit resolves placeholders, ABI data, signer, TAPOS, and transaction bytes. The plugin sends `ResolvedSigningRequest.serializedTransaction` to Wisp through `vex_signTransaction` and converts the returned strings to WharfKit `Signature` values.
+The session resolves the Vexanium transaction before signing. The plugin forwards the exact serialized transaction bytes to Wisp through the Vexanium provider and returns the resulting signatures to the session.
 
-The plugin supports Vexanium Mainnet only. It rejects a different chain during both login and signing. Unless a provider or client is supplied explicitly, it selects the provider whose reverse-DNS identifier is `com.wisp.wallet`.
+A different chain ID is rejected during both login and signing. Portable Vexanium Signing Requests are handled separately by `@windstack/vexanium`.
 
-Portable `vsr:` requests are handled by `@windstack/vexanium`; they are separate from the connected SessionKit transaction path.
+## Runtime
+
+The package targets browser applications with Wisp Wallet available through the Vexanium provider interface. It does not store private keys and does not rebuild transactions after the session has resolved them.
+
+Applications should provide accurate dApp metadata and must treat wallet authorization as origin-bound permission state.
 
 ## License
 
-MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.
+MIT License.
+
+Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.
