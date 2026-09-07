@@ -1,5 +1,14 @@
-import { SigningRequest, type ZlibProvider } from "@wharfkit/signing-request";
-import { deflateRaw, inflateRaw } from "pako";
+/**
+ * WindStack Antelope SDK
+ * Created by Gilang Ramadan
+ * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+ * SPDX-License-Identifier: MIT
+ */
+import {
+  SigningRequest,
+  pakoCompressionProvider,
+  type CompressionProvider,
+} from "@windstack/signing-request";
 import { ESR_SCHEME, VSR_SCHEME } from "./constants.js";
 import type {
   CanonicalSigningRequestUri,
@@ -7,73 +16,76 @@ import type {
   VexSigningRequestCreateOptions,
   VexSigningRequestParseOptions,
   VexSigningRequestUri,
+  VexSigningRequestZlibProvider,
 } from "./types.js";
 
-const defaultZlib: ZlibProvider = { deflateRaw, inflateRaw };
+function compressionProvider(zlib?: VexSigningRequestZlibProvider): CompressionProvider {
+  if (!zlib) return pakoCompressionProvider;
+  return {
+    deflate(data) {
+      const output = zlib.deflateRaw(data);
+      if (!(output instanceof Uint8Array)) {
+        throw new TypeError("VSR compression provider returned invalid deflate output");
+      }
+      return output;
+    },
+    inflate(data, maxOutputBytes) {
+      const output = zlib.inflateRaw(data);
+      if (!(output instanceof Uint8Array)) {
+        throw new TypeError("VSR compression provider returned invalid inflate output");
+      }
+      if (maxOutputBytes !== undefined && output.length > maxOutputBytes) {
+        throw new RangeError("Inflated signing request exceeds the configured size limit");
+      }
+      return output;
+    },
+  };
+}
 
-/**
- * Create the canonical Vexanium Signing Request URI.
- *
- * VSR v1 uses the ESR Revision 3 compatible payload implemented by WharfKit,
- * with the Vexanium-owned `vsr:` URI scheme. Existing `esr:` URIs remain accepted
- * as interoperability input.
- */
+/** Create a canonical Vexanium Signing Request URI. */
 export async function createSigningRequest(
   args: VexSigningRequestCreateInput,
   options: VexSigningRequestCreateOptions = {},
 ): Promise<CanonicalSigningRequestUri> {
-  const { compress, slashes, ...createOptions } = options;
-  const zlib = createOptions.zlib ?? (compress === true ? defaultZlib : undefined);
-  const request = await SigningRequest.create(args, { ...createOptions, zlib });
-  return encodeSigningRequest(request, { compress, slashes, zlib });
+  const request = await SigningRequest.create(args, {
+    abiProvider: options.abiProvider,
+    maxDecodedBytes: options.maxDecodedBytes,
+    signal: options.signal,
+  });
+  return encodeSigningRequest(request, options);
 }
 
-/** Encode a WharfKit SigningRequest using the canonical Vexanium `vsr:` scheme. */
+/** Encode a native WindStack SigningRequest using the canonical Vexanium `vsr:` scheme. */
 export function encodeSigningRequest(
   request: SigningRequest,
   options: Pick<VexSigningRequestCreateOptions, "compress" | "slashes" | "zlib"> = {},
 ): CanonicalSigningRequestUri {
-  const zlib = options.zlib ?? defaultZlib;
-  const encodableRequest =
-    options.compress === true ? SigningRequest.from(request.encode(false), { zlib }) : request;
-
-  return encodableRequest.encode(
-    options.compress,
+  return request.encode(
+    options.compress ?? false,
     options.slashes ?? true,
-    VSR_SCHEME,
+    "vsr",
+    compressionProvider(options.zlib),
   ) as CanonicalSigningRequestUri;
 }
 
 function assertSigningRequestUri(uri: VexSigningRequestUri): VexSigningRequestUri {
   if (typeof uri !== "string" || uri.length === 0 || uri !== uri.trim()) {
-    throw new Error("Invalid signing-request URI");
+    throw new TypeError("Invalid signing-request URI");
   }
-
-  const separatorIndex = uri.indexOf(":");
-  if (separatorIndex <= 0) {
-    throw new Error("Signing-request URI must use the vsr: or esr: scheme");
-  }
-
-  const scheme = uri.slice(0, separatorIndex + 1);
-  const payload = uri.slice(separatorIndex + 1);
-
+  const scheme = uri.slice(0, uri.indexOf(":") + 1).toLowerCase();
   if (scheme !== VSR_SCHEME && scheme !== ESR_SCHEME) {
-    throw new Error(`Unsupported signing-request scheme: ${scheme}`);
+    throw new TypeError("Signing-request URI must use the vsr: or esr: scheme");
   }
-  if (payload.replace(/^\/\//, "").length === 0) {
-    throw new Error("Signing-request URI payload is empty");
-  }
-
   return uri;
 }
 
-/** Parse compressed or uncompressed VSR/ESR without rewriting its URI or payload. */
+/** Parse compressed or uncompressed VSR/ESR without changing the source request. */
 export function parseSigningRequest(
   uri: VexSigningRequestUri,
   options: VexSigningRequestParseOptions = {},
 ): SigningRequest {
   return SigningRequest.from(assertSigningRequestUri(uri), {
-    ...options,
-    zlib: options.zlib ?? defaultZlib,
+    maxDecodedBytes: options.maxDecodedBytes,
+    compressionProvider: compressionProvider(options.zlib),
   });
 }
