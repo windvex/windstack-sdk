@@ -32,6 +32,8 @@ jobs:
         run: npm run format:check
       - name: Check release metadata
         run: npm run check:release
+      - name: Check public package surface
+        run: npm run check:public
       - name: Build native Antelope packages
         run: npm run build:native
       - name: Test native Antelope packages
