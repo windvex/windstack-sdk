@@ -23,11 +23,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@wharfkit/signing-request": "^3.4.0",
     "@windstack/abi": "1.0.0",
     "@windstack/core": "0.6.2",
     "@windstack/crypto": "1.0.0",
-    "pako": "^2.2.0"
+    "@windstack/signing-request": "1.0.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -40,7 +39,6 @@
     "dapp",
     "antelope",
     "vsr",
-    "wharfkit",
     "typescript",
     "esr",
     "signing-request",
@@ -62,9 +60,6 @@
     "registry": "https://registry.npmjs.org/"
   },
   "engines": {
-    "node": ">=18"
-  },
-  "devDependencies": {
-    "@types/pako": "^2.0.4"
+    "node": ">=20.19.0"
   }
 }
