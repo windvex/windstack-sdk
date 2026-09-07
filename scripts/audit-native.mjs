@@ -11,7 +11,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const packages = ["crypto", "abi", "rpc", "contract", "account", "antelope", "session"];
+const packages = [
+  "crypto",
+  "abi",
+  "rpc",
+  "contract",
+  "account",
+  "antelope",
+  "signing-request",
+  "session",
+];
 const directory = await mkdtemp(path.join(tmpdir(), "windstack-native-audit-"));
 
 try {
@@ -43,7 +52,11 @@ try {
     ["ls", "--all"],
     ["audit", "--omit=dev"],
   ]) {
-    const result = spawnSync("npm", args, { cwd: directory, encoding: "utf8", stdio: "inherit" });
+    const result = spawnSync("npm", args, {
+      cwd: directory,
+      encoding: "utf8",
+      stdio: "inherit",
+    });
     if (result.status !== 0) {
       throw new Error(`Native dependency audit failed during npm ${args[0]}`);
     }
