@@ -1,30 +1,22 @@
-import { WISP_PROVIDER_CONTRACT } from "@windstack/core";
-
-const { evm, provider } = WISP_PROVIDER_CONTRACT;
-
-export const EVM_PROVIDER_GLOBAL = evm.global;
-export const EIP6963_REQUEST_PROVIDER_EVENT = evm.events.requestProvider;
-export const EIP6963_ANNOUNCE_PROVIDER_EVENT = evm.events.announceProvider;
+export const EVM_PROVIDER_GLOBAL = "ethereum" as const;
+export const EIP6963_REQUEST_PROVIDER_EVENT = "eip6963:requestProvider" as const;
+export const EIP6963_ANNOUNCE_PROVIDER_EVENT = "eip6963:announceProvider" as const;
 export const DEFAULT_EVM_DISCOVERY_TIMEOUT_MS = 120;
-export const WISP_EVM_PROVIDER_RDNS = provider.rdns;
-export const VEX_EVM_CHAIN_ID = evm.chainId;
-export const VEX_EVM_CHAIN_ID_HEX = evm.chainIdHex;
-export const VEX_EVM_SCOPE = evm.scope;
 
 export const EVM_METHODS = {
-  REQUEST_ACCOUNTS: evm.methods.requestAccounts,
-  GET_ACCOUNTS: evm.methods.getAccounts,
-  GET_COINBASE: evm.methods.getCoinbase,
-  GET_CHAIN_ID: evm.methods.getChainId,
-  GET_NETWORK_VERSION: evm.methods.getNetworkVersion,
-  REQUEST_PERMISSIONS: evm.methods.requestPermissions,
-  GET_PERMISSIONS: evm.methods.getPermissions,
-  SWITCH_CHAIN: evm.methods.switchChain,
-  ADD_CHAIN: evm.methods.addChain,
-  SIGN_MESSAGE: evm.methods.signMessage,
-  SIGN_TYPED_DATA: evm.methods.signTypedData,
-  SIGN_TYPED_DATA_V3: evm.methods.signTypedDataV3,
-  SIGN_TYPED_DATA_V4: evm.methods.signTypedDataV4,
-  SIGN_TRANSACTION: evm.methods.signTransaction,
-  SEND_TRANSACTION: evm.methods.sendTransaction,
+  REQUEST_ACCOUNTS: "eth_requestAccounts",
+  GET_ACCOUNTS: "eth_accounts",
+  GET_COINBASE: "eth_coinbase",
+  GET_CHAIN_ID: "eth_chainId",
+  GET_NETWORK_VERSION: "net_version",
+  REQUEST_PERMISSIONS: "wallet_requestPermissions",
+  GET_PERMISSIONS: "wallet_getPermissions",
+  SWITCH_CHAIN: "wallet_switchEthereumChain",
+  ADD_CHAIN: "wallet_addEthereumChain",
+  SIGN_MESSAGE: "personal_sign",
+  SIGN_TYPED_DATA: "eth_signTypedData",
+  SIGN_TYPED_DATA_V3: "eth_signTypedData_v3",
+  SIGN_TYPED_DATA_V4: "eth_signTypedData_v4",
+  SIGN_TRANSACTION: "eth_signTransaction",
+  SEND_TRANSACTION: "eth_sendTransaction",
 } as const;

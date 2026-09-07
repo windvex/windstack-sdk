@@ -1,6 +1,6 @@
-import { WISP_ERROR_CODES } from "@windstack/core";
+import { PROVIDER_ERROR_CODES } from "@windstack/core";
 
-export const VEXANIUM_ERROR_CODES = WISP_ERROR_CODES;
+export const VEXANIUM_ERROR_CODES = PROVIDER_ERROR_CODES;
 
 export type VexaniumErrorCode = (typeof VEXANIUM_ERROR_CODES)[keyof typeof VEXANIUM_ERROR_CODES];
 

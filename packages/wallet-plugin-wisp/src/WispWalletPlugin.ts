@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -10,13 +10,14 @@ import type { WalletLoginContext, WalletLoginResult, WalletPlugin } from "@winds
 import {
   VEXANIUM_ERROR_CODES,
   VEXANIUM_MAINNET_CHAIN_ID,
-  WISP_PROVIDER_RDNS,
   VexaniumProviderError,
   createVexaniumClient,
   type VexaniumAccount,
   type VexaniumClient,
   type VexaniumProvider,
 } from "@windstack/vexanium";
+
+const WISP_PROVIDER_RDNS = "com.wisp.wallet";
 
 export type WispWalletPluginMetadata = {
   name?: string;

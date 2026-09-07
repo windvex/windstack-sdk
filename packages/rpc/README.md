@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@windstack/rpc` provides a typed client for Antelope chain RPC endpoints. It supports multiple endpoints, automatic failover for retriable read failures, request timeouts, `AbortSignal` cancellation, injected `fetch`, structured RPC errors, block queries, table queries, account queries, ABI queries, currency queries, required-key resolution, and transaction submission.
+`@windstack/rpc` provides typed Antelope node RPC, chain-verified endpoint failover, request timeouts, cancellation, strict response validation, Spring/Savanna transaction state, and Hyperion-compatible history.
 
 Broadcast requests are not automatically retried because a transaction may already have reached the chain even when the original network response is lost.
 
@@ -23,6 +23,8 @@ const rpc = new RpcClient({
     "https://backup.example",
   ],
   timeoutMs: 10_000,
+  maxResponseBytes: 4 * 1024 * 1024,
+  expectedChainId: "0123...64 hexadecimal characters...",
 });
 
 const info = await rpc.getInfo();
@@ -34,7 +36,19 @@ const rows = await rpc.getTableRows({
 });
 ```
 
-HTTP request errors are exposed through `RpcError`. Timeouts use `RpcTimeoutError`. Invalid chain requests are returned immediately instead of being retried across every configured endpoint.
+Recent finality is read from Spring and historical lookup falls back to Hyperion only when Spring reports `UNKNOWN` or explicitly does not support the status API:
+
+```ts
+import { AntelopeTransactionHistory, HyperionClient, SpringFinalityClient } from "@windstack/rpc";
+
+const history = new AntelopeTransactionHistory(
+  new SpringFinalityClient(rpc),
+  new HyperionClient({ endpoint: "https://history.example" }),
+);
+const observation = await history.getTransaction(transactionId, signal);
+```
+
+HTTP request errors are exposed through `RpcError`; chain mismatches use `RpcChainMismatchError`; timeouts use `RpcTimeoutError`. Custom RPC paths do not retry unless marked `{ retry: "safe" }`.
 
 ## Security
 

@@ -5,7 +5,6 @@ import {
   EIP6963_ANNOUNCE_PROVIDER_EVENT,
   EIP6963_REQUEST_PROVIDER_EVENT,
   EVM_PROVIDER_GLOBAL,
-  WISP_EVM_PROVIDER_RDNS,
 } from "./constants.js";
 import type { EIP1193Provider, EIP6963ProviderDetail, EIP6963ProviderInfo } from "./types.js";
 
@@ -118,9 +117,12 @@ export async function discoverEVMProviders(
 }
 
 export async function getEVMProvider(
-  timeoutMs = DEFAULT_EVM_DISCOVERY_TIMEOUT_MS,
+  options: { timeoutMs?: number; preferredRdns?: string } = {},
 ): Promise<EIP1193Provider | null> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_EVM_DISCOVERY_TIMEOUT_MS;
   const providers = await discoverEVMProviders(timeoutMs);
-  const wispProvider = providers.find(({ info }) => info.rdns === WISP_EVM_PROVIDER_RDNS)?.provider;
-  return wispProvider ?? providers[0]?.provider ?? getInjectedEVMProvider();
+  const preferred = options.preferredRdns
+    ? providers.find(({ info }) => info.rdns === options.preferredRdns)?.provider
+    : undefined;
+  return preferred ?? providers[0]?.provider ?? getInjectedEVMProvider();
 }

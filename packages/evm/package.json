@@ -1,7 +1,7 @@
 {
   "name": "@windstack/evm",
-  "version": "1.0.0",
-  "description": "EIP-1193 and EIP-6963 EVM provider client for Wisp Wallet-compatible dApps.",
+  "version": "2.0.0",
+  "description": "Generic EVM address, JSON-RPC, EIP-1193, and EIP-6963 provider utilities.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,18 +19,18 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit false",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "1.0.0"
+    "@windstack/core": "2.0.0"
   },
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "vexanium",
-    "vex-evm",
-    "wisp-wallet",
+    "rpc",
+    "account",
+    "wallet",
     "evm",
     "eip-1193",
     "eip-6963",

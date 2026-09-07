@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -225,22 +225,29 @@ console.log(
 const npmToken = await verifyRegistryAuthentication();
 run("npm", ["run", "release:dry-run"]);
 
+const conflicts = [];
 for (const { manifest } of releaseEntries) {
   const { name, version } = manifest;
   if (await publishedVersion(name, version)) {
-    console.log(`${name}@${version} is already published; skipping.`);
+    conflicts.push(`${name}@${version} is already public`);
     continue;
   }
   const lifecycleStatus = await versionLifecycleStatus(name, version, npmToken);
-  if (lifecycleStatus) {
-    console.log(`${name}@${version} is already submitted (${lifecycleStatus}); skipping upload.`);
-    continue;
-  }
+  if (lifecycleStatus)
+    conflicts.push(`${name}@${version} is already submitted (${lifecycleStatus})`);
+}
+if (conflicts.length) {
+  throw new Error(`Refusing a partial or silently skipped release:\n${conflicts.join("\n")}`);
+}
 
+for (const { manifest } of releaseEntries) {
+  const { name, version } = manifest;
   console.log(`Publishing ${name}@${version}...`);
   run("npm", ["publish", "--workspace", name, "--access", "public", "--registry", registry]);
 }
 
 await waitForPublishedVersions(releaseEntries);
 
-console.log("All WindStack 1.0 release packages are published and verified.");
+console.log(
+  `All WindStack ${releaseEntries[0]?.manifest.version ?? "release"} packages are published and verified.`,
+);

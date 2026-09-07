@@ -15,16 +15,16 @@ npm install @windstack/wallet-plugin-wisp
 ## Usage
 
 ```ts
-import { VEXANIUM_MAINNET } from "@windstack/antelope/vexanium";
 import { SessionManager } from "@windstack/session";
+import { vexNative } from "@windstack/vexanium";
 import { WispWalletPlugin } from "@windstack/wallet-plugin-wisp";
 
 const sessionManager = new SessionManager({
   appName: "My Vexanium App",
   chains: [{
-    id: VEXANIUM_MAINNET.chainId,
-    url: VEXANIUM_MAINNET.endpoints,
-    contracts: VEXANIUM_MAINNET.contracts,
+    id: vexNative.chainId,
+    url: vexNative.rpcUrl,
+    contracts: vexNative.contracts,
   }],
   walletPlugins: [new WispWalletPlugin()],
 });

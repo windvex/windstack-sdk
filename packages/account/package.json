@@ -1,7 +1,7 @@
 {
   "name": "@windstack/account",
-  "version": "1.0.0",
-  "description": "Antelope account, balance, permission and system-action helpers for WindStack.",
+  "version": "2.0.0",
+  "description": "Common Antelope account, balance, permission, and system-action helpers.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,23 +19,24 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/contract": "1.0.0",
-    "@windstack/crypto": "1.0.0",
-    "@windstack/rpc": "1.0.0"
+    "@windstack/contract": "2.0.0",
+    "@windstack/crypto": "2.0.0",
+    "@windstack/rpc": "2.0.0"
   },
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "vexanium",
     "antelope",
-    "vex",
     "account",
     "staking",
     "ram",
     "voting",
+    "contract",
+    "transaction",
     "typescript"
   ],
   "license": "MIT",

@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packages = [
+  "core",
   "crypto",
   "abi",
   "rpc",

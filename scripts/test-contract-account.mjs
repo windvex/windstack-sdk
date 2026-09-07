@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -145,6 +145,7 @@ assert.throws(
 );
 assert.throws(() => account.buyRamBytes("bob", 0), /RAM bytes/);
 assert.throws(() => account.sellRam("9223372036854775808"), /signed 64-bit/);
+assert.throws(() => account.sellRam(Number.MAX_SAFE_INTEGER + 1), /integer-compatible/);
 assert.throws(() => account.registerProducer("invalid", "", 0), /public-key format/);
 assert.throws(
   () => account.createAccount("bob", { ...authority, threshold: 2 }, authority),

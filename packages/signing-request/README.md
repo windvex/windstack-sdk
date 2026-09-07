@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@windstack/signing-request` creates, parses, resolves, signs, and verifies portable signing requests for Vexanium and compatible Antelope applications. It supports single actions, multiple actions, full transactions, identity requests, callbacks, request signatures, compression, full chain IDs, multi-chain requests, and ABI-aware placeholder resolution.
+`@windstack/signing-request` creates, parses, resolves, signs, and verifies portable signing requests for Antelope applications. It supports single actions, multiple actions, full transactions, identity requests, callbacks, request signatures, compression, full chain IDs, multi-chain requests, and ABI-aware placeholder resolution.
 
 Vexanium applications can use the canonical `vsr:` scheme. Existing `esr:` requests are accepted for protocol interoperability.
 
@@ -21,14 +21,14 @@ import {
 } from "@windstack/signing-request";
 import { RpcClient } from "@windstack/rpc";
 
-const rpc = new RpcClient({ endpoints: "https://api.windcrypto.com" });
+const rpc = new RpcClient({ endpoints: "https://node.example" });
 const abiProvider = new RpcSigningRequestAbiProvider(rpc);
 
 const request = await createSigningRequest(
   {
-    chainId: "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f",
+    chainId: "00".repeat(32),
     action: {
-      account: "vex.token",
+      account: "token.cntrct",
       name: "transfer",
       authorization: [
         { actor: "............1", permission: "............2" },
@@ -36,8 +36,8 @@ const request = await createSigningRequest(
       data: {
         from: "............1",
         to: "receiver",
-        quantity: "1.0000 VEX",
-        memo: "WindStack",
+        quantity: "1.0000 TKN",
+        memo: "example",
       },
     },
     callback: "https://app.example/signed?tx={{tx}}",
@@ -45,7 +45,7 @@ const request = await createSigningRequest(
   { abiProvider },
 );
 
-const uri = request.encode(true, false, "vsr");
+const uri = request.encode(true, false, "esr");
 ```
 
 A wallet resolves actor and permission placeholders against the selected signer before signing:
@@ -92,7 +92,7 @@ The package is ESM-first and requires Node.js 20.19 or newer when used directly 
 
 Signing-request URIs are untrusted input. Parsing and resolution do not trigger signing, broadcasting, callbacks, or wallet permissions. Compressed payloads are decoded with a bounded output limit, unsupported protocol versions and flags are rejected, and structured action data is resolved through the contract ABI rather than by replacing arbitrary strings.
 
-Request signatures prove that request bytes were signed by a supplied public key; applications that need account-level authority verification must additionally verify that the key is authorized for the claimed Vexanium account permission.
+Request signatures prove that request bytes were signed by a supplied public key; applications that need account-level authority verification must additionally verify that the key is authorized for the claimed account permission.
 
 ## License
 

@@ -13,7 +13,6 @@ import {
   VEXANIUM_METHODS,
   VEXANIUM_PROVIDER_STANDARD,
   VEXANIUM_PROVIDER_VERSION,
-  WISP_VEXANIUM_PROVIDER_INFO,
   createSigningRequest,
   createVexaniumClient,
   encodeSigningRequest,
@@ -26,9 +25,18 @@ const privateKey = PrivateKey.fromBytes("K1", scalarOne);
 const signature = privateKey.signDigest(sha256Digest(Uint8Array.of(0))).toString();
 const calls = [];
 const methods = Object.values(VEXANIUM_METHODS);
+const testProviderInfo = {
+  uuid: "com.test.wallet",
+  name: "Test wallet",
+  rdns: "com.test.wallet",
+  standard: VEXANIUM_PROVIDER_STANDARD,
+  version: VEXANIUM_PROVIDER_VERSION,
+  chains: [VEXANIUM_MAINNET_CHAIN_ID, VEXANIUM_MAINNET_SCOPE],
+  capabilities: Object.values(VEXANIUM_CAPABILITIES),
+};
 
 const provider = {
-  providerInfo: WISP_VEXANIUM_PROVIDER_INFO,
+  providerInfo: testProviderInfo,
   async request({ method, params }) {
     calls.push({ method, params });
 

@@ -39,6 +39,7 @@ export type EIP6963ProviderDetail = ProviderDetail<EIP1193Provider, EIP6963Provi
 export type EVMClientOptions = {
   provider?: EIP1193Provider;
   discoveryTimeoutMs?: number;
+  preferredRdns?: string;
 };
 
 export type AddEthereumChainParameter = {

@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -91,16 +91,19 @@ function assertBigIntRange(value: bigint, bits: number, signed: boolean, label: 
 }
 
 function toBigInt(value: unknown, label: string): bigint {
-  if (typeof value === "number" && !Number.isSafeInteger(value)) {
-    throw new TypeError(
-      `${label} must use bigint or a decimal string outside the safe integer range`,
-    );
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) {
+      throw new TypeError(
+        `${label} must use bigint or a decimal string outside the safe integer range`,
+      );
+    }
+    return BigInt(value);
   }
-  try {
-    return BigInt(value as string | number | bigint);
-  } catch {
-    throw new TypeError(`${label} expects an integer-compatible value`);
+  if (typeof value === "string" && /^-?(?:0|[1-9]\d*)$/.test(value)) {
+    return BigInt(value);
   }
+  throw new TypeError(`${label} expects an integer-compatible value`);
 }
 
 function toNumber(value: unknown, label: string): number {
@@ -150,7 +153,10 @@ export function nameToBigInt(name: string): bigint {
 }
 
 export function bigIntToName(value: bigint): string {
-  let current = BigInt.asUintN(64, value);
+  if (typeof value !== "bigint" || value < 0n || value > 0xffffffffffffffffn) {
+    throw new RangeError("Antelope name value must fit in uint64");
+  }
+  let current = value;
   const chars = new Array<string>(13).fill(".");
   for (let index = 0; index <= 12; index += 1) {
     const charIndex = index === 0 ? Number(current & 0x0fn) : Number(current & 0x1fn);
@@ -386,13 +392,37 @@ export type AssetValue = Readonly<{
   value: string;
 }>;
 
+export type ExtendedAssetValue = Readonly<{
+  quantity: AssetValue;
+  contract: string;
+  value: string;
+}>;
+
+export type TokenIdentity = Readonly<{
+  contract: string;
+  symbol: string;
+  precision: number;
+  key: string;
+}>;
+
+export type AssetRoundingMode = "reject" | "down" | "up" | "half-up";
+export const ANTELOPE_ASSET_MAX_AMOUNT = (1n << 62n) - 1n;
+
+function assertAssetRange(value: bigint, label = "asset amount"): bigint {
+  if (value < -ANTELOPE_ASSET_MAX_AMOUNT || value > ANTELOPE_ASSET_MAX_AMOUNT) {
+    throw new RangeError(`${label} is outside the Antelope asset range`);
+  }
+  return value;
+}
+
 export function parseAsset(value: string): AssetValue {
   const match = /^(-?)(0|[1-9]\d*)(?:\.(\d+))? ([A-Z]{1,7})$/.exec(value);
   if (!match) throw new TypeError(`Invalid asset: ${value}`);
   const fraction = match[3] ?? "";
   assertInteger(fraction.length, 0, 18, "asset precision");
   const amount = BigInt(`${match[1]}${match[2]}${fraction}`);
-  assertBigIntRange(amount, 64, true, "asset amount");
+  if (match[1] && amount === 0n) throw new TypeError("Asset cannot use negative zero");
+  assertAssetRange(amount);
   return Object.freeze({
     amount,
     precision: fraction.length,
@@ -406,7 +436,7 @@ export function formatAsset(
   precision: number,
   symbol: string,
 ): string {
-  const units = assertBigIntRange(toBigInt(amount, "asset amount"), 64, true, "asset amount");
+  const units = assertAssetRange(toBigInt(amount, "asset amount"));
   validateSymbol(symbol);
   assertInteger(precision, 0, 18, "symbol precision");
   const negative = units < 0n;
@@ -417,9 +447,79 @@ export function formatAsset(
   return `${negative ? "-" : ""}${quantity} ${symbol}`;
 }
 
+export function parseExtendedAsset(
+  value: string | { quantity: string; contract: string },
+): ExtendedAssetValue {
+  const separator = typeof value === "string" ? value.lastIndexOf("@") : -1;
+  const quantity = typeof value === "string" ? value.slice(0, separator) : value?.quantity;
+  const contract = typeof value === "string" ? value.slice(separator + 1) : value?.contract;
+  if (
+    (typeof value === "string" && separator < 1) ||
+    typeof quantity !== "string" ||
+    typeof contract !== "string"
+  ) {
+    throw new TypeError("extended_asset expects quantity@contract or { quantity, contract }");
+  }
+  validateCanonicalName(contract, "extended_asset contract");
+  const parsed = parseAsset(quantity);
+  return Object.freeze({
+    quantity: parsed,
+    contract,
+    value: `${parsed.value}@${contract}`,
+  });
+}
+
+export function tokenIdentity(contract: string, symbol: string, precision: number): TokenIdentity {
+  validateCanonicalName(contract, "token contract");
+  validateSymbol(symbol);
+  assertInteger(precision, 0, 18, "symbol precision");
+  return Object.freeze({ contract, symbol, precision, key: `${contract}:${symbol}:${precision}` });
+}
+
+export function tokenIdentityFromAsset(value: ExtendedAssetValue): TokenIdentity {
+  return tokenIdentity(value.contract, value.quantity.symbol, value.quantity.precision);
+}
+
+/** Convert asset units between precisions without using floating point. */
+export function convertAssetPrecision(
+  amount: bigint | string | number,
+  fromPrecision: number,
+  toPrecision: number,
+  rounding: AssetRoundingMode = "reject",
+): bigint {
+  if (!["reject", "down", "up", "half-up"].includes(rounding)) {
+    throw new TypeError("Unsupported asset rounding mode");
+  }
+  assertInteger(fromPrecision, 0, 18, "source precision");
+  assertInteger(toPrecision, 0, 18, "target precision");
+  const units = assertAssetRange(toBigInt(amount, "asset amount"));
+  if (fromPrecision === toPrecision) return units;
+  if (toPrecision > fromPrecision) {
+    return assertAssetRange(
+      units * 10n ** BigInt(toPrecision - fromPrecision),
+      "converted asset amount",
+    );
+  }
+  const divisor = 10n ** BigInt(fromPrecision - toPrecision);
+  const quotient = units / divisor;
+  const remainder = units % divisor;
+  if (remainder === 0n || rounding === "down") return quotient;
+  if (rounding === "reject") throw new RangeError("Asset precision conversion would lose units");
+  const sign = units < 0n ? -1n : 1n;
+  if (rounding === "up") return quotient + sign;
+  return remainder * sign * 2n >= divisor ? quotient + sign : quotient;
+}
+
 function validateSymbol(symbol: string): string {
   if (!/^[A-Z]{1,7}$/.test(symbol)) throw new TypeError(`Invalid Antelope symbol: ${symbol}`);
   return symbol;
+}
+
+function validateCanonicalName(name: string, label: string): string {
+  if (!name || name.endsWith(".") || bigIntToName(nameToBigInt(name)) !== name) {
+    throw new TypeError(`${label} must be a canonical Antelope name`);
+  }
+  return name;
 }
 
 function symbolToBigInt(symbol: string, precision: number): bigint {
@@ -434,6 +534,7 @@ function symbolToBigInt(symbol: string, precision: number): bigint {
 
 function symbolFromBigInt(raw: bigint): { precision: number; symbol: string } {
   const precision = Number(raw & 0xffn);
+  assertInteger(precision, 0, 18, "symbol precision");
   let value = raw >> 8n;
   let symbol = "";
   while (value > 0n) {
@@ -493,33 +594,20 @@ function blockTimestampToSlot(value: unknown): number {
 function decodeAsset(reader: BinaryReader): string {
   const amount = reader.readInt64();
   const { precision, symbol } = symbolFromBigInt(reader.readUint64());
-  const negative = amount < 0n;
-  const digits = (negative ? -amount : amount).toString().padStart(precision + 1, "0");
-  const formatted = precision
-    ? `${digits.slice(0, -precision)}.${digits.slice(-precision)}`
-    : digits;
-  return `${negative ? "-" : ""}${formatted} ${symbol}`;
+  return formatAsset(amount, precision, symbol);
 }
 
 function encodeExtendedAsset(writer: BinaryWriter, value: unknown): void {
-  let quantity: unknown;
-  let contract: unknown;
-  if (typeof value === "string") {
-    const separator = value.lastIndexOf("@");
-    if (separator < 1) throw new TypeError("extended_asset expects quantity@contract");
-    quantity = value.slice(0, separator);
-    contract = value.slice(separator + 1);
-  } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    const record = value as Record<string, unknown>;
-    quantity = record.quantity;
-    contract = record.contract;
-  } else {
-    throw new TypeError("extended_asset expects { quantity, contract } or quantity@contract");
-  }
-  const asset = parseAsset(String(quantity));
-  writer.writeInt64(asset.amount);
-  writer.writeUint64(symbolToBigInt(asset.symbol, asset.precision));
-  writer.writeName(String(contract));
+  const asset = parseExtendedAsset(value as string | { quantity: string; contract: string });
+  writer.writeInt64(asset.quantity.amount);
+  writer.writeUint64(symbolToBigInt(asset.quantity.symbol, asset.quantity.precision));
+  writer.writeName(asset.contract);
+}
+
+function decodeExtendedAsset(reader: BinaryReader): { quantity: string; contract: string } {
+  const quantity = decodeAsset(reader);
+  const contract = validateCanonicalName(reader.readName(), "extended_asset contract");
+  return { quantity, contract };
 }
 
 export class AbiSerializer {
@@ -966,7 +1054,7 @@ export class AbiSerializer {
       case "asset":
         return decodeAsset(reader);
       case "extended_asset":
-        return { quantity: decodeAsset(reader), contract: reader.readName() };
+        return decodeExtendedAsset(reader);
       case "symbol": {
         const { precision, symbol } = symbolFromBigInt(reader.readUint64());
         return `${precision},${symbol}`;

@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@windstack/solana` provides a client for the Solana provider interface exposed by Wisp-compatible browser wallets. It supports account access, provider requests, message signing, disconnect handling, account normalization, and provider error preservation.
+`@windstack/solana` provides a client for compatible Solana browser-wallet providers. It supports account access, provider requests, message signing, disconnect handling, account normalization, and provider error preservation.
 
 The package focuses on wallet-provider communication and does not bundle a Solana transaction library.
 

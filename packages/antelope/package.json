@@ -1,7 +1,7 @@
 {
   "name": "@windstack/antelope",
-  "version": "1.0.0",
-  "description": "Antelope transaction, signing, contract, account, and RPC client for WindStack applications.",
+  "version": "2.0.0",
+  "description": "Antelope transaction, TAPOS, signing, keosd, contract, account, and verified RPC toolkit.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,9 +10,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./vexanium": {
-      "types": "./dist/vexanium.d.ts",
-      "import": "./dist/vexanium.js"
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
     }
   },
   "files": [
@@ -23,24 +23,26 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/account": "1.0.0",
-    "@windstack/abi": "1.0.0",
-    "@windstack/contract": "1.0.0",
-    "@windstack/crypto": "1.0.0",
-    "@windstack/rpc": "1.0.0"
+    "@windstack/account": "2.0.0",
+    "@windstack/abi": "2.0.0",
+    "@windstack/contract": "2.0.0",
+    "@windstack/core": "2.0.0",
+    "@windstack/crypto": "2.0.0",
+    "@windstack/rpc": "2.0.0"
   },
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "vexanium",
     "antelope",
     "transaction",
     "signing",
     "tapos",
     "rpc",
+    "account",
     "typescript"
   ],
   "license": "MIT",

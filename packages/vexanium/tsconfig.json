@@ -7,9 +7,11 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
+    { "path": "../antelope" },
     { "path": "../abi" },
     { "path": "../core" },
     { "path": "../crypto" },
+    { "path": "../evm" },
     { "path": "../signing-request" }
   ]
 }

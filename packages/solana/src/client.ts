@@ -1,4 +1,4 @@
-import { WISP_ERROR_CODES, WispProviderError, normalizeProviderError } from "@windstack/core";
+import { PROVIDER_ERROR_CODES, ProviderRpcError, normalizeProviderRpcError } from "@windstack/core";
 import type { RequestArguments } from "@windstack/core";
 import { SOLANA_METHODS } from "./constants.js";
 import { isSolanaPublicKey, normalizeSolanaAccounts } from "./accounts.js";
@@ -18,8 +18,8 @@ export async function createSolanaClient(options: SolanaClientOptions = {}): Pro
   const requireProvider = (): SolanaProvider => {
     provider = provider ?? getInjectedSolanaProvider();
     if (!provider?.request)
-      throw new WispProviderError(
-        WISP_ERROR_CODES.INTERNAL_ERROR,
+      throw new ProviderRpcError(
+        PROVIDER_ERROR_CODES.INTERNAL_ERROR,
         "No Solana provider is available",
       );
     return provider;
@@ -31,14 +31,14 @@ export async function createSolanaClient(options: SolanaClientOptions = {}): Pro
     try {
       return await requireProvider().request<TResult, TParams>(args);
     } catch (error) {
-      throw normalizeProviderError(error);
+      throw normalizeProviderRpcError(error);
     }
   };
 
   const assertBase64Transaction = (value: string): void => {
     if (value.length === 0 || value.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
-      throw new WispProviderError(
-        WISP_ERROR_CODES.INVALID_PARAMS,
+      throw new ProviderRpcError(
+        PROVIDER_ERROR_CODES.INVALID_PARAMS,
         "Transaction must be standard base64",
       );
     }
@@ -61,7 +61,10 @@ export async function createSolanaClient(options: SolanaClientOptions = {}): Pro
     },
     async signMessage(message: string | Uint8Array, publicKey?: string) {
       if (publicKey && !isSolanaPublicKey(publicKey)) {
-        throw new WispProviderError(WISP_ERROR_CODES.INVALID_PARAMS, "Invalid Solana public key");
+        throw new ProviderRpcError(
+          PROVIDER_ERROR_CODES.INVALID_PARAMS,
+          "Invalid Solana public key",
+        );
       }
       const params: SolanaSignMessageParams = {
         message: typeof message === "string" ? message : Array.from(message),

@@ -18,10 +18,9 @@ export {
   VEXANIUM_METHODS,
   VEXANIUM_PROVIDER_GLOBAL,
   VEXANIUM_REQUEST_PROVIDER_EVENT,
+  VEX_EVM_ANTELOPE_CONTRACT,
   VSR_SCHEME,
   ESR_SCHEME,
-  WISP_PROVIDER_RDNS,
-  WISP_VEXANIUM_PROVIDER_INFO,
 } from "./constants.js";
 export {
   VEXANIUM_ERROR_CODES,
@@ -118,10 +117,6 @@ export {
   buildExplorerTxUrl,
 } from "./explorer.js";
 export type { BuildExplorerUrlOptions, ExplorerTarget } from "./explorer.js";
-export { assetToNumber, formatAsset, parseAsset } from "./asset.js";
-export type { VexAsset } from "./asset.js";
-export { mapExplorerAction, mapExplorerTransaction } from "./decoder.js";
-export type { ExplorerActionLike, ExplorerTransactionLike } from "./decoder.js";
 export {
   isAntelopeName,
   isChecksum256,
@@ -132,12 +127,16 @@ export {
   sameVexaniumChain,
   toVexaniumCaip2ChainId,
 } from "./validation.js";
-export type {
-  VexaniumActionModel,
-  VexaniumProducerModel,
-  VexaniumResourceModel,
-  VexaniumResourceUsage,
-  VexaniumTokenMetadata,
-  VexaniumTransactionModel,
-  VexaniumTransactionStatus,
-} from "./models.js";
+export {
+  VEX_EVM_BRIDGE_TRANSFER_SELECTOR,
+  VEX_EVM_RESERVED_NATIVE_BRIDGE_PREFIX,
+  classifyVexEvmAddress,
+  decodeVexEvmBridgeTransferCalldata,
+  hasReservedNativeBridgePrefix,
+  isReservedNativeBridgeAddress,
+  nativeAccountToReservedEvmAddress,
+  reservedEvmAddressToNativeAccount,
+} from "./bridge.js";
+export type { VexEvmAddressClassification, VexEvmBridgeTransfer } from "./bridge.js";
+export { decodeVexEvmContractAction } from "./evm-action.js";
+export type { VexEvmContractAction, VexEvmTransactionEvent } from "./evm-action.js";

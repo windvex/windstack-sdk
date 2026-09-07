@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { AbiSerializer } from "../packages/abi/dist/index.js";
-import { PrivateKey, sha256Digest } from "../packages/crypto/dist/index.js";
+import { PrivateKey, PublicKey, sha256Digest } from "../packages/crypto/dist/index.js";
+import { decodeVexEvmContractAction } from "../packages/vexanium/dist/index.js";
 
 const RPC = "https://api.windcrypto.com";
 const CHAIN_ID = "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f";
 const EXPECTED_ABI = {
+  "vex.evm": "a388596c4b2a04bff58c16781dc17c6a1a6bbe4920d463225e5ae7e074cfb4ca",
   "vex.token": "b05a9a7fa75705eb216a5330f8549a291d66c367eea1e49c980fd64783d9c2a0",
   vexcore: "3f92498072f9ae810dc758b1ae15ecfa9ee3baae7763f0a73ada5a2a185c68f5",
 };
@@ -197,8 +199,26 @@ assert.equal(String(info.chain_id).toLowerCase(), CHAIN_ID, "RPC endpoint is not
 
 const token = await post("/v1/chain/get_abi", { account_name: "vex.token" });
 const system = await post("/v1/chain/get_abi", { account_name: "vexcore" });
+const evm = await post("/v1/chain/get_abi", { account_name: "vex.evm" });
 validateAbi("vex.token", token.abi);
 validateAbi("vexcore", system.abi);
+validateAbi("vex.evm", evm.abi);
+
+const evmHistoryUrl = new URL("/v2/history/get_actions", `${RPC}/`);
+evmHistoryUrl.searchParams.set("account", "vex.evm");
+evmHistoryUrl.searchParams.set("filter", "vex.evm:evmtx");
+evmHistoryUrl.searchParams.set("limit", "1");
+evmHistoryUrl.searchParams.set("sort", "desc");
+const evmHistoryResponse = await fetch(evmHistoryUrl, {
+  headers: { accept: "application/json" },
+  signal: AbortSignal.timeout(15_000),
+});
+assert.equal(evmHistoryResponse.ok, true, "VEX EVM history lookup failed");
+const evmHistory = await evmHistoryResponse.json();
+assert.ok(Array.isArray(evmHistory.actions) && evmHistory.actions.length > 0);
+const decodedEvmAction = decodeVexEvmContractAction(evmHistory.actions[0]);
+assert.equal(decodedEvmAction.name, "evmtx");
+assert.match(decodedEvmAction.event.rlpTransaction, /^0x[0-9a-f]+$/);
 
 const block = await post("/v1/chain/get_block", {
   block_num_or_id: info.last_irreversible_block_num,
@@ -266,6 +286,8 @@ const activeKey = activePermission?.required_auth?.keys?.find(
   (key) => key.weight >= activePermission.required_auth.threshold,
 )?.key;
 assert.equal(typeof activeKey, "string", `${actor} has no directly usable active key`);
+const normalizedActiveKey = PublicKey.fromString(activeKey).toString();
+assert.match(normalizedActiveKey, /^PUB_(?:K1|R1)_/);
 const transferData = new AbiSerializer(token.abi).encodeAction("transfer", {
   from: actor,
   to: actor,
@@ -334,5 +356,5 @@ for (const name of [
 }
 
 console.log(
-  `Vexanium read-only RPC and production ABI verified: ${token.abi.actions.length} vex.token actions, ${system.abi.actions.length} vexcore actions`,
+  `Vexanium read-only RPC and production ABI verified: ${token.abi.actions.length} vex.token actions, ${system.abi.actions.length} vexcore actions, ${evm.abi.actions.length} vex.evm actions`,
 );

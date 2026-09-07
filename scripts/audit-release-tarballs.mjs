@@ -1,11 +1,11 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
  */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -69,7 +69,43 @@ try {
       ["pack", "--workspace", manifest.name, "--pack-destination", tarballsDirectory],
       root,
     );
-    await access(path.join(tarballsDirectory, tarballFilename(manifest.name, manifest.version)));
+    const tarballPath = path.join(
+      tarballsDirectory,
+      tarballFilename(manifest.name, manifest.version),
+    );
+    await access(tarballPath);
+    const entries = execFileSync("tar", ["-tzf", tarballPath], { encoding: "utf8" })
+      .trim()
+      .split("\n");
+    for (const required of [
+      "package/package.json",
+      "package/README.md",
+      "package/LICENSE",
+      "package/dist/index.js",
+      "package/dist/index.d.ts",
+    ]) {
+      assert.ok(entries.includes(required), `${manifest.name} tarball is missing ${required}`);
+    }
+    for (const conditions of Object.values(manifest.exports ?? {})) {
+      for (const target of Object.values(conditions)) {
+        assert.equal(typeof target, "string", `${manifest.name} has an invalid export target`);
+        assert.ok(
+          entries.includes(`package/${target.replace(/^\.\//, "")}`),
+          `${manifest.name} tarball is missing exported file ${target}`,
+        );
+      }
+    }
+    assert.ok(
+      entries.some((entry) => entry.endsWith(".d.ts")),
+      `${manifest.name} has no declarations`,
+    );
+    for (const entry of entries) {
+      assert.ok(
+        !/^package\/(?:src|scripts|test|\.github|\.env)/.test(entry),
+        `${manifest.name} publishes private/development file ${entry}`,
+      );
+      assert.ok(!entry.endsWith(".tsbuildinfo"), `${manifest.name} publishes ${entry}`);
+    }
   }
 
   const dependencies = Object.fromEntries(
@@ -94,6 +130,9 @@ try {
     )}\n`,
   );
 
+  const releaseVersion = manifests[0]?.version;
+  assert.ok(releaseVersion && manifests.every((manifest) => manifest.version === releaseVersion));
+
   const smokeTest = `
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -110,19 +149,50 @@ for (const name of packageNames) {
   const manifest = JSON.parse(
     await readFile(new URL(\`./node_modules/\${name}/package.json\`, import.meta.url), "utf8"),
   );
-  assert.equal(manifest.version, "1.0.0", \`\${name} must install at 1.0.0\`);
+  assert.equal(manifest.version, ${JSON.stringify(releaseVersion)}, \`\${name} must install at the coordinated release version\`);
 }
 
 const antelope = await import("@windstack/antelope");
 assert.equal(typeof antelope.PrivateKeySigner, "function");
+assert.equal(typeof antelope.KeosdSigner, "function");
+assert.equal(typeof antelope.transactionId, "function");
+const antelopeMain = await readFile(
+  new URL("./node_modules/@windstack/antelope/dist/index.js", import.meta.url),
+  "utf8",
+);
+assert.doesNotMatch(antelopeMain, /node:|Buffer/, "browser entrypoint must not import Node APIs");
+const antelopeNode = await import("@windstack/antelope/node");
+assert.equal(typeof antelopeNode.KeosdUnixTransport, "function");
 
-const vexaniumPreset = await import("@windstack/antelope/vexanium");
+const vexaniumPreset = await import("@windstack/vexanium/antelope");
 assert.equal(
-  vexaniumPreset.VEXANIUM_MAINNET.chainId,
+  vexaniumPreset.VEXANIUM_ANTELOPE_MAINNET.chainId,
   "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f",
 );
-assert.equal(vexaniumPreset.VEXANIUM_MAINNET.contracts.system, "vexcore");
-assert.equal(vexaniumPreset.VEXANIUM_MAINNET.contracts.token, "vex.token");
+assert.equal(vexaniumPreset.VEXANIUM_ANTELOPE_MAINNET.contracts.system, "vexcore");
+assert.equal(vexaniumPreset.VEXANIUM_ANTELOPE_MAINNET.contracts.token, "vex.token");
+assert.equal(typeof vexaniumPreset.createVexaniumAntelopeClient, "function");
+assert.equal(vexaniumPreset.VEXANIUM_LEGACY_PUBLIC_KEY_PREFIX, "VEX");
+
+const core = await import("@windstack/core");
+assert.equal(typeof core.parseDecimal, "function");
+assert.equal(typeof core.quoteConstantProductRoute, "function");
+
+const crypto = await import("@windstack/crypto");
+assert.equal(typeof crypto.normalizePublicKey, "function");
+assert.equal(typeof crypto.publicKeysEqual, "function");
+
+const abi = await import("@windstack/abi");
+assert.equal(typeof abi.parseExtendedAsset, "function");
+assert.equal(typeof abi.convertAssetPrecision, "function");
+
+const rpc = await import("@windstack/rpc");
+assert.equal(typeof rpc.SpringFinalityClient, "function");
+assert.equal(typeof rpc.HyperionClient, "function");
+
+const evm = await import("@windstack/evm");
+assert.equal(typeof evm.normalizeEvmAddress, "function");
+assert.equal(typeof evm.EvmRpcClient, "function");
 
 const signingRequest = await import("@windstack/signing-request");
 assert.equal(typeof signingRequest.SigningRequest, "function");
@@ -132,6 +202,9 @@ assert.equal(typeof session.SessionManager, "function");
 
 const vexanium = await import("@windstack/vexanium");
 assert.equal(typeof vexanium.createSigningRequest, "function");
+assert.equal(typeof vexanium.nativeAccountToReservedEvmAddress, "function");
+assert.equal(typeof vexanium.decodeVexEvmBridgeTransferCalldata, "function");
+assert.equal(typeof vexanium.decodeVexEvmContractAction, "function");
 
 const wisp = await import("@windstack/wallet-plugin-wisp");
 assert.equal(typeof wisp.WispWalletPlugin, "function");

@@ -1,7 +1,7 @@
 {
   "name": "@windstack/abi",
-  "version": "1.0.0",
-  "description": "Pure TypeScript Antelope ABI serializer and binary codec for WindStack.",
+  "version": "2.0.0",
+  "description": "Pure TypeScript Antelope ABI, binary, exact asset, extended asset, and name codec.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,19 +19,20 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/crypto": "1.0.0"
+    "@windstack/crypto": "2.0.0"
   },
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "vexanium",
     "antelope",
     "abi",
     "serialization",
     "binary",
+    "asset",
     "typescript"
   ],
   "license": "MIT",

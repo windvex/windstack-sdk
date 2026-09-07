@@ -1,6 +1,6 @@
 {
   "name": "@windstack/contract",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "ABI-aware Antelope smart-contract client for WindStack.",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,20 +19,21 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/abi": "1.0.0",
-    "@windstack/rpc": "1.0.0"
+    "@windstack/abi": "2.0.0",
+    "@windstack/rpc": "2.0.0"
   },
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "vexanium",
     "antelope",
     "contract",
     "abi",
     "rpc",
+    "transaction",
     "typescript"
   ],
   "license": "MIT",

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { formatAsset, parseAsset } from "../packages/abi/dist/index.js";
 import { resolveDappMetadata } from "../packages/core/dist/index.js";
 import {
   createEVMClient,
@@ -18,10 +19,8 @@ import {
   buildExplorerTokenUrl,
   buildExplorerTxUrl,
   createVexaniumClient,
-  formatAsset,
   isVexaniumCaip2ChainId,
   normalizeVexaniumAccount,
-  parseAsset,
   parsePermissionLevel,
   sameVexaniumChain,
   vexEvm,
@@ -99,7 +98,7 @@ let discovered = await discoverEVMProviders(0);
 assert.equal(discovered.length, 1);
 assert.equal(Object.isFrozen(discovered[0].info), true);
 assert.equal(Object.isFrozen(discovered[0]), true);
-assert.equal(await getEVMProvider(0), firstProvider);
+assert.equal(await getEVMProvider({ timeoutMs: 0 }), firstProvider);
 
 const lateProvider = makeEIP1193Provider("0x1a50");
 runtimeWindow.dispatchEvent(
@@ -125,6 +124,14 @@ await assert.rejects(
   { code: -32602 },
 );
 await evmClient.switchChain("0x1a50");
+const malformedEvmClient = await createEVMClient({
+  provider: {
+    request: async ({ method }) => (method === "eth_chainId" ? "not-a-chain" : ["not-an-address"]),
+    on() {},
+  },
+});
+await assert.rejects(() => malformedEvmClient.connect(), { code: -32602 });
+await assert.rejects(() => malformedEvmClient.getChainId(), { code: -32602 });
 
 assert.equal(parseAsset("-1.2345 VEX").amount, -12345n);
 assert.equal(formatAsset(-12345n, 4, "VEX"), "-1.2345 VEX");
@@ -147,6 +154,7 @@ assert.equal(vexNative.rpcUrl, "https://api.windcrypto.com");
 assert.equal(vexEvm.chainIdHex, "0x1a50");
 assert.equal(vexEvm.rpcUrl, "https://api.windcrypto.com/rpc");
 assert.equal(vexEvm.statsUrl, "https://api.windcrypto.com/v3/evm/stats");
+assert.equal(vexEvm.antelopeContract, "vex.evm");
 assert.equal(vexEvm.explorerUrl, "https://explorer.windcrypto.com/evm");
 assert.equal(vexEvm.routes.home, "https://explorer.windcrypto.com/evm");
 assert.equal(vexEvm.routes.tx("0xabc"), "https://explorer.windcrypto.com/evm/tx/0xabc");

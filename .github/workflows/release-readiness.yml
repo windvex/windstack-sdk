@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/release-readiness.yml"
 
 permissions:
   contents: read
@@ -22,6 +20,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -31,3 +31,5 @@ jobs:
         run: npm ci
       - name: Run complete release dry run
         run: npm run release:dry-run
+        env:
+          RELEASE_BASE_REF: ${{ github.event.before }}

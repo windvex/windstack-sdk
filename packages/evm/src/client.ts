@@ -1,8 +1,8 @@
 import {
-  WISP_ERROR_CODES,
-  WispProviderError,
+  PROVIDER_ERROR_CODES,
+  ProviderRpcError,
   invalidParams,
-  normalizeProviderError,
+  normalizeProviderRpcError,
 } from "@windstack/core";
 import type { RequestArguments } from "@windstack/core";
 import { EVM_METHODS } from "./constants.js";
@@ -14,6 +14,7 @@ import type {
   EVMClientOptions,
   EVMProviderEventMap,
 } from "./types.js";
+import { normalizeEvmAddress, normalizeEvmChainId } from "./address.js";
 
 const HEX_CHAIN_ID_PATTERN = /^0x(?:0|[1-9a-f][0-9a-f]*)$/i;
 
@@ -62,14 +63,40 @@ function assertAddChainParams(params: AddEthereumChainParameter): void {
   }
 }
 
+function normalizeAccountsResponse(value: unknown): `0x${string}`[] {
+  if (!Array.isArray(value) || value.length > 1000) {
+    throw invalidParams("Provider returned malformed accounts");
+  }
+  let accounts: `0x${string}`[];
+  try {
+    accounts = value.map((account) => {
+      if (typeof account !== "string") throw new TypeError("Invalid account");
+      return normalizeEvmAddress(account);
+    });
+  } catch {
+    throw invalidParams("Provider returned malformed accounts");
+  }
+  if (new Set(accounts).size !== accounts.length) {
+    throw invalidParams("Provider returned duplicate accounts");
+  }
+  return accounts;
+}
+
 export async function createEVMClient(options: EVMClientOptions = {}): Promise<EVMClient> {
   let provider: EIP1193Provider | null =
-    options.provider ?? (await getEVMProvider(options.discoveryTimeoutMs));
+    options.provider ??
+    (await getEVMProvider({
+      timeoutMs: options.discoveryTimeoutMs,
+      preferredRdns: options.preferredRdns,
+    }));
 
   const requireProvider = (): EIP1193Provider => {
     provider = provider ?? getInjectedEVMProvider();
     if (!provider?.request) {
-      throw new WispProviderError(WISP_ERROR_CODES.INTERNAL_ERROR, "No EVM provider is available");
+      throw new ProviderRpcError(
+        PROVIDER_ERROR_CODES.INTERNAL_ERROR,
+        "No EVM provider is available",
+      );
     }
     return provider;
   };
@@ -80,7 +107,7 @@ export async function createEVMClient(options: EVMClientOptions = {}): Promise<E
     try {
       return await requireProvider().request<TResult, TParams>(args);
     } catch (error) {
-      throw normalizeProviderError(error);
+      throw normalizeProviderRpcError(error);
     }
   };
 
@@ -93,14 +120,21 @@ export async function createEVMClient(options: EVMClientOptions = {}): Promise<E
       return provider;
     },
     request,
-    connect() {
-      return request<string[]>({ method: EVM_METHODS.REQUEST_ACCOUNTS });
+    async connect() {
+      const accounts = await request<unknown>({ method: EVM_METHODS.REQUEST_ACCOUNTS });
+      return normalizeAccountsResponse(accounts);
     },
-    getAccounts() {
-      return request<string[]>({ method: EVM_METHODS.GET_ACCOUNTS });
+    async getAccounts() {
+      const accounts = await request<unknown>({ method: EVM_METHODS.GET_ACCOUNTS });
+      return normalizeAccountsResponse(accounts);
     },
-    getChainId() {
-      return request<string>({ method: EVM_METHODS.GET_CHAIN_ID });
+    async getChainId() {
+      try {
+        return normalizeEvmChainId(await request<string>({ method: EVM_METHODS.GET_CHAIN_ID }));
+      } catch (error) {
+        if (error instanceof ProviderRpcError) throw error;
+        throw invalidParams("Provider returned a malformed chain ID");
+      }
     },
     async switchChain(chainId: string) {
       assertHexChainId(chainId);

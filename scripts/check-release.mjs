@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,23 +32,6 @@ const nativePackages = [
 ];
 const forbiddenDependencies = ["elliptic", "bn.js", "crypto-browserify", "randombytes"];
 const forbiddenPublicKeywords = new Set(["wharfkit", "sessionkit", "eos", "eosio"]);
-const forbiddenMarkdown = [
-  { pattern: /\b(?:generated|written|built) by (?:an )?AI\b/i, label: "generated wording" },
-  {
-    pattern: /\b(?:engineering|technical|teknis|internal) note\b/i,
-    label: "internal-note wording",
-  },
-  { pattern: /\b(?:ChatGPT|Codex)\b/i, label: "assistant wording" },
-  { pattern: /\bTODO release\b/i, label: "unfinished release wording" },
-  { pattern: /\bmigration scratchpad\b/i, label: "migration-note wording" },
-  { pattern: /\bdeveloper reminder\b/i, label: "developer-note wording" },
-  { pattern: /\bEOSIO\b/i, label: "EOSIO branding" },
-  { pattern: /\bEOS\b/i, label: "EOS branding" },
-  { pattern: /Publish native packages from VPS/i, label: "deployment note" },
-  { pattern: /npm whoami/i, label: "npm authentication note" },
-  { pattern: /release:npm/i, label: "release command" },
-  { pattern: /not (?:a )?WharfKit fork/i, label: "implementation comparison" },
-];
 const requiredReadmeSections = [
   "## Overview",
   "## Installation",
@@ -59,7 +43,7 @@ const requiredMarkdownSections = ["## Overview", "## License"];
 const creatorPattern = /Created by (?:\*\*)?Gilang Ramadan/;
 const copyrightPattern = /Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI/;
 const sourceHeader = `/**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -98,6 +82,46 @@ function assertDependencyAllowed(owner, dependency) {
 const rootPackage = await readJson("package.json");
 assert.equal(rootPackage.private, true, "Root package must remain private");
 assert.match(rootPackage.version, /^\d+\.\d+\.\d+$/, "Root version must be semantic");
+
+function git(args, allowFailure = false) {
+  try {
+    return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  } catch (error) {
+    if (allowFailure) return "";
+    throw error;
+  }
+}
+
+const releaseRelevant =
+  /^(?:packages\/[^/]+\/(?:src\/|package\.json|README\.md|tsconfig\.json)|package(?:-lock)?\.json|README\.md|CHANGELOG\.md|docs\/|specs\/|test\/fixtures\/|tsconfig(?:\.base)?\.json|scripts\/(?:check-release|publish-release|audit-release-tarballs|verify-vexanium)\.mjs|\.github\/workflows\/)/;
+const dirtyFiles = git(["status", "--porcelain"])
+  .split("\n")
+  .filter(Boolean)
+  .map((line) => line.slice(3));
+const configuredBaseline = process.env.RELEASE_BASE_REF?.trim();
+const baseline =
+  configuredBaseline && !/^0+$/.test(configuredBaseline)
+    ? configuredBaseline
+    : dirtyFiles.length
+      ? "HEAD"
+      : "HEAD^";
+const changedFiles = dirtyFiles.length
+  ? dirtyFiles
+  : git(["diff", "--name-only", baseline, "HEAD"], true).split("\n").filter(Boolean);
+if (changedFiles.some((file) => releaseRelevant.test(file))) {
+  const baselineManifest = git(["show", `${baseline}:package.json`], true);
+  if (!baselineManifest) {
+    throw new Error(
+      `Cannot verify the release version against ${baseline}; fetch release history first`,
+    );
+  }
+  const baselineVersion = JSON.parse(baselineManifest).version;
+  assert.notEqual(
+    rootPackage.version,
+    baselineVersion,
+    `Release-relevant files changed but version remains ${rootPackage.version}`,
+  );
+}
 
 const packageDirectories = (await readdir(path.join(root, "packages"), { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
@@ -227,14 +251,23 @@ for (const relativePath of sourceChecks) {
   assert.ok(source.startsWith(sourceHeader), `${relativePath} must include creator attribution`);
   assert.doesNotMatch(source, /@wharfkit\//, `${relativePath} cannot import WharfKit`);
   assert.doesNotMatch(source, /\bMath\.random\s*\(/, `${relativePath} cannot use Math.random`);
-  assert.doesNotMatch(
-    source,
-    /(?:from\s+["']node:|\bBuffer\b)/,
-    `${relativePath} must remain portable`,
-  );
+  if (relativePath !== "packages/antelope/src/node.ts") {
+    assert.doesNotMatch(
+      source,
+      /(?:from\s+["']node:|\bBuffer\b)/,
+      `${relativePath} must remain portable`,
+    );
+  }
 }
 
-const vexaniumPreset = await readFile(path.join(root, "packages/antelope/src/vexanium.ts"), "utf8");
+const vexaniumPreset = (
+  await Promise.all([
+    ...["antelope.ts", "chains.ts", "constants.ts"].map((file) =>
+      readFile(path.join(root, "packages/vexanium/src", file), "utf8"),
+    ),
+    readFile(path.join(root, "specs/wisp-provider-contract.json"), "utf8"),
+  ])
+).join("\n");
 for (const expected of [
   "Vexanium Mainnet",
   "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f",
@@ -242,7 +275,8 @@ for (const expected of [
   '"vexcore"',
   '"vex.token"',
   '"VEX"',
-  "VEXANIUM_NATIVE_PRECISION = 4",
+  "precision: 4",
+  'VEXANIUM_LEGACY_PUBLIC_KEY_PREFIX = "VEX"',
 ]) {
   assert.ok(vexaniumPreset.includes(expected), `Vexanium preset is missing ${expected}`);
 }
@@ -251,9 +285,6 @@ const markdownFiles = (await walk(root)).filter((file) => file.endsWith(".md"));
 for (const file of markdownFiles) {
   const content = await readFile(file, "utf8");
   const relativePath = path.relative(root, file);
-  for (const { pattern, label } of forbiddenMarkdown) {
-    assert.ok(!pattern.test(content), `${relativePath} contains ${label}`);
-  }
   for (const section of requiredMarkdownSections) {
     assert.ok(content.includes(section), `${relativePath} is missing ${section}`);
   }

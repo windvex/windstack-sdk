@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -285,9 +285,10 @@ export class AccountClient {
 
   sellRam(bytes: number | bigint | string, signal?: AbortSignal): Promise<ContractAction> {
     let value: bigint;
-    try {
-      value = BigInt(bytes);
-    } catch {
+    if (typeof bytes === "bigint") value = bytes;
+    else if (typeof bytes === "number" && Number.isSafeInteger(bytes)) value = BigInt(bytes);
+    else if (typeof bytes === "string" && /^(?:0|[1-9]\d*)$/.test(bytes)) value = BigInt(bytes);
+    else {
       throw new TypeError("RAM bytes must be an integer-compatible value");
     }
     if (value <= 0n || value > 0x7fffffffffffffffn) {

@@ -2,29 +2,29 @@
 
 ## Overview
 
-WindStack SDK 1.0.0 provides a coordinated set of packages for Vexanium, Antelope transactions, Wisp Wallet integration, EVM providers, and Solana providers.
+WindStack SDK 2.0.0 provides a coordinated, general-purpose package set for Antelope, Vexanium, EVM, Solana, signing, exact assets, and protocol math.
 
-The table below describes the capabilities available in the public 1.0.0 package set.
+The table below describes the capabilities available in the public 2.0.0 package set.
 
 | Package | Supported capabilities |
 | --- | --- |
-| `@windstack/core` | Provider contracts, shared errors, events, browser helpers, and application metadata |
-| `@windstack/crypto` | K1/R1 keys, signatures, verification, recovery, modern and Vexanium-compatible key formats |
-| `@windstack/abi` | ABI primitives, structs, aliases, variants, inheritance, optionals, arrays, and binary extensions |
-| `@windstack/rpc` | Vexanium and Antelope RPC reads, timeout handling, cancellation, endpoint failover, and safe transaction submission |
+| `@windstack/core` | Provider errors/events, exact decimal and basis-point operations, AMM quotes/routes, and liquidity math |
+| `@windstack/crypto` | K1/R1 keys, canonical signatures, WIF, recovery, and equivalent `VEX`/`EOS`/modern key formats |
+| `@windstack/abi` | ABI codec, names, exact assets, extended assets, token identity, and checked precision conversion |
+| `@windstack/rpc` | Strict Antelope RPC, verified failover, cancellation, Spring states, Hyperion history, and safe submission |
 | `@windstack/contract` | ABI loading, caching, action serialization, contract access, and table queries |
-| `@windstack/account` | VEX balances, transfers, resource operations, RAM, voting, producers, accounts, and permissions |
-| `@windstack/antelope` | TAPOS, transaction serialization, signing digests, required-key discovery, signer validation, and broadcast |
+| `@windstack/account` | Token balances/transfers, resource operations, RAM, voting, producers, accounts, and permissions |
+| `@windstack/antelope` | TAPOS, transaction serialization/digest/id, required keys, signer validation, keosd, and broadcast |
 | `@windstack/signing-request` | VSR/ESR parsing, encoding, compression, callbacks, chain constraints, action resolution, transactions, and identity requests |
 | `@windstack/session` | Wallet plugins, login, restore, persistence, logout, and transaction orchestration |
-| `@windstack/vexanium` | Vexanium chain metadata, provider access, signing-request helpers, asset utilities, and explorer links |
+| `@windstack/vexanium` | Vexanium metadata, provider access, signing requests, bridge primitives, VEX EVM transaction-action decoding, and explorer links |
 | `@windstack/wallet-plugin-wisp` | Wisp Wallet discovery, account authorization, and exact Vexanium transaction signing |
-| `@windstack/evm` | EIP-1193 requests, EIP-6963 discovery, chain management, accounts, and provider events |
-| `@windstack/solana` | Wisp-compatible Solana provider access, accounts, requests, message signing, and provider events |
+| `@windstack/evm` | Address/chain normalization, verified JSON-RPC, EIP-1193 requests, EIP-6963 discovery, and events |
+| `@windstack/solana` | Solana provider access, account normalization, requests, message signing, and provider events |
 
 ## Vexanium compatibility
 
-WindStack 1.0.0 is validated against the current production ABIs for `vexcore` and `vex.token`.
+WindStack 2.0.0 is validated against the current production ABIs for `vexcore` and `vex.token`.
 
 The Vexanium Mainnet preset uses:
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@windstack/crypto` provides K1 and R1 key handling for WindStack and Vexanium applications. It supports private keys, public keys, recoverable signatures, signature verification, public-key recovery, current Antelope key encodings, and compatibility with older K1 key encodings used by existing Vexanium accounts and node software.
+`@windstack/crypto` provides generic Antelope K1 and R1 key handling. It supports private keys, public keys, recoverable signatures, canonical K1 signing, signature verification, public-key recovery, WIF, modern key encodings, and legacy `VEX` and `EOS` K1 encodings.
 
 The public API is based on `Uint8Array`. Elliptic-curve and hashing primitives are provided by the Noble libraries.
 
@@ -15,7 +15,7 @@ npm install @windstack/crypto
 ## Usage
 
 ```ts
-import { PrivateKey, sha256Digest } from "@windstack/crypto";
+import { PrivateKey, normalizePublicKey, publicKeysEqual, sha256Digest } from "@windstack/crypto";
 
 const privateKey = PrivateKey.fromString("PVT_K1_...");
 const publicKey = privateKey.toPublicKey();
@@ -25,9 +25,12 @@ const signature = privateKey.signDigest(digest);
 console.log(signature.toString());
 console.log(signature.verifyDigest(digest, publicKey));
 console.log(signature.recoverDigest(digest).equals(publicKey));
+console.log(publicKey.toLegacyString("VEX"));
+console.log(normalizePublicKey("VEX..."));
+console.log(publicKeysEqual("VEX...", "PUB_K1_..."));
 ```
 
-K1 signatures are emitted in the canonical compact form required by Vexanium-compatible transaction signing. Existing K1 private and public keys can be imported through the compatibility parsers without changing their key material.
+K1 signatures are deterministic, low-S, recoverable, and emitted in Antelope canonical compact form. Legacy prefixes are display encodings: equivalent `VEX…`, `EOS…`, and `PUB_K1_…` values normalize to the same curve and key bytes.
 
 ## Runtime
 

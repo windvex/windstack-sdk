@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@windstack/vexanium` provides Vexanium network metadata, browser wallet-provider access, Vexanium Signing Requests, session observation, asset helpers, and Wind Explorer URL utilities.
+`@windstack/vexanium` contains behavior that is specific to Vexanium: network metadata, browser wallet-provider access, Signing Requests, session observation, explorer routes, and VEX EVM bridge decoding.
 
 VEX Native configuration exposed by this package uses:
 
@@ -22,6 +22,26 @@ npm install @windstack/vexanium
 ```
 
 ## Usage
+
+### Antelope client and local signer
+
+```ts
+import { PrivateKey } from "@windstack/antelope";
+import {
+  VEXANIUM_ANTELOPE_MAINNET,
+  createVexaniumAntelopeClient,
+  createVexaniumPrivateKeySigner,
+} from "@windstack/vexanium/antelope";
+
+const client = createVexaniumAntelopeClient();
+const signer = createVexaniumPrivateKeySigner([
+  PrivateKey.fromString("PVT_K1_..."),
+]);
+
+console.log(VEXANIUM_ANTELOPE_MAINNET.nativeToken.symbol); // VEX
+```
+
+The signer announces K1 public keys with the native `VEX` prefix. Equivalent `VEX…`, `EOS…`, and `PUB_K1_…` inputs are matched by their key bytes.
 
 ### Network metadata
 
@@ -112,21 +132,50 @@ const uri = await createSigningRequest({
 const request = parseSigningRequest(uri);
 ```
 
-### Explorer and asset utilities
+### Explorer routes
 
 ```ts
 import {
   buildExplorerAccountUrl,
   buildExplorerTxUrl,
-  formatAsset,
-  parseAsset,
 } from "@windstack/vexanium";
 
-const asset = parseAsset("1.2500 VEX");
-const value = formatAsset(asset.amount, asset.precision, asset.symbol);
 const accountUrl = buildExplorerAccountUrl("gvexa");
 const transactionUrl = buildExplorerTxUrl("transaction-id");
 ```
+
+Exact asset parsing and formatting are available from `@windstack/abi`; exact decimal utilities are available from `@windstack/core`.
+
+### VEX EVM bridge primitives
+
+```ts
+import {
+  decodeVexEvmBridgeTransferCalldata,
+  nativeAccountToReservedEvmAddress,
+  reservedEvmAddressToNativeAccount,
+} from "@windstack/vexanium";
+
+const address = nativeAccountToReservedEvmAddress("alice");
+const account = reservedEvmAddressToNativeAccount(address);
+const transfer = decodeVexEvmBridgeTransferCalldata(calldata);
+```
+
+Reserved addresses are accepted only when their `0xbbbb…` suffix decodes to a canonical Vexanium account. Prefix-only matches, malformed ABI offsets, truncated UTF-8, and oversized memos are rejected.
+
+### VEX EVM contract actions
+
+Decoded `vex.evm::evmtx` and `vex.evm::pushtx` data can be normalized without losing uint64 values:
+
+```ts
+import { decodeVexEvmContractAction } from "@windstack/vexanium";
+
+const action = decodeVexEvmContractAction(hyperionAction);
+if (action.name === "evmtx") {
+  console.log(action.event.rlpTransaction, action.event.protocolVersion);
+}
+```
+
+Both `evmtx_v1` and `evmtx_v3` variants are supported. RLP bytes, event fields, account names, and uint64 values are validated before being returned. Other `vex.evm` actions can be decoded from their current on-chain ABI with `AbiSerializer` from `@windstack/abi`.
 
 ## Runtime
 

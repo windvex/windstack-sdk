@@ -1,7 +1,7 @@
 {
   "name": "@windstack/core",
-  "version": "1.0.0",
-  "description": "Shared provider primitives for WindStack SDK packages.",
+  "version": "2.0.0",
+  "description": "Runtime-neutral provider, error, exact decimal, basis-point, and constant-product math primitives.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,16 +19,17 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit false",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build"
   },
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "vexanium",
-    "wisp-wallet",
+    "bigint",
+    "decimal",
     "wallet",
     "provider",
+    "amm",
     "typescript"
   ],
   "license": "MIT",

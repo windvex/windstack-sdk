@@ -1,7 +1,7 @@
 import type { DappMetadata, DappMetadataInput, DappRequestContext } from "./types.js";
 import { getRuntimeWindow } from "./window.js";
 
-const DEFAULT_DAPP_NAME = "Wisp DApp";
+const DEFAULT_DAPP_NAME = "Application";
 const DEFAULT_ORIGIN = "unknown://local";
 
 function safeTrim(value: unknown): string | undefined {

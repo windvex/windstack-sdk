@@ -1,7 +1,7 @@
 {
   "name": "@windstack/crypto",
-  "version": "1.0.0",
-  "description": "Portable Antelope K1/R1 key and signature operations powered by Noble cryptography.",
+  "version": "2.0.0",
+  "description": "Portable Antelope K1/R1 keys, canonical signatures, recovery, WIF, and legacy key compatibility.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,6 +19,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build"
   },
   "dependencies": {
@@ -28,12 +29,12 @@
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "vexanium",
     "antelope",
     "cryptography",
     "secp256k1",
     "p256",
     "signatures",
+    "keys",
     "typescript"
   ],
   "license": "MIT",

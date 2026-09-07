@@ -2,9 +2,9 @@
 
 ## Overview
 
-`@windstack/account` provides account reads and Vexanium-compatible account action builders. It supports account queries, VEX balances, token transfers, CPU and NET staking, unstaking, RAM operations, refunds, producer voting, proxy voting, producer registration, reward claims, account creation, and permission management.
+`@windstack/account` provides account reads and common Antelope account action builders. It supports account queries, token balances and transfers, resource staking, RAM operations, refunds, producer voting, account creation, and permission management.
 
-System and token contract names are supplied by the parent client. The Vexanium preset uses `vexcore` for system actions and `vex.token` for the native `VEX` token.
+System and token contract names are supplied by the parent client. No chain, contract, symbol, or permission is selected implicitly for sensitive operations.
 
 ## Installation
 
@@ -12,21 +12,25 @@ System and token contract names are supplied by the parent client. The Vexanium 
 npm install @windstack/account
 ```
 
-The account helper is normally created by `@windstack/antelope` so RPC, ABI caching, chain identity, and Vexanium contract configuration are shared automatically.
+The account helper is normally created by `@windstack/antelope` so RPC, ABI caching, and chain identity are shared automatically. Chain presets may supply the appropriate system and token contracts.
 
 ## Usage
 
 ```ts
-import { createVexaniumClient } from "@windstack/antelope/vexanium";
+import { AntelopeClient } from "@windstack/antelope";
 
-const client = createVexaniumClient();
+const client = new AntelopeClient({
+  endpoints: "https://node.example",
+  chainId: "00".repeat(32),
+  contracts: { system: "system", token: "token" },
+});
 const account = client.account("alice");
 
-const balances = await account.balance(undefined, "VEX");
-const transfer = await account.transfer("bob", "1.0000 VEX", "WindStack");
-const stake = await account.delegate("alice", "1.0000 VEX", "2.0000 VEX");
-const unstake = await account.undelegate("alice", "1.0000 VEX", "1.0000 VEX");
-const buyRam = await account.buyRam("alice", "5.0000 VEX");
+const balances = await account.balance(undefined, "TKN");
+const transfer = await account.transfer("bob", "1.0000 TKN", "example");
+const stake = await account.delegate("alice", "1.0000 TKN", "2.0000 TKN");
+const unstake = await account.undelegate("alice", "1.0000 TKN", "1.0000 TKN");
+const buyRam = await account.buyRam("alice", "5.0000 TKN");
 const sellRam = await account.sellRam(4096);
 ```
 
@@ -48,7 +52,7 @@ const producer = await account.registerProducer(
 );
 ```
 
-Producer voting rejects duplicates and accepts at most 30 producer accounts, matching the Vexanium system contract. `clearVote()` removes the current direct producer or proxy selection.
+Producer voting rejects duplicates and accepts at most 30 producer accounts. `clearVote()` removes the current direct producer or proxy selection.
 
 ### Account permissions
 

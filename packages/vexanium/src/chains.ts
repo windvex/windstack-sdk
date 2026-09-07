@@ -1,5 +1,8 @@
-import { WISP_PROVIDER_CONTRACT } from "@windstack/core";
-import { VEXANIUM_MAINNET_CHAIN_ID, VEXANIUM_MAINNET_SCOPE } from "./constants.js";
+import {
+  VEXANIUM_MAINNET_CHAIN_ID,
+  VEXANIUM_MAINNET_SCOPE,
+  VEX_EVM_ANTELOPE_CONTRACT,
+} from "./constants.js";
 import type { VexaniumCaip2ChainId, VexaniumFullChainId } from "./types.js";
 
 export type WindstackChainEnvironment = "mainnet" | "testnet" | "local";
@@ -62,6 +65,7 @@ export type VexaniumEvmChainConfig = {
   rpcUrl: string;
   apiUrl: string;
   statsUrl: string;
+  antelopeContract: typeof VEX_EVM_ANTELOPE_CONTRACT;
   explorerUrl: string;
   nativeCurrency: WindstackNativeCurrency;
   routes: Pick<WindstackExplorerRoutes, "home" | "tx" | "block" | "account" | "token">;
@@ -69,7 +73,6 @@ export type VexaniumEvmChainConfig = {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "");
 const encodePath = (value: string | number): string => encodeURIComponent(String(value));
-const { evm } = WISP_PROVIDER_CONTRACT;
 
 export function createVexaniumExplorerRoutes(baseUrl: string): WindstackExplorerRoutes {
   const base = trimTrailingSlash(baseUrl);
@@ -138,11 +141,12 @@ export const vexEvm = {
   displayName: "Vexanium EVM",
   shortName: "VEX EVM",
   environment: "mainnet",
-  chainId: evm.chainId,
-  chainIdHex: evm.chainIdHex,
+  chainId: 6736,
+  chainIdHex: "0x1a50",
   rpcUrl: "https://api.windcrypto.com/rpc",
   apiUrl: "https://api.windcrypto.com/v3/evm",
   statsUrl: "https://api.windcrypto.com/v3/evm/stats",
+  antelopeContract: VEX_EVM_ANTELOPE_CONTRACT,
   explorerUrl: "https://explorer.windcrypto.com/evm",
   nativeCurrency: {
     name: "Vexanium",

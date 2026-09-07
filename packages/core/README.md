@@ -2,9 +2,9 @@
 
 ## Overview
 
-`@windstack/core` contains shared provider contracts, error types, event utilities, browser helpers, and application metadata utilities used across WindStack wallet-facing packages.
+`@windstack/core` contains runtime-neutral provider errors, typed events, browser helpers, application metadata, exact decimal conversion, basis-point operations, and constant-product protocol math.
 
-The exported `WISP_PROVIDER_CONTRACT` keeps provider identity, error codes, Vexanium provider identifiers, EVM chain identifiers, method names, capabilities, and discovery events consistent across packages.
+Provider errors use standard numeric JSON-RPC and EIP-1193 codes while preserving provider-supplied error data.
 
 ## Installation
 
@@ -15,24 +15,19 @@ npm install @windstack/core
 ## Usage
 
 ```ts
-import {
-  WISP_PROVIDER_CONTRACT,
-  WispEventEmitter,
-  normalizeProviderError,
-  resolveDappMetadata,
-} from "@windstack/core";
+import { parseDecimal, quoteConstantProduct } from "@windstack/core";
 
-const metadata = resolveDappMetadata({
-  name: "My App",
-  url: "https://app.example",
-  icon: "https://app.example/icon.png",
+const quote = quoteConstantProduct({
+  reserveIn: 1_000_000n,
+  reserveOut: 2_000_000n,
+  amountIn: parseDecimal("10.0000", 4),
+  feeBps: 30,
 });
 
-console.log(WISP_PROVIDER_CONTRACT.vex.standard);
-console.log(WISP_PROVIDER_CONTRACT.evm.chainIdHex);
+console.log(quote.amountOut);
 ```
 
-`resolveDappMetadata()` combines explicit application metadata with safe values available from the current document. Provider error normalization preserves numeric wallet error codes, while `WispEventEmitter` supplies typed listener registration and cleanup for provider clients.
+All protocol-critical results use `bigint`. Precision conversion rejects discarded units by default; AMM and liquidity quotes use documented integer-floor semantics. Invalid precision, out-of-range basis points, disconnected routes, and duplicate pools are rejected.
 
 ## Security
 

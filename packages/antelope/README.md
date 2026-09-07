@@ -2,11 +2,9 @@
 
 ## Overview
 
-`@windstack/antelope` is the high-level transaction client for WindStack applications. It combines Vexanium-compatible RPC access, ABI serialization, contract access, account helpers, TAPOS construction, canonical transaction serialization, signing-digest calculation, required-key resolution, pluggable signers, and transaction broadcast.
+`@windstack/antelope` is a chain-neutral Antelope transaction toolkit. It combines verified RPC access, ABI serialization, contract and account helpers, TAPOS, transaction serialization/digest/id, required-key resolution, pluggable signers, keosd, and transaction broadcast.
 
 A client can be bound to an expected chain ID. When configured, signing stops if the RPC endpoint reports a different chain, preventing a transaction from being signed against an unintended network.
-
-Vexanium Mainnet is available through the `@windstack/antelope/vexanium` entrypoint with the canonical chain ID, RPC endpoint, `vexcore` system contract, `vex.token` native token contract, `VEX` symbol, and precision `4` already configured.
 
 ## Installation
 
@@ -16,31 +14,27 @@ npm install @windstack/antelope
 
 ## Usage
 
-### Vexanium Mainnet
+### Chain-bound client
 
 ```ts
 import {
-  VEXANIUM_MAINNET,
-  createVexaniumClient,
-} from "@windstack/antelope/vexanium";
-import {
+  AntelopeClient,
   PrivateKey,
   PrivateKeySigner,
 } from "@windstack/antelope";
 
-const client = createVexaniumClient();
-
-console.log(VEXANIUM_MAINNET.contracts.system); // vexcore
-console.log(VEXANIUM_MAINNET.contracts.token); // vex.token
-console.log(VEXANIUM_MAINNET.nativeToken.symbol); // VEX
-
+const client = new AntelopeClient({
+  endpoints: ["https://node.example"],
+  chainId: "00".repeat(32),
+  contracts: { system: "eosio", token: "eosio.token" },
+});
 const signer = new PrivateKeySigner([
   PrivateKey.fromString("PVT_K1_..."),
 ]);
 
 const transfer = await client
   .account("alice")
-  .transfer("bob", "1.0000 VEX", "WindStack");
+  .transfer("bob", "1.0000 SYS", "example");
 
 const result = await client.transact({
   actions: [transfer],
@@ -69,7 +63,19 @@ const signer: Signer = {
 };
 ```
 
-The built-in K1 signer uses the compatibility public-key representation expected by older Vexanium node software when resolving required keys. Applications can request current K1 public-key strings with `k1PublicKeyFormat: "modern"`.
+`PrivateKeySigner` defaults to legacy `EOS` display strings and accepts a custom legacy prefix. Required keys returned in a configured legacy form or as `PUB_K1` are normalized before matching.
+
+HTTP keosd is browser-safe and loopback-only by default. Unix sockets are isolated from the browser entrypoint:
+
+```ts
+import { KeosdSigner } from "@windstack/antelope";
+import { KeosdUnixTransport } from "@windstack/antelope/node";
+
+const signer = new KeosdSigner({
+  walletName: "default",
+  transport: new KeosdUnixTransport({ socketPath: "/run/keosd.sock" }),
+});
+```
 
 ## Security
 
@@ -80,8 +86,6 @@ The configured chain ID is checked before signing. Signer output is parsed, coun
 The package is ESM-first and requires Node.js 20.19 or newer when used directly in Node.js. It uses Web-standard byte and networking APIs and does not require Node.js `Buffer` for transaction construction or signing.
 
 The client accepts one or more RPC endpoints for read operations and required-key resolution. Transaction broadcast is not retried automatically when the outcome of a submitted transaction is uncertain.
-
-Vexanium production ABI compatibility is checked as part of the repository release validation against `vexcore` and `vex.token`.
 
 ## License
 

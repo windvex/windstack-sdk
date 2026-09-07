@@ -1,40 +1,36 @@
-import { WISP_PROVIDER_CONTRACT } from "./provider-contract.js";
-
-const { errors } = WISP_PROVIDER_CONTRACT;
-
-export const WISP_ERROR_CODES = {
-  USER_REJECTED: errors.userRejected,
-  UNAUTHORIZED: errors.unauthorized,
-  UNSUPPORTED_METHOD: errors.unsupportedMethod,
-  DISCONNECTED: errors.disconnected,
-  CHAIN_DISCONNECTED: errors.chainDisconnected,
-  REQUEST_PENDING: errors.requestPending,
-  UNSUPPORTED_CHAIN: errors.unsupportedChain,
-  UNSUPPORTED_CAPABILITY: errors.unsupportedCapability,
-  INCOMPATIBLE_VERSION: errors.incompatibleVersion,
-  INVALID_REQUEST: errors.invalidRequest,
-  METHOD_NOT_FOUND: errors.methodNotFound,
-  INVALID_PARAMS: errors.invalidParams,
-  INTERNAL_ERROR: errors.internalError,
+export const PROVIDER_ERROR_CODES = {
+  USER_REJECTED: 4001,
+  UNAUTHORIZED: 4100,
+  UNSUPPORTED_METHOD: 4200,
+  DISCONNECTED: 4900,
+  CHAIN_DISCONNECTED: 4901,
+  REQUEST_PENDING: -32002,
+  UNSUPPORTED_CHAIN: -32004,
+  UNSUPPORTED_CAPABILITY: -32005,
+  INCOMPATIBLE_VERSION: -32006,
+  INVALID_REQUEST: -32600,
+  METHOD_NOT_FOUND: -32601,
+  INVALID_PARAMS: -32602,
+  INTERNAL_ERROR: -32603,
 } as const;
 
-export type WispErrorCode = (typeof WISP_ERROR_CODES)[keyof typeof WISP_ERROR_CODES];
+export type ProviderErrorCode = (typeof PROVIDER_ERROR_CODES)[keyof typeof PROVIDER_ERROR_CODES];
 
-export class WispProviderError<TData = unknown> extends Error {
-  readonly code: WispErrorCode | number;
+export class ProviderRpcError<TData = unknown> extends Error {
+  readonly code: ProviderErrorCode | number;
   readonly data?: TData;
 
-  constructor(code: WispErrorCode | number, message: string, data?: TData) {
+  constructor(code: ProviderErrorCode | number, message: string, data?: TData) {
     super(message);
-    this.name = "WispProviderError";
+    this.name = "ProviderRpcError";
     this.code = code;
     this.data = data;
   }
 }
 
-export function isWispProviderError(value: unknown): value is WispProviderError {
+export function isProviderRpcError(value: unknown): value is ProviderRpcError {
   return (
-    value instanceof WispProviderError ||
+    value instanceof ProviderRpcError ||
     (typeof value === "object" &&
       value !== null &&
       "code" in value &&
@@ -43,36 +39,44 @@ export function isWispProviderError(value: unknown): value is WispProviderError 
   );
 }
 
-export function userRejected(message = "User rejected the request") {
-  return new WispProviderError(WISP_ERROR_CODES.USER_REJECTED, message);
-}
-
-export function requestPending(message = "A wallet request is already pending") {
-  return new WispProviderError(WISP_ERROR_CODES.REQUEST_PENDING, message);
-}
-
-export function methodNotFound(method: string) {
-  return new WispProviderError(WISP_ERROR_CODES.METHOD_NOT_FOUND, `Unsupported method: ${method}`);
-}
-
-export function invalidParams(message = "Invalid request parameters", data?: unknown) {
-  return new WispProviderError(WISP_ERROR_CODES.INVALID_PARAMS, message, data);
-}
-
-export function internalError(message = "Internal wallet error", data?: unknown) {
-  return new WispProviderError(WISP_ERROR_CODES.INTERNAL_ERROR, message, data);
-}
-
-export function normalizeProviderError(error: unknown): WispProviderError {
-  if (error instanceof WispProviderError) return error;
-  if (isWispProviderError(error)) {
+export function normalizeProviderRpcError(error: unknown): ProviderRpcError {
+  if (error instanceof ProviderRpcError) return error;
+  if (isProviderRpcError(error)) {
     const candidate = error as { code: number; message?: unknown; data?: unknown };
-    return new WispProviderError(
+    return new ProviderRpcError(
       candidate.code,
-      typeof candidate.message === "string" ? candidate.message : "Wallet request failed",
+      typeof candidate.message === "string" ? candidate.message : "Provider request failed",
       candidate.data,
     );
   }
-  if (error instanceof Error) return internalError(error.message, error);
-  return internalError("Wallet request failed", error);
+  if (error instanceof Error)
+    return new ProviderRpcError(PROVIDER_ERROR_CODES.INTERNAL_ERROR, error.message, error);
+  return new ProviderRpcError(
+    PROVIDER_ERROR_CODES.INTERNAL_ERROR,
+    "Provider request failed",
+    error,
+  );
+}
+
+export function userRejected(message = "User rejected the request") {
+  return new ProviderRpcError(PROVIDER_ERROR_CODES.USER_REJECTED, message);
+}
+
+export function requestPending(message = "A wallet request is already pending") {
+  return new ProviderRpcError(PROVIDER_ERROR_CODES.REQUEST_PENDING, message);
+}
+
+export function methodNotFound(method: string) {
+  return new ProviderRpcError(
+    PROVIDER_ERROR_CODES.METHOD_NOT_FOUND,
+    `Unsupported method: ${method}`,
+  );
+}
+
+export function invalidParams(message = "Invalid request parameters", data?: unknown) {
+  return new ProviderRpcError(PROVIDER_ERROR_CODES.INVALID_PARAMS, message, data);
+}
+
+export function internalError(message = "Internal wallet error", data?: unknown) {
+  return new ProviderRpcError(PROVIDER_ERROR_CODES.INTERNAL_ERROR, message, data);
 }

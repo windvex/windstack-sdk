@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -135,6 +135,26 @@ assert.throws(() => serializer.encode("uint8", 256), /uint8/);
 assert.throws(() => serializer.encode("bytes", null), /hexadecimal or Uint8Array/);
 assert.throws(() => serializer.encode("bytes", { length: 2 }), /hexadecimal or Uint8Array/);
 assert.throws(() => parseAsset("01.0000 VEX"), /Invalid asset/);
+const invalidAssetAmount = serializer.encode("asset", "1 VEX");
+new DataView(
+  invalidAssetAmount.buffer,
+  invalidAssetAmount.byteOffset,
+  invalidAssetAmount.byteLength,
+).setBigInt64(0, 1n << 62n, true);
+assert.throws(() => serializer.decode("asset", invalidAssetAmount), /asset range/);
+const invalidAssetPrecision = serializer.encode("asset", "1 VEX");
+invalidAssetPrecision[8] = 19;
+assert.throws(() => serializer.decode("asset", invalidAssetPrecision), /symbol precision/);
+assert.throws(
+  () => serializer.encode("extended_asset", { quantity: "1.0000 VEX", contract: false }),
+  /extended_asset/,
+);
+const emptyExtendedContract = serializer.encode("extended_asset", {
+  quantity: "1.0000 VEX",
+  contract: "vex.token",
+});
+emptyExtendedContract.fill(0, 16);
+assert.throws(() => serializer.decode("extended_asset", emptyExtendedContract), /canonical/);
 assert.throws(() => serializer.decode("bool", Uint8Array.of(2)), /Invalid bool/);
 assert.throws(() => serializer.decode("uint64", new Uint8Array(7)), /Unexpected end/);
 assert.throws(() => serializer.decode("uint8", Uint8Array.of(1, 2)), /Unused ABI bytes/);

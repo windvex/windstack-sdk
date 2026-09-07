@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -23,6 +23,8 @@ export * from "@windstack/contract";
 export { PrivateKey, PublicKey, Signature, concatBytes, sha256Digest } from "@windstack/crypto";
 export type { KeyType } from "@windstack/crypto";
 export * from "@windstack/rpc";
+export { KeosdError, KeosdHttpTransport, KeosdSigner } from "./keosd.js";
+export type { KeosdHttpTransportOptions, KeosdSignerOptions, KeosdTransport } from "./keosd.js";
 
 export type Action = ContractAction;
 export type TransactionExtension = [number, string];
@@ -46,8 +48,8 @@ export type SignRequest = {
   requiredKeys: readonly string[];
 };
 export interface Signer {
-  getAvailableKeys(): Promise<readonly string[]>;
-  sign(request: SignRequest): Promise<readonly (string | Signature)[]>;
+  getAvailableKeys(signal?: AbortSignal): Promise<readonly string[]>;
+  sign(request: SignRequest, signal?: AbortSignal): Promise<readonly (string | Signature)[]>;
 }
 export type TransactArgs = {
   actions: Action[];
@@ -71,11 +73,32 @@ export type ChainContracts = {
   system?: string;
 };
 
-function blockPrefix(block: GetBlockResponse): number {
-  if (typeof block.ref_block_prefix === "number") return block.ref_block_prefix >>> 0;
-  const bytes = cryptoHexToBytes(block.id);
-  if (bytes.length !== 32) throw new TypeError("Invalid block id");
-  return new DataView(bytes.buffer, bytes.byteOffset + 8, 4).getUint32(0, true);
+export type Tapos = Readonly<{
+  refBlockNum: number;
+  refBlockPrefix: number;
+  blockNum: number;
+  blockId: string;
+}>;
+
+export function taposFromBlock(
+  block: Pick<GetBlockResponse, "id" | "block_num" | "ref_block_prefix">,
+): Tapos {
+  if (!Number.isInteger(block.block_num) || block.block_num < 0 || block.block_num > 0xffffffff)
+    throw new TypeError("Invalid TAPOS block number");
+  if (!/^[0-9a-f]{64}$/i.test(block.id)) throw new TypeError("Invalid TAPOS block id");
+  let refBlockPrefix: number;
+  if (typeof block.ref_block_prefix === "number") {
+    refBlockPrefix = assertUint(block.ref_block_prefix, 0xffffffff, "ref_block_prefix");
+  } else {
+    const bytes = cryptoHexToBytes(block.id);
+    refBlockPrefix = new DataView(bytes.buffer, bytes.byteOffset + 8, 4).getUint32(0, true);
+  }
+  return Object.freeze({
+    refBlockNum: block.block_num & 0xffff,
+    refBlockPrefix,
+    blockNum: block.block_num,
+    blockId: block.id.toLowerCase(),
+  });
 }
 
 function timestampSeconds(value: string): number {
@@ -172,13 +195,24 @@ export function transactionDigest(
   );
 }
 
+/** Antelope transaction id: SHA-256 of the serialized transaction, excluding signatures. */
+export function transactionId(serializedTransaction: Uint8Array): string {
+  if (!(serializedTransaction instanceof Uint8Array)) {
+    throw new TypeError("Serialized transaction must be Uint8Array");
+  }
+  return bytesToHex(sha256Digest(serializedTransaction));
+}
+
 export type PrivateKeySignerOptions = {
   k1PublicKeyFormat?: "legacy" | "modern";
+  /** Network-specific prefix for legacy K1 public keys. Defaults to `EOS`. */
+  legacyPublicKeyPrefix?: string;
 };
 
 export class PrivateKeySigner implements Signer {
   readonly #keys: PrivateKey[];
   readonly #k1PublicKeyFormat: "legacy" | "modern";
+  readonly #legacyPublicKeyPrefix: string;
 
   constructor(keys: PrivateKey[], options: PrivateKeySignerOptions = {}) {
     if (!keys.length) throw new TypeError("At least one private key is required");
@@ -188,13 +222,19 @@ export class PrivateKeySigner implements Signer {
     }
     this.#keys = [...keys];
     this.#k1PublicKeyFormat = options.k1PublicKeyFormat ?? "legacy";
+    this.#legacyPublicKeyPrefix = options.legacyPublicKeyPrefix ?? "EOS";
+    if (this.#k1PublicKeyFormat === "legacy") {
+      for (const key of this.#keys) {
+        if (key.type === "K1") key.toPublicKey().toLegacyString(this.#legacyPublicKeyPrefix);
+      }
+    }
   }
 
   async getAvailableKeys(): Promise<string[]> {
     return this.#keys.map((key) => {
       const publicKey = key.toPublicKey();
       return key.type === "K1" && this.#k1PublicKeyFormat === "legacy"
-        ? publicKey.toLegacyString()
+        ? publicKey.toLegacyString(this.#legacyPublicKeyPrefix)
         : publicKey.toString();
     });
   }
@@ -226,7 +266,7 @@ export class AntelopeClient {
     if (options.chainId && !/^[0-9a-f]{64}$/i.test(options.chainId)) {
       throw new TypeError("Configured Antelope chain id must be exactly 64 hexadecimal characters");
     }
-    this.rpc = new RpcClient(options);
+    this.rpc = new RpcClient({ ...options, expectedChainId: options.chainId });
     this.abiCache = options.abiCache ?? new AbiCache();
     this.chainId = options.chainId?.toLowerCase();
     this.contracts = Object.freeze({ ...(options.contracts ?? {}) });
@@ -264,13 +304,14 @@ export class AntelopeClient {
     }
 
     const block = await this.rpc.getBlock(info.last_irreversible_block_num, args.signal);
+    const tapos = taposFromBlock(block);
     const expiration = new Date((timestampSeconds(info.head_block_time) + expireSeconds) * 1000)
       .toISOString()
       .replace(/\.000Z$/, "");
     const transaction: Transaction = {
       expiration,
-      ref_block_num: block.block_num & 0xffff,
-      ref_block_prefix: blockPrefix(block),
+      ref_block_num: tapos.refBlockNum,
+      ref_block_prefix: tapos.refBlockPrefix,
       max_net_usage_words: 0,
       max_cpu_usage_ms: 0,
       delay_sec: 0,
@@ -289,7 +330,7 @@ export class AntelopeClient {
       : new Uint8Array(32);
     const digest = transactionDigest(actualChainId, serializedTransaction, contextFreeDataHash);
 
-    const availableKeys = [...new Set(await args.signer.getAvailableKeys())];
+    const availableKeys = [...new Set(await args.signer.getAvailableKeys(args.signal))];
     if (!availableKeys.length) throw new Error("Signer returned no available keys");
     for (const key of availableKeys) PublicKey.fromString(key);
 
@@ -304,14 +345,17 @@ export class AntelopeClient {
       throw new TypeError("RPC returned duplicate required keys");
     }
 
-    const signed = await args.signer.sign({
-      chainId: actualChainId,
-      transaction,
-      serializedTransaction,
-      serializedContextFreeData,
-      digest,
-      requiredKeys,
-    });
+    const signed = await args.signer.sign(
+      {
+        chainId: actualChainId,
+        transaction,
+        serializedTransaction,
+        serializedContextFreeData,
+        digest,
+        requiredKeys,
+      },
+      args.signal,
+    );
     if (!Array.isArray(signed)) throw new TypeError("Signer returned an invalid signature list");
     const parsedSignatures = signed.map((value) => {
       if (typeof value === "string") return Signature.fromString(value);

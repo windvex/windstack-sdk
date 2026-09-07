@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -17,7 +17,13 @@ const rpc = new RpcClient({
   endpoints: ["https://one.test/", "https://one.test", "https://two.test"],
   fetch: async (input, init) => {
     requests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
-    return Response.json({ chain_id: "00".repeat(32), head_block_num: 1 });
+    return Response.json({
+      chain_id: "00".repeat(32),
+      head_block_num: 1,
+      last_irreversible_block_num: 1,
+      head_block_id: "00".repeat(32),
+      head_block_time: "2026-09-07T00:00:00.000",
+    });
   },
 });
 assert.deepEqual(rpc.endpoints, ["https://one.test", "https://two.test"]);
@@ -32,7 +38,13 @@ const failover = new RpcClient({
     if (String(input).startsWith("https://bad.test")) {
       return Response.json({ message: "temporary failure" }, { status: 503 });
     }
-    return Response.json({ chain_id: "00".repeat(32), head_block_num: 1 });
+    return Response.json({
+      chain_id: "00".repeat(32),
+      head_block_num: 1,
+      last_irreversible_block_num: 1,
+      head_block_id: "00".repeat(32),
+      head_block_time: "2026-09-07T00:00:00.000",
+    });
   },
 });
 assert.equal((await failover.getInfo()).head_block_num, 1);
@@ -60,7 +72,13 @@ const invalidJson = new RpcClient({
     attempts += 1;
     return attempts === 1
       ? new Response("not-json", { status: 200 })
-      : Response.json({ chain_id: "00".repeat(32), head_block_num: 1 });
+      : Response.json({
+          chain_id: "00".repeat(32),
+          head_block_num: 1,
+          last_irreversible_block_num: 1,
+          head_block_id: "00".repeat(32),
+          head_block_time: "2026-09-07T00:00:00.000",
+        });
   },
 });
 assert.equal((await invalidJson.getInfo()).head_block_num, 1);
@@ -72,6 +90,28 @@ const invalidJsonNoRetry = new RpcClient({
   fetch: async () => new Response("not-json", { status: 200 }),
 });
 await assert.rejects(() => invalidJsonNoRetry.getInfo(), RpcResponseError);
+
+const malformedRows = new RpcClient({
+  endpoints: ["https://bad-rows.test", "https://good-rows.test"],
+  fetch: async (input) =>
+    String(input).startsWith("https://bad-rows.test")
+      ? Response.json({ rows: {}, more: false })
+      : Response.json({ rows: [], more: false }),
+});
+assert.deepEqual(
+  await malformedRows.getTableRows({ code: "token", scope: "alice", table: "accounts" }),
+  { rows: [], more: false },
+);
+
+const malformedBalance = new RpcClient({
+  endpoints: "https://balance.test",
+  retries: 0,
+  fetch: async () => Response.json([1]),
+});
+await assert.rejects(
+  () => malformedBalance.getCurrencyBalance("token", "alice"),
+  /array of strings/,
+);
 
 const timeoutRpc = new RpcClient({
   endpoints: "https://timeout.test",

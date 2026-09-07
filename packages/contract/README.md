@@ -18,17 +18,17 @@ npm install @windstack/contract @windstack/rpc
 import { ContractKit } from "@windstack/contract";
 import { RpcClient } from "@windstack/rpc";
 
-const rpc = new RpcClient({ endpoints: "https://api.windcrypto.com" });
+const rpc = new RpcClient({ endpoints: "https://node.example" });
 const contracts = new ContractKit(rpc);
-const token = await contracts.load("vex.token");
+const token = await contracts.load("token.cntrct");
 
 const action = await token.action(
   "transfer",
   {
     from: "alice",
     to: "bob",
-    quantity: "1.0000 VEX",
-    memo: "WindStack",
+    quantity: "1.0000 TKN",
+    memo: "example",
   },
   ["alice@active"],
 );

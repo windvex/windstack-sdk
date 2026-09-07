@@ -1,5 +1,5 @@
 /**
- * WindStack Antelope SDK
+ * WindStack SDK
  * Created by Gilang Ramadan
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
@@ -10,6 +10,17 @@ import { ripemd160 } from "@noble/hashes/legacy.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 
 export type KeyType = "K1" | "R1";
+export type PublicKeyFormat = "modern" | "legacy";
+
+export type ParsePublicKeyOptions = {
+  /** Legacy Antelope prefixes accepted in addition to `EOS`. */
+  legacyPrefixes?: readonly string[];
+};
+
+export type FormatPublicKeyOptions = ParsePublicKeyOptions & {
+  format?: PublicKeyFormat;
+  legacyPrefix?: string;
+};
 
 const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const encoder = new TextEncoder();
@@ -141,16 +152,6 @@ function decodeModern(value: string, type: KeyType): Uint8Array {
   return data;
 }
 
-function decodeLegacyPublicKey(value: string, prefix: "EOS" | "VEX"): Uint8Array {
-  const decoded = base58Decode(value.slice(prefix.length));
-  if (decoded.length !== 37) throw new TypeError(`Invalid legacy ${prefix} public key length`);
-  const data = decoded.slice(0, -4);
-  if (!equalBytes(decoded.slice(-4), ripemdChecksum(data))) {
-    throw new TypeError(`Legacy ${prefix} public-key checksum mismatch`);
-  }
-  return data;
-}
-
 export class PublicKey {
   readonly type: KeyType;
   readonly #data: Uint8Array;
@@ -169,17 +170,26 @@ export class PublicKey {
     return new PublicKey(type, data);
   }
 
-  static fromString(value: string): PublicKey {
+  static fromString(value: string, options: ParsePublicKeyOptions = {}): PublicKey {
+    if (typeof value !== "string") throw new TypeError("Public key must be a string");
     const modern = /^PUB_(K1|R1)_(.+)$/.exec(value);
     if (modern) {
       const type = modern[1] as KeyType;
       return new PublicKey(type, decodeModern(modern[2]!, type));
     }
-    if (value.startsWith("EOS")) {
-      return new PublicKey("K1", decodeLegacyPublicKey(value, "EOS"));
-    }
-    if (value.startsWith("VEX")) {
-      return new PublicKey("K1", decodeLegacyPublicKey(value, "VEX"));
+    const legacyPrefixes = options.legacyPrefixes ?? ["EOS", "VEX"];
+    for (const prefix of legacyPrefixes) assertLegacyPrefix(prefix);
+    const prefix = [...legacyPrefixes]
+      .sort((left, right) => right.length - left.length)
+      .find((candidate) => value.startsWith(candidate));
+    if (prefix) {
+      const decoded = base58Decode(value.slice(prefix.length));
+      if (decoded.length !== 37) throw new TypeError("Invalid legacy public key length");
+      const data = decoded.slice(0, -4);
+      if (!equalBytes(decoded.slice(-4), ripemdChecksum(data))) {
+        throw new TypeError("Legacy public-key checksum mismatch");
+      }
+      return new PublicKey("K1", data);
     }
     throw new TypeError("Unsupported Antelope public-key format");
   }
@@ -192,8 +202,9 @@ export class PublicKey {
     return `PUB_${this.type}_${encodeModern(this.#data, this.type)}`;
   }
 
-  toLegacyString(prefix: "EOS" | "VEX" = "EOS"): string {
+  toLegacyString(prefix = "EOS"): string {
     if (this.type !== "K1") throw new TypeError("Legacy public keys only support K1");
+    assertLegacyPrefix(prefix);
     return `${prefix}${base58Encode(concatBytes(this.#data, ripemdChecksum(this.#data)))}`;
   }
 
@@ -204,6 +215,38 @@ export class PublicKey {
   verifyDigest(digest: Uint8Array, signature: Signature): boolean {
     return signature.verifyDigest(digest, this);
   }
+}
+
+function assertLegacyPrefix(prefix: string): void {
+  if (!/^[A-Z][A-Z0-9]{1,11}$/.test(prefix)) {
+    throw new TypeError("Legacy public-key prefix must contain 2-12 uppercase letters or digits");
+  }
+}
+
+/** Normalize modern and configured legacy representations to `PUB_K1_…`/`PUB_R1_…`. */
+export function normalizePublicKey(value: string, options: ParsePublicKeyOptions = {}): string {
+  return PublicKey.fromString(value, options).toString();
+}
+
+/** Compare public keys by curve and bytes rather than their display prefix. */
+export function publicKeysEqual(
+  left: string | PublicKey,
+  right: string | PublicKey,
+  options: ParsePublicKeyOptions = {},
+): boolean {
+  const a = typeof left === "string" ? PublicKey.fromString(left, options) : left;
+  const b = typeof right === "string" ? PublicKey.fromString(right, options) : right;
+  return a.equals(b);
+}
+
+export function formatPublicKey(
+  value: string | PublicKey,
+  options: FormatPublicKeyOptions = {},
+): string {
+  const key = typeof value === "string" ? PublicKey.fromString(value, options) : value;
+  return options.format === "legacy"
+    ? key.toLegacyString(options.legacyPrefix ?? "EOS")
+    : key.toString();
 }
 
 export class Signature {

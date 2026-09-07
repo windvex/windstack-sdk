@@ -1,7 +1,7 @@
 {
   "name": "@windstack/rpc",
-  "version": "1.0.0",
-  "description": "Typed, fault-tolerant Antelope node RPC client using Web-standard fetch and AbortSignal.",
+  "version": "2.0.0",
+  "description": "Typed Antelope RPC, verified endpoint failover, Spring finality, and Hyperion history client.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,16 +19,20 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@windstack/core": "2.0.0"
   },
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "vexanium",
     "antelope",
     "rpc",
     "nodeos",
     "fetch",
+    "transaction",
     "typescript"
   ],
   "license": "MIT",

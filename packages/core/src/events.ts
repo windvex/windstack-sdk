@@ -1,7 +1,7 @@
 export type EventHandler<TPayload = unknown> = (payload: TPayload) => void;
 export type EventMap = Record<string, unknown>;
 
-export class WispEventEmitter<TEvents extends EventMap> {
+export class EventEmitter<TEvents extends EventMap> {
   private readonly listeners = new Map<keyof TEvents, Set<EventHandler<TEvents[keyof TEvents]>>>();
 
   on<TEvent extends keyof TEvents>(event: TEvent, handler: EventHandler<TEvents[TEvent]>): void {

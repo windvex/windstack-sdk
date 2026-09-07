@@ -18,14 +18,14 @@ npm install @windstack/session
 import { SessionManager } from "@windstack/session";
 
 const sessionManager = new SessionManager({
-  appName: "My Vexanium App",
+  appName: "My App",
   chains: [
     {
-      id: "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f",
-      url: "https://api.windcrypto.com",
+      id: "00".repeat(32),
+      url: "https://node.example",
       contracts: {
-        system: "vexcore",
-        token: "vex.token",
+        system: "system",
+        token: "token",
       },
     },
   ],
@@ -36,7 +36,7 @@ const sessionManager = new SessionManager({
 const session = await sessionManager.login();
 const transfer = await session
   .account()
-  .transfer("bob", "1.0000 VEX", "WindStack");
+  .transfer("bob", "1.0000 TKN", "example");
 
 await session.transact({ actions: [transfer] });
 ```

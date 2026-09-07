@@ -48,30 +48,30 @@ export type DappRequestMetadataParams = {
   sessionId?: string;
 };
 
-export type WispScope =
+export type ChainScope =
   | `eip155:${number}`
   | `antelope:${string}`
   | "solana:mainnet"
   | "solana:devnet"
   | `solana:${string}`;
 
-export type WispSessionAccount = {
-  scope: WispScope;
+export type ProviderSessionAccount = {
+  scope: ChainScope;
   address: string;
   label?: string;
 };
 
-export type WispSession = {
+export type ProviderSession = {
   id: string;
   dapp: DappMetadata;
   origin: string;
-  scopes: WispScope[];
-  accounts: WispSessionAccount[];
+  scopes: ChainScope[];
+  accounts: ProviderSessionAccount[];
   createdAt: number;
   updatedAt: number;
 };
 
-export type WispProviderLike<TEvents extends Record<string, unknown> = Record<string, unknown>> = {
+export type ProviderLike<TEvents extends Record<string, unknown> = Record<string, unknown>> = {
   request<TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult>;
   on?<TEvent extends keyof TEvents>(
     event: TEvent,
