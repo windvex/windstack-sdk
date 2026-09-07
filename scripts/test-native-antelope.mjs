@@ -3,7 +3,7 @@ import { AbiSerializer, bigIntToName, nameToBigInt } from "../packages/abi/dist/
 import { AntelopeClient, PrivateKeySigner } from "../packages/antelope/dist/index.js";
 import { PrivateKey, PublicKey, sha256Digest } from "../packages/crypto/dist/index.js";
 import { RpcClient } from "../packages/rpc/dist/index.js";
-import { MemorySessionStorage, SessionKit } from "../packages/session/dist/index.js";
+import { MemorySessionStorage, SessionManager } from "../packages/session/dist/index.js";
 
 const scalarOne = Uint8Array.from({ length: 32 }, (_, index) => (index === 31 ? 1 : 0));
 const privateKey = PrivateKey.fromBytes("K1", scalarOne);
@@ -194,7 +194,7 @@ const walletPlugin = {
     };
   },
 };
-const kit = new SessionKit({
+const kit = new SessionManager({
   chains: [
     {
       id: chainId,

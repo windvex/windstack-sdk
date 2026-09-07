@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { PrivateKeySigner } from "../packages/antelope/dist/index.js";
 import { PrivateKey } from "../packages/crypto/dist/index.js";
-import { MemorySessionStorage, SessionKit } from "../packages/session/dist/index.js";
+import { MemorySessionStorage, SessionManager } from "../packages/session/dist/index.js";
 
 const chainId = "11".repeat(32);
 const chain = {
@@ -40,7 +40,7 @@ const plugin = {
     logoutCalls += 1;
   },
 };
-const kit = new SessionKit({ chains: [chain], walletPlugins: [plugin], storage });
+const kit = new SessionManager({ chains: [chain], walletPlugins: [plugin], storage });
 const session = await kit.login();
 assert.equal(session.actor, "alice");
 assert.equal(session.permission, "active");
@@ -78,7 +78,7 @@ await storage.set(
   "windstack:session",
   JSON.stringify({ chainId, walletPluginId: plugin.id, identity }),
 );
-const mismatchedRestoreKit = new SessionKit({
+const mismatchedRestoreKit = new SessionManager({
   chains: [chain],
   walletPlugins: [
     {
@@ -115,7 +115,7 @@ const rollbackPlugin = {
     rollbackCalls += 1;
   },
 };
-const rollbackKit = new SessionKit({
+const rollbackKit = new SessionManager({
   chains: [chain],
   walletPlugins: [rollbackPlugin],
   storage: failingStorage,
@@ -125,7 +125,7 @@ assert.equal(rollbackCalls, 1);
 assert.equal(rollbackKit.getSession(), null);
 
 const cleanupStorage = new MemorySessionStorage();
-const logoutFailureKit = new SessionKit({
+const logoutFailureKit = new SessionManager({
   chains: [chain],
   walletPlugins: [
     {
@@ -151,21 +151,21 @@ const pendingPlugin = {
       releaseLogin = () => resolve({ identity, signer });
     }),
 };
-const pendingKit = new SessionKit({ chains: [chain], walletPlugins: [pendingPlugin] });
+const pendingKit = new SessionManager({ chains: [chain], walletPlugins: [pendingPlugin] });
 const pendingLogin = pendingKit.login();
 await assert.rejects(() => pendingKit.login(), /already active/);
 releaseLogin();
 await pendingLogin;
 
 assert.throws(
-  () => new SessionKit({ chains: [chain, chain], walletPlugins: [plugin] }),
+  () => new SessionManager({ chains: [chain, chain], walletPlugins: [plugin] }),
   /chain ids must be unique/,
 );
 assert.throws(
-  () => new SessionKit({ chains: [chain], walletPlugins: [plugin, plugin] }),
+  () => new SessionManager({ chains: [chain], walletPlugins: [plugin, plugin] }),
   /plugin ids must be unique/,
 );
-const invalidIdentityKit = new SessionKit({
+const invalidIdentityKit = new SessionManager({
   chains: [chain],
   walletPlugins: [
     {
@@ -175,7 +175,7 @@ const invalidIdentityKit = new SessionKit({
   ],
 });
 await assert.rejects(() => invalidIdentityKit.login(), /Invalid Antelope name character/);
-const invalidSignerKit = new SessionKit({
+const invalidSignerKit = new SessionManager({
   chains: [chain],
   walletPlugins: [{ id: "invalid-signer", login: async () => ({ identity, signer: {} }) }],
 });

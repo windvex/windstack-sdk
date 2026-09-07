@@ -15,9 +15,9 @@ npm install @windstack/session
 ## Usage
 
 ```ts
-import { SessionKit } from "@windstack/session";
+import { SessionManager } from "@windstack/session";
 
-const sessionKit = new SessionKit({
+const sessionManager = new SessionManager({
   appName: "My Vexanium App",
   chains: [
     {
@@ -33,7 +33,7 @@ const sessionKit = new SessionKit({
   storage: mySessionStorage,
 });
 
-const session = await sessionKit.login();
+const session = await sessionManager.login();
 const transfer = await session
   .account()
   .transfer("bob", "1.0000 VEX", "WindStack");

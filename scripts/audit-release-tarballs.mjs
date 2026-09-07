@@ -128,7 +128,7 @@ const signingRequest = await import("@windstack/signing-request");
 assert.equal(typeof signingRequest.SigningRequest, "function");
 
 const session = await import("@windstack/session");
-assert.equal(typeof session.SessionKit, "function");
+assert.equal(typeof session.SessionManager, "function");
 
 const vexanium = await import("@windstack/vexanium");
 assert.equal(typeof vexanium.createSigningRequest, "function");

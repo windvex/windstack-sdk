@@ -185,7 +185,7 @@ export class Session {
   }
 }
 
-export type SessionKitOptions = {
+export type SessionManagerOptions = {
   chains: SessionChain[];
   walletPlugins: WalletPlugin[];
   appName?: string;
@@ -199,7 +199,7 @@ type StoredSession = {
   identity: SessionIdentity;
 };
 
-export class SessionKit {
+export class SessionManager {
   readonly chains: readonly SessionChain[];
   readonly walletPlugins: readonly WalletPlugin[];
   readonly appName?: string;
@@ -209,17 +209,18 @@ export class SessionKit {
   #loginPending = false;
   #restorePending = false;
 
-  constructor(options: SessionKitOptions) {
-    if (!options.chains.length) throw new TypeError("SessionKit requires at least one chain");
+  constructor(options: SessionManagerOptions) {
+    if (!options.chains.length) throw new TypeError("SessionManager requires at least one chain");
     if (!options.walletPlugins.length)
-      throw new TypeError("SessionKit requires at least one wallet plugin");
+      throw new TypeError("SessionManager requires at least one wallet plugin");
     const chains = options.chains.map(validateChain);
     const plugins = options.walletPlugins.map(validatePlugin);
     const chainIds = new Set(chains.map((chain) => chain.id));
-    if (chainIds.size !== chains.length) throw new TypeError("SessionKit chain ids must be unique");
+    if (chainIds.size !== chains.length)
+      throw new TypeError("SessionManager chain ids must be unique");
     const pluginIds = new Set(plugins.map((plugin) => plugin.id));
     if (pluginIds.size !== plugins.length) {
-      throw new TypeError("SessionKit wallet plugin ids must be unique");
+      throw new TypeError("SessionManager wallet plugin ids must be unique");
     }
     if (options.storageKey !== undefined && !options.storageKey.trim()) {
       throw new TypeError("Session storage key must be non-empty");
