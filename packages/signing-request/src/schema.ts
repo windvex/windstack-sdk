@@ -110,3 +110,20 @@ export const SIGNING_REQUEST_ABI: Abi = {
   ],
   actions: [{ name: "identity", type: "identity", ricardian_contract: "" }],
 };
+
+/** Revision 2 uses the same request schema except that identity requests have no scope. */
+export const SIGNING_REQUEST_ABI_V2: Abi = {
+  ...SIGNING_REQUEST_ABI,
+  structs: (SIGNING_REQUEST_ABI.structs ?? []).map((struct) =>
+    struct.name === "identity"
+      ? {
+          name: "identity",
+          base: "",
+          fields: [{ name: "permission", type: "permission_level?" }],
+        }
+      : {
+          ...struct,
+          fields: struct.fields.map((field) => ({ ...field })),
+        },
+  ),
+};
