@@ -1,12 +1,14 @@
 # WindStack SDK
 
-WindStack provides TypeScript packages for Vexanium and Antelope applications, Wisp Wallet, EVM providers, and Solana providers.
+[![Build](https://github.com/windvex/windstack-sdk/actions/workflows/validate.yml/badge.svg)](https://github.com/windvex/windstack-sdk/actions/workflows/validate.yml)
+
+WindStack is a TypeScript SDK for Vexanium and Antelope applications, Wisp Wallet integrations, EVM providers, and Solana providers.
 
 Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.
 
 ## Overview
 
-WindStack 1.0.0 is a coordinated package set. Applications can install only the capabilities they need while keeping provider contracts, transaction formats, signing behavior, and chain configuration consistent across the stack.
+WindStack 1.0.0 provides a coordinated set of focused packages. Applications can install only the capabilities they need while keeping provider contracts, transaction formats, signing behavior, and Vexanium configuration consistent across the stack.
 
 | Package | Purpose |
 | --- | --- |
@@ -24,11 +26,9 @@ WindStack 1.0.0 is a coordinated package set. Applications can install only the 
 | `@windstack/evm` | EIP-1193 and EIP-6963 provider client for Wisp-compatible EVM applications |
 | `@windstack/solana` | Solana provider client for Wisp-compatible applications |
 
-Vexanium Mainnet is available as a first-class preset with the canonical chain ID, RPC endpoint, `vexcore` system contract, `vex.token` native token contract, `VEX` symbol, and precision `4`.
-
 ## Installation
 
-Install the high-level Antelope transaction and session packages:
+Install the high-level Vexanium transaction and session packages:
 
 ```bash
 npm install @windstack/antelope @windstack/session
@@ -40,15 +40,18 @@ For portable Vexanium signing requests:
 npm install @windstack/signing-request
 ```
 
-Individual packages can be installed independently.
+For browser applications that connect to Wisp Wallet:
+
+```bash
+npm install @windstack/vexanium @windstack/wallet-plugin-wisp
+```
+
+Each package can also be installed independently.
 
 ## Usage
 
 ```ts
-import {
-  PrivateKey,
-  PrivateKeySigner,
-} from "@windstack/antelope";
+import { PrivateKey, PrivateKeySigner } from "@windstack/antelope";
 import {
   VEXANIUM_MAINNET,
   createVexaniumClient,
@@ -78,13 +81,35 @@ console.log(result.response);
 
 Applications should keep private keys in appropriate secure storage or a signing service. Wallet integrations can provide their own `Signer` implementation so application code never receives private-key material.
 
+## Vexanium Mainnet
+
+| Setting | Value |
+| --- | --- |
+| Chain ID | `f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f` |
+| RPC | `https://api.windcrypto.com` |
+| System contract | `vexcore` |
+| Native token contract | `vex.token` |
+| Native symbol | `VEX` |
+| Precision | `4` |
+
 ## Runtime
 
-The thirteen WindStack 1.0.0 packages are ESM-first and use Web-standard primitives such as `Uint8Array`, `TextEncoder`, `fetch`, `AbortController`, and secure platform randomness. Node.js 20.19 or newer is supported. Browser and React Native environments must provide the Web APIs used by the selected package.
+WindStack is ESM-first and uses Web-standard primitives such as `Uint8Array`, `TextEncoder`, `fetch`, `AbortController`, and secure platform randomness.
+
+Node.js 20.19 or newer is supported. Browser and React Native environments must provide the Web APIs required by the selected package.
 
 K1 and R1 cryptographic operations are provided by the Noble libraries. The WindStack 1.0.0 dependency graph does not require `elliptic`, `bn.js`, or Node.js crypto polyfills.
 
-Release validation checks package metadata, formatting, documentation, dependency boundaries, regression tests, package contents, dependency audit results, and the current production ABIs for `vexcore` and `vex.token`.
+## Reliability
+
+WindStack is covered by package-level and regression tests for cryptography, ABI serialization, RPC behavior, contract and account operations, Antelope transactions, VSR/ESR requests, provider contracts, wallet sessions, and Vexanium production ABI compatibility.
+
+The Vexanium compatibility checks use the current `vexcore` and `vex.token` production ABIs and read-only Mainnet RPC calls.
+
+## Documentation
+
+- [Supported capabilities](docs/capability-matrix.md)
+- [VexaniumProvider v1](VEXANIUM-PROVIDER-V1.md)
 
 ## License
 
