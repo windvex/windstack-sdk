@@ -4,7 +4,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const nativePackages = ["crypto", "abi", "rpc", "contract", "account", "antelope", "session"];
+const nativePackages = [
+  "crypto",
+  "abi",
+  "rpc",
+  "contract",
+  "account",
+  "antelope",
+  "signing-request",
+  "session",
+];
 const forbiddenDependencies = ["elliptic", "bn.js", "crypto-browserify", "randombytes"];
 const forbiddenMarkdown = [
   { pattern: /\b(?:generated|written|built) by (?:an )?AI\b/i, label: "generated wording" },
@@ -54,6 +63,20 @@ async function walk(directory) {
     else files.push(fullPath);
   }
   return files;
+}
+
+function dependencySections(manifest) {
+  return [
+    manifest.dependencies ?? {},
+    manifest.optionalDependencies ?? {},
+    manifest.peerDependencies ?? {},
+    manifest.devDependencies ?? {},
+  ];
+}
+
+function assertDependencyAllowed(owner, dependency) {
+  assert.ok(!dependency.startsWith("@wharfkit/"), `${owner} cannot depend on ${dependency}`);
+  assert.ok(!forbiddenDependencies.includes(dependency), `${owner} cannot depend on ${dependency}`);
 }
 
 const rootPackage = await readJson("package.json");
@@ -114,7 +137,7 @@ for (const packageDirectory of nativePackages) {
   for (const section of requiredReadmeSections) {
     assert.ok(readme.includes(section), `${manifest.name} README is missing ${section}`);
   }
-  if (["crypto", "rpc", "antelope", "session"].includes(packageDirectory)) {
+  if (["crypto", "rpc", "antelope", "signing-request", "session"].includes(packageDirectory)) {
     assert.ok(readme.includes("## Security"), `${manifest.name} README is missing ## Security`);
   }
   assert.match(readme, creatorPattern, `${manifest.name} README must credit Gilang Ramadan`);
@@ -138,11 +161,7 @@ for (const name of manifests.keys()) visitNative(name);
 
 for (const [name, manifest] of manifests) {
   for (const [dependency, version] of Object.entries(manifest.dependencies ?? {})) {
-    assert.ok(!dependency.startsWith("@wharfkit/"), `${name} cannot depend on ${dependency}`);
-    assert.ok(
-      !forbiddenDependencies.includes(dependency),
-      `${name} cannot depend on ${dependency}`,
-    );
+    assertDependencyAllowed(name, dependency);
     if (manifests.has(dependency)) {
       assert.equal(
         version,
@@ -153,12 +172,22 @@ for (const [name, manifest] of manifests) {
   }
 }
 
+const packageDirectories = (await readdir(path.join(root, "packages"), { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name);
+for (const packageDirectory of packageDirectories) {
+  const manifest = await readJson(`packages/${packageDirectory}/package.json`);
+  for (const section of dependencySections(manifest)) {
+    for (const dependency of Object.keys(section)) {
+      assertDependencyAllowed(manifest.name ?? packageDirectory, dependency);
+    }
+  }
+}
+
 const sourceChecks = (
   await Promise.all(
     nativePackages.map(async (packageDirectory) =>
-      (
-        await walk(path.join(root, "packages", packageDirectory, "src"))
-      )
+      (await walk(path.join(root, "packages", packageDirectory, "src")))
         .filter((file) => file.endsWith(".ts"))
         .map((file) => path.relative(root, file)),
     ),
@@ -204,11 +233,7 @@ for (const file of markdownFiles) {
 }
 
 const lock = await readJson("package-lock.json");
-assert.equal(
-  lock.version,
-  rootPackage.version,
-  "package-lock root version must match package.json",
-);
+assert.equal(lock.version, rootPackage.version, "package-lock root version must match package.json");
 assert.equal(
   lock.packages?.[""]?.version,
   rootPackage.version,
@@ -227,6 +252,21 @@ for (const packageDirectory of nativePackages) {
     `package-lock dependencies for ${manifest.name} are stale`,
   );
 }
+for (const packageDirectory of packageDirectories) {
+  const manifest = await readJson(`packages/${packageDirectory}/package.json`);
+  const lockManifest = lock.packages?.[`packages/${packageDirectory}`];
+  assert.ok(lockManifest, `package-lock is missing ${manifest.name}`);
+  for (const sectionName of [
+    "dependencies",
+    "optionalDependencies",
+    "peerDependencies",
+    "devDependencies",
+  ]) {
+    for (const dependency of Object.keys(lockManifest?.[sectionName] ?? {})) {
+      assertDependencyAllowed(`${manifest.name} lockfile`, dependency);
+    }
+  }
+}
 
 const reachable = new Set();
 function visitDependency(name) {
@@ -241,11 +281,7 @@ for (const manifest of manifests.values()) {
   for (const dependency of Object.keys(manifest.dependencies ?? {})) visitDependency(dependency);
 }
 for (const dependency of reachable) {
-  assert.ok(!dependency.startsWith("@wharfkit/"), `Native dependency graph reaches ${dependency}`);
-  assert.ok(
-    !forbiddenDependencies.includes(dependency),
-    `Native dependency graph reaches ${dependency}`,
-  );
+  assertDependencyAllowed("Native dependency graph", dependency);
 }
 
 console.log(`Release guard passed for WindStack ${rootPackage.version}`);
