@@ -12,6 +12,7 @@
     "format:check": "biome format packages/*/src scripts package.json package-lock.json tsconfig.json tsconfig.base.json packages/*/package.json packages/*/tsconfig.json specs/wisp-provider-contract.json biome.json",
     "check:release": "node scripts/check-release.mjs",
     "audit:native": "node scripts/audit-native.mjs",
+    "audit:release": "node scripts/audit-release-tarballs.mjs",
     "build:native": "tsc -b packages/crypto packages/abi packages/rpc packages/contract packages/account packages/antelope packages/signing-request packages/session",
     "build": "tsc -b packages/core packages/evm packages/solana packages/crypto packages/abi packages/rpc packages/contract packages/account packages/antelope packages/signing-request packages/vexanium packages/wallet-plugin-wisp packages/session",
     "typecheck": "npm run build",
@@ -24,7 +25,7 @@
     "verify:vexanium": "node scripts/verify-vexanium-live.mjs",
     "validate:native": "npm run clean && npm run format:check && npm run check:release && npm run build:native && npm run test:native && npm run pack:native",
     "validate": "npm run clean && npm run format:check && npm run check:release && npm run build && npm test && npm run pack:dry-run",
-    "release:dry-run": "npm run validate && npm run verify:vexanium && npm audit && npm run audit:native",
+    "release:dry-run": "npm run validate && npm run audit:release && npm run verify:vexanium && npm audit && npm run audit:native",
     "release:npm": "node scripts/publish-release.mjs"
   },
   "devDependencies": {
