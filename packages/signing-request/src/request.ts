@@ -189,7 +189,7 @@ function normalizeIdentity(identity: SigningRequestIdentity): SigningRequestIden
   if (!identity || typeof identity !== "object")
     throw new TypeError("Identity request is required");
   return {
-    scope: validateName(identity.scope, "Identity scope"),
+    scope: validateName(identity.scope ?? "", "Identity scope"),
     permission: identity.permission
       ? normalizePermissionLevel(identity.permission, "Identity permission")
       : null,
