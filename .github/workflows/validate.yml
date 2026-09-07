@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - audit/release-1.0.0-hardening
   pull_request:
 
 permissions:
@@ -45,5 +44,7 @@ jobs:
         run: npm test
       - name: Check native package tarballs
         run: npm run pack:native
+      - name: Audit all dependencies
+        run: npm audit
       - name: Audit native production dependencies
         run: npm run audit:native
