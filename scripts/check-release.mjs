@@ -11,12 +11,21 @@ const forbiddenMarkdown = [
   { pattern: /\bengineering\b/i, label: "engineering wording" },
   { pattern: /\btechnical\b/i, label: "technical wording" },
   { pattern: /\bteknis\b/i, label: "teknis wording" },
+  { pattern: /\bEOSIO\b/i, label: "EOSIO branding" },
+  { pattern: /\bEOS\b/i, label: "EOS branding" },
   { pattern: /Publish native packages from VPS/i, label: "deployment note" },
   { pattern: /npm whoami/i, label: "npm authentication note" },
   { pattern: /release:npm/i, label: "release command" },
   { pattern: /not (?:a )?WharfKit fork/i, label: "implementation comparison" },
 ];
-const requiredReadmeSections = ["## Overview", "## Installation", "## Usage", "## Runtime", "## License"];
+const requiredReadmeSections = [
+  "## Overview",
+  "## Installation",
+  "## Usage",
+  "## Runtime",
+  "## License",
+];
+const requiredMarkdownSections = ["## Overview", "## License"];
 const header = "Created by Gilang Ramadan";
 
 async function readJson(relativePath) {
@@ -43,13 +52,23 @@ const manifests = new Map();
 for (const packageDirectory of nativePackages) {
   const manifest = await readJson(`packages/${packageDirectory}/package.json`);
   manifests.set(manifest.name, manifest);
-  assert.equal(manifest.version, rootPackage.version, `${manifest.name} must use the root release version`);
+  assert.equal(
+    manifest.version,
+    rootPackage.version,
+    `${manifest.name} must use the root release version`,
+  );
   assert.equal(manifest.author, "Gilang Ramadan", `${manifest.name} author must be Gilang Ramadan`);
   assert.equal(manifest.license, "MIT", `${manifest.name} must use MIT`);
   assert.equal(manifest.publishConfig?.access, "public", `${manifest.name} must publish as public`);
   assert.equal(manifest.sideEffects, false, `${manifest.name} must declare sideEffects=false`);
-  assert.ok(Array.isArray(manifest.files) && manifest.files.includes("dist"), `${manifest.name} must publish dist`);
-  assert.ok(manifest.files.includes("README.md") && manifest.files.includes("LICENSE"), `${manifest.name} must publish documentation and license`);
+  assert.ok(
+    Array.isArray(manifest.files) && manifest.files.includes("dist"),
+    `${manifest.name} must publish dist`,
+  );
+  assert.ok(
+    manifest.files.includes("README.md") && manifest.files.includes("LICENSE"),
+    `${manifest.name} must publish documentation and license`,
+  );
 
   const readme = await readFile(path.join(root, `packages/${packageDirectory}/README.md`), "utf8");
   assert.ok(readme.startsWith(`# ${manifest.name}\n`), `${manifest.name} README title is invalid`);
@@ -64,7 +83,11 @@ for (const [name, manifest] of manifests) {
     assert.ok(!dependency.startsWith("@wharfkit/"), `${name} cannot depend on ${dependency}`);
     assert.ok(!forbiddenDependencies.includes(dependency), `${name} cannot depend on ${dependency}`);
     if (manifests.has(dependency)) {
-      assert.equal(version, rootPackage.version, `${name} must pin ${dependency} to ${rootPackage.version}`);
+      assert.equal(
+        version,
+        rootPackage.version,
+        `${name} must pin ${dependency} to ${rootPackage.version}`,
+      );
     }
   }
 }
@@ -76,6 +99,7 @@ const sourceChecks = [
   "packages/contract/src/index.ts",
   "packages/account/src/index.ts",
   "packages/antelope/src/index.ts",
+  "packages/antelope/src/vexanium.ts",
   "packages/session/src/index.ts",
   "packages/session/src/native.ts",
   "packages/session/src/compat.ts",
@@ -88,14 +112,23 @@ for (const relativePath of sourceChecks) {
 const markdownFiles = (await walk(root)).filter((file) => file.endsWith(".md"));
 for (const file of markdownFiles) {
   const content = await readFile(file, "utf8");
+  const relativePath = path.relative(root, file);
   for (const { pattern, label } of forbiddenMarkdown) {
-    assert.ok(!pattern.test(content), `${path.relative(root, file)} contains ${label}`);
+    assert.ok(!pattern.test(content), `${relativePath} contains ${label}`);
   }
+  for (const section of requiredMarkdownSections) {
+    assert.ok(content.includes(section), `${relativePath} is missing ${section}`);
+  }
+  assert.ok(content.includes(header), `${relativePath} must credit Gilang Ramadan`);
 }
 
 const lock = await readJson("package-lock.json");
 assert.equal(lock.version, rootPackage.version, "package-lock root version must match package.json");
-assert.equal(lock.packages?.[""]?.version, rootPackage.version, "package-lock root package version is stale");
+assert.equal(
+  lock.packages?.[""]?.version,
+  rootPackage.version,
+  "package-lock root package version is stale",
+);
 for (const packageDirectory of nativePackages) {
   const manifest = await readJson(`packages/${packageDirectory}/package.json`);
   assert.equal(
