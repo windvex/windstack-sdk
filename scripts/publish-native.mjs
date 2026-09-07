@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageDirectories = [
+  "core",
   "crypto",
   "abi",
   "rpc",
@@ -13,6 +14,10 @@ const packageDirectories = [
   "antelope",
   "signing-request",
   "session",
+  "evm",
+  "solana",
+  "vexanium",
+  "wallet-plugin-wisp",
 ];
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -103,4 +108,4 @@ for (const directory of packageDirectories) {
   if (!verified) throw new Error(`npm did not confirm ${name}@${version} after publish`);
 }
 
-console.log("All WindStack native packages are published and verified.");
+console.log("All WindStack 1.0 release packages are published and verified.");
