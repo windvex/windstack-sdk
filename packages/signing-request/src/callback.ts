@@ -20,7 +20,8 @@ export function verifyResolvedSigningRequestSignature(
   signature: string | Signature,
   publicKey: string | PublicKey,
 ): boolean {
-  const parsedSignature = typeof signature === "string" ? Signature.fromString(signature) : signature;
+  const parsedSignature =
+    typeof signature === "string" ? Signature.fromString(signature) : signature;
   const parsedKey = typeof publicKey === "string" ? PublicKey.fromString(publicKey) : publicKey;
   return parsedSignature.verifyDigest(resolved.digest, parsedKey);
 }

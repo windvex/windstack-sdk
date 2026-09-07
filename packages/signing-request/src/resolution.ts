@@ -13,11 +13,7 @@ import {
   type AbiStruct,
   type AbiVariant,
 } from "@windstack/abi";
-import {
-  serializeTransaction,
-  transactionDigest,
-  type Transaction,
-} from "@windstack/antelope";
+import { serializeTransaction, transactionDigest, type Transaction } from "@windstack/antelope";
 import { RpcClient } from "@windstack/rpc";
 import {
   SIGNING_REQUEST_PLACEHOLDER_ACTOR,
@@ -242,11 +238,7 @@ function hasNullHeader(transaction: SigningRequestTransaction): boolean {
       ? transaction.expiration
       : `${transaction.expiration}Z`,
   );
-  return (
-    expiration === 0 &&
-    transaction.ref_block_num === 0 &&
-    transaction.ref_block_prefix === 0
-  );
+  return expiration === 0 && transaction.ref_block_num === 0 && transaction.ref_block_prefix === 0;
 }
 
 function applyTapos(
@@ -279,7 +271,8 @@ function createIdentityTransaction(
   if (!tapos) throw new TypeError("Identity proof resolution requires an expiration context");
   if (
     identity.permission &&
-    (identity.permission.actor !== signer.actor || identity.permission.permission !== signer.permission)
+    (identity.permission.actor !== signer.actor ||
+      identity.permission.permission !== signer.permission)
   ) {
     throw new TypeError(
       "Selected signer does not match the permission requested by the identity request",
@@ -337,9 +330,7 @@ export async function resolveSigningRequest(
       delay_sec: 0,
       context_free_actions: [],
       actions: await Promise.all(
-        actions.map((action) =>
-          resolveAction(action, signer, options.abiProvider, options.signal),
-        ),
+        actions.map((action) => resolveAction(action, signer, options.abiProvider, options.signal)),
       ),
       transaction_extensions: [],
     };
@@ -392,9 +383,7 @@ function blockPrefix(blockId: string): number {
 }
 
 function timestampSeconds(value: string): number {
-  const milliseconds = Date.parse(
-    /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`,
-  );
+  const milliseconds = Date.parse(/(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`);
   if (!Number.isFinite(milliseconds)) throw new TypeError(`Invalid chain timestamp: ${value}`);
   return Math.floor(milliseconds / 1000);
 }
@@ -433,11 +422,7 @@ export async function resolveSigningRequestWithRpc(
     expireSeconds?: number;
   },
 ): Promise<ResolvedSigningRequest> {
-  const {
-    rpc,
-    expireSeconds: requestedExpireSeconds = 120,
-    ...resolveOptions
-  } = args;
+  const { rpc, expireSeconds: requestedExpireSeconds = 120, ...resolveOptions } = args;
   if (
     !Number.isInteger(requestedExpireSeconds) ||
     requestedExpireSeconds < 1 ||
@@ -449,9 +434,7 @@ export async function resolveSigningRequestWithRpc(
   const chainId = validateChainId(info.chain_id, "RPC chain id");
   const block = await rpc.getBlock(info.last_irreversible_block_num, resolveOptions.signal);
   const tapos: SigningRequestTapos = {
-    expiration: new Date(
-      (timestampSeconds(info.head_block_time) + requestedExpireSeconds) * 1000,
-    )
+    expiration: new Date((timestampSeconds(info.head_block_time) + requestedExpireSeconds) * 1000)
       .toISOString()
       .replace(/\.000Z$/, ""),
     refBlockNum: block.block_num,

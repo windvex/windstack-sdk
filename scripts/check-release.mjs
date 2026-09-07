@@ -187,7 +187,9 @@ for (const packageDirectory of packageDirectories) {
 const sourceChecks = (
   await Promise.all(
     nativePackages.map(async (packageDirectory) =>
-      (await walk(path.join(root, "packages", packageDirectory, "src")))
+      (
+        await walk(path.join(root, "packages", packageDirectory, "src"))
+      )
         .filter((file) => file.endsWith(".ts"))
         .map((file) => path.relative(root, file)),
     ),
@@ -233,7 +235,11 @@ for (const file of markdownFiles) {
 }
 
 const lock = await readJson("package-lock.json");
-assert.equal(lock.version, rootPackage.version, "package-lock root version must match package.json");
+assert.equal(
+  lock.version,
+  rootPackage.version,
+  "package-lock root version must match package.json",
+);
 assert.equal(
   lock.packages?.[""]?.version,
   rootPackage.version,

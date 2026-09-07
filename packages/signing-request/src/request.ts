@@ -4,24 +4,10 @@
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
  */
-import {
-  AbiSerializer,
-  bytesToHex,
-  hexToBytes,
-  nameToBigInt,
-} from "@windstack/abi";
-import {
-  PrivateKey,
-  PublicKey,
-  Signature,
-  concatBytes,
-  sha256Digest,
-} from "@windstack/crypto";
+import { AbiSerializer, bytesToHex, hexToBytes, nameToBigInt } from "@windstack/abi";
+import { PrivateKey, PublicKey, Signature, concatBytes, sha256Digest } from "@windstack/crypto";
 import { decodeBase64Url, encodeBase64Url } from "./base64url.js";
-import {
-  pakoCompressionProvider,
-  type CompressionProvider,
-} from "./compression.js";
+import { pakoCompressionProvider, type CompressionProvider } from "./compression.js";
 import { SIGNING_REQUEST_ABI } from "./schema.js";
 import type {
   SigningRequestAction,
@@ -114,7 +100,8 @@ async function normalizeAction(
   abiProvider: SigningRequestEncodingOptions["abiProvider"],
   signal?: AbortSignal,
 ): Promise<SigningRequestAction> {
-  if (!action || typeof action !== "object") throw new TypeError("Signing-request action is required");
+  if (!action || typeof action !== "object")
+    throw new TypeError("Signing-request action is required");
   const account = validateName(action.account, "Action account");
   const name = validateName(action.name, "Action name");
   const authorization = (action.authorization ?? []).map((level, index) =>
@@ -173,9 +160,7 @@ async function normalizeTransaction(
     transaction.actions.map((action) => normalizeAction(action, abiProvider, signal)),
   );
   const transactionExtensions = (transaction.transaction_extensions ?? []).map((extension) => {
-    const [type, data] = Array.isArray(extension)
-      ? extension
-      : [extension.type, extension.data];
+    const [type, data] = Array.isArray(extension) ? extension : [extension.type, extension.data];
     if (!Number.isInteger(type) || type < 0 || type > 0xffff) {
       throw new RangeError("Transaction extension type must be an integer between 0 and 65535");
     }
@@ -196,7 +181,8 @@ async function normalizeTransaction(
 }
 
 function normalizeIdentity(identity: SigningRequestIdentity): SigningRequestIdentity {
-  if (!identity || typeof identity !== "object") throw new TypeError("Identity request is required");
+  if (!identity || typeof identity !== "object")
+    throw new TypeError("Identity request is required");
   return {
     scope: validateName(identity.scope, "Identity scope"),
     permission: identity.permission
@@ -217,11 +203,12 @@ function normalizeInfo(info: SigningRequestInfoInput | undefined): SigningReques
     }
     if (seen.has(key)) throw new TypeError(`Duplicate signing-request info key: ${key}`);
     seen.add(key);
-    const value = rawValue instanceof Uint8Array
-      ? bytesToHex(rawValue)
-      : Array.isArray(info)
-        ? normalizeHex(String(rawValue), `Info value ${key}`)
-        : bytesToHex(encoder.encode(String(rawValue)));
+    const value =
+      rawValue instanceof Uint8Array
+        ? bytesToHex(rawValue)
+        : Array.isArray(info)
+          ? normalizeHex(String(rawValue), `Info value ${key}`)
+          : bytesToHex(encoder.encode(String(rawValue)));
     return { key, value };
   });
 }
@@ -319,9 +306,10 @@ function fromAbiData(value: unknown): SigningRequestData {
   ) {
     throw new TypeError("Invalid signing-request request type");
   }
-  const chainId: SigningRequestChain = chain.type === "chain_alias"
-    ? { type: "chain_alias", value: Number(chain.value) }
-    : { type: "chain_id", value: String(chain.value).toLowerCase() };
+  const chainId: SigningRequestChain =
+    chain.type === "chain_alias"
+      ? { type: "chain_alias", value: Number(chain.value) }
+      : { type: "chain_id", value: String(chain.value).toLowerCase() };
   return {
     chainId,
     request: {
@@ -435,7 +423,10 @@ export class SigningRequest {
     if (!encoded.length) throw new TypeError("Signing-request payload is empty");
     const header = encoded[0]!;
     const version = header & 0x7f;
-    if (version < SIGNING_REQUEST_MIN_SUPPORTED_VERSION || version > SIGNING_REQUEST_PROTOCOL_VERSION) {
+    if (
+      version < SIGNING_REQUEST_MIN_SUPPORTED_VERSION ||
+      version > SIGNING_REQUEST_PROTOCOL_VERSION
+    ) {
       throw new TypeError(`Unsupported signing-request protocol version: ${version}`);
     }
     const compressed = (header & 0x80) !== 0;
@@ -532,11 +523,7 @@ export class SigningRequest {
 
   getRequestDigest(): Uint8Array {
     return sha256Digest(
-      concatBytes(
-        Uint8Array.of(this.version),
-        encoder.encode("request"),
-        this.serializeBody(),
-      ),
+      concatBytes(Uint8Array.of(this.version), encoder.encode("request"), this.serializeBody()),
     );
   }
 
@@ -553,7 +540,9 @@ export class SigningRequest {
   }
 
   verifyRequestSignature(publicKey: PublicKey): boolean {
-    return this.#requestSignature?.signature.verifyDigest(this.getRequestDigest(), publicKey) ?? false;
+    return (
+      this.#requestSignature?.signature.verifyDigest(this.getRequestDigest(), publicKey) ?? false
+    );
   }
 
   serializeBody(): Uint8Array {

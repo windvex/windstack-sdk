@@ -140,10 +140,7 @@ const identity = await SigningRequest.create({
 });
 assert.equal(identity.isIdentity, true);
 assert.throws(
-  () =>
-    SigningRequest.from(
-      identity.encode(false, false, "vsr").replace(/^vsr:/, "http:"),
-    ),
+  () => SigningRequest.from(identity.encode(false, false, "vsr").replace(/^vsr:/, "http:")),
   /vsr: or esr:/,
 );
 const identityResolved = await resolveSigningRequest(identity, {
@@ -189,16 +186,10 @@ const selected = await resolveSigningRequest(multiChain, {
 assert.equal(selected.chainId, VEX_CHAIN_ID);
 
 const compressedBytes = pakoCompressionProvider.deflate(new Uint8Array(16_384));
-assert.throws(
-  () => pakoCompressionProvider.inflate(compressedBytes, 1024),
-  /size limit/,
-);
+assert.throws(() => pakoCompressionProvider.inflate(compressedBytes, 1024), /size limit/);
 assert.throws(() => SigningRequest.from("vsr:not+base64"), /valid vsr: or esr:/);
 assert.throws(
-  () =>
-    SigningRequest.from(
-      `vsr:${Buffer.from(Uint8Array.of(4, 0)).toString("base64url")}`,
-    ),
+  () => SigningRequest.from(`vsr:${Buffer.from(Uint8Array.of(4, 0)).toString("base64url")}`),
   /Unsupported signing-request protocol version/,
 );
 
