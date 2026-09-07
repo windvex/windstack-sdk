@@ -10,6 +10,7 @@
     { "path": "./packages/contract" },
     { "path": "./packages/account" },
     { "path": "./packages/antelope" },
+    { "path": "./packages/signing-request" },
     { "path": "./packages/vexanium" },
     { "path": "./packages/wallet-plugin-wisp" },
     { "path": "./packages/session" }
