@@ -28,14 +28,12 @@
   "sideEffects": false,
   "keywords": [
     "windstack",
-    "windcrypto",
-    "wind-crypto",
     "wisp-wallet",
-    "wisp",
     "solana",
+    "wallet",
+    "provider",
     "wallet-standard",
-    "dapp",
-    "web3"
+    "typescript"
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
