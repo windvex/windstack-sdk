@@ -19,7 +19,11 @@ function providerDetail(provider: VexaniumProvider): VexaniumProviderDetail {
 }
 
 function hasRequest(value: unknown): value is Pick<VexaniumProvider, "request"> {
-  return typeof value === "object" && value !== null && typeof (value as { request?: unknown }).request === "function";
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { request?: unknown }).request === "function"
+  );
 }
 
 /** Runtime guard for the formal VexaniumProvider v1 contract. */
@@ -63,7 +67,9 @@ export async function discoverVexaniumProviders(
   timeoutMs = DEFAULT_PROVIDER_DISCOVERY_TIMEOUT_MS,
 ): Promise<VexaniumProviderDetail[]> {
   if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
-    throw vexaniumInvalidParams("Provider discovery timeout must be a non-negative finite number", { timeoutMs });
+    throw vexaniumInvalidParams("Provider discovery timeout must be a non-negative finite number", {
+      timeoutMs,
+    });
   }
   const runtimeWindow = getRuntimeWindow();
   if (!runtimeWindow) return [];
@@ -88,7 +94,10 @@ export async function discoverVexaniumProviders(
     runtimeWindow.addEventListener(VEXANIUM_ANNOUNCE_PROVIDER_EVENT, onAnnounce as EventListener);
     requestVexaniumProviders();
     setTimeout(() => {
-      runtimeWindow.removeEventListener(VEXANIUM_ANNOUNCE_PROVIDER_EVENT, onAnnounce as EventListener);
+      runtimeWindow.removeEventListener(
+        VEXANIUM_ANNOUNCE_PROVIDER_EVENT,
+        onAnnounce as EventListener,
+      );
       resolve();
     }, timeoutMs);
   });
@@ -105,9 +114,8 @@ export type GetVexaniumProviderOptions = {
 export async function getVexaniumProvider(
   optionsOrTimeout: GetVexaniumProviderOptions | number = DEFAULT_PROVIDER_DISCOVERY_TIMEOUT_MS,
 ): Promise<VexaniumProvider | null> {
-  const options = typeof optionsOrTimeout === "number"
-    ? { timeoutMs: optionsOrTimeout }
-    : optionsOrTimeout;
+  const options =
+    typeof optionsOrTimeout === "number" ? { timeoutMs: optionsOrTimeout } : optionsOrTimeout;
   const timeoutMs = options.timeoutMs ?? DEFAULT_PROVIDER_DISCOVERY_TIMEOUT_MS;
   const providers = await discoverVexaniumProviders(timeoutMs);
 

@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-import {
-  WISP_ERROR_CODES,
-  WISP_PROVIDER_CONTRACT,
-} from "../packages/core/dist/index.js";
+import { WISP_ERROR_CODES, WISP_PROVIDER_CONTRACT } from "../packages/core/dist/index.js";
 import {
   EIP6963_ANNOUNCE_PROVIDER_EVENT,
   EIP6963_REQUEST_PROVIDER_EVENT,
@@ -29,10 +26,7 @@ import {
 } from "../packages/vexanium/dist/index.js";
 
 const contract = JSON.parse(
-  await readFile(
-    new URL("../specs/wisp-provider-contract.json", import.meta.url),
-    "utf8",
-  ),
+  await readFile(new URL("../specs/wisp-provider-contract.json", import.meta.url), "utf8"),
 );
 
 assert.deepEqual(contract, WISP_PROVIDER_CONTRACT);
@@ -50,27 +44,15 @@ assert.equal(contract.vex.chainId, VEXANIUM_MAINNET_CHAIN_ID);
 assert.equal(contract.vex.scope, VEXANIUM_MAINNET_SCOPE);
 assert.deepEqual(contract.vex.capabilities, Object.values(VEXANIUM_CAPABILITIES));
 assert.deepEqual(Object.values(contract.vex.methods), Object.values(VEXANIUM_METHODS));
-assert.equal(
-  contract.vex.events.requestProvider,
-  VEXANIUM_REQUEST_PROVIDER_EVENT,
-);
-assert.equal(
-  contract.vex.events.announceProvider,
-  VEXANIUM_ANNOUNCE_PROVIDER_EVENT,
-);
+assert.equal(contract.vex.events.requestProvider, VEXANIUM_REQUEST_PROVIDER_EVENT);
+assert.equal(contract.vex.events.announceProvider, VEXANIUM_ANNOUNCE_PROVIDER_EVENT);
 
 assert.equal(contract.evm.global, EVM_PROVIDER_GLOBAL);
 assert.equal(contract.evm.chainId, VEX_EVM_CHAIN_ID);
 assert.equal(contract.evm.chainIdHex, VEX_EVM_CHAIN_ID_HEX);
 assert.equal(contract.evm.scope, VEX_EVM_SCOPE);
 assert.deepEqual(Object.values(contract.evm.methods), Object.values(EVM_METHODS));
-assert.equal(
-  contract.evm.events.requestProvider,
-  EIP6963_REQUEST_PROVIDER_EVENT,
-);
-assert.equal(
-  contract.evm.events.announceProvider,
-  EIP6963_ANNOUNCE_PROVIDER_EVENT,
-);
+assert.equal(contract.evm.events.requestProvider, EIP6963_REQUEST_PROVIDER_EVENT);
+assert.equal(contract.evm.events.announceProvider, EIP6963_ANNOUNCE_PROVIDER_EVENT);
 
 console.log("Canonical Wisp provider specification: PASS");

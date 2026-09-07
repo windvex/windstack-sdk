@@ -13,9 +13,18 @@ export type EIP1193Provider = {
   selectedAddress?: string | null;
   chainId?: string;
   request<TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult>;
-  on<TEvent extends keyof EVMProviderEventMap>(event: TEvent, handler: (payload: EVMProviderEventMap[TEvent]) => void): void;
-  off?<TEvent extends keyof EVMProviderEventMap>(event: TEvent, handler: (payload: EVMProviderEventMap[TEvent]) => void): void;
-  removeListener<TEvent extends keyof EVMProviderEventMap>(event: TEvent, handler: (payload: EVMProviderEventMap[TEvent]) => void): void;
+  on<TEvent extends keyof EVMProviderEventMap>(
+    event: TEvent,
+    handler: (payload: EVMProviderEventMap[TEvent]) => void,
+  ): void;
+  off?<TEvent extends keyof EVMProviderEventMap>(
+    event: TEvent,
+    handler: (payload: EVMProviderEventMap[TEvent]) => void,
+  ): void;
+  removeListener<TEvent extends keyof EVMProviderEventMap>(
+    event: TEvent,
+    handler: (payload: EVMProviderEventMap[TEvent]) => void,
+  ): void;
 };
 
 export type EIP6963ProviderInfo = {
@@ -54,6 +63,12 @@ export type EVMClient = {
   getChainId(): Promise<string>;
   switchChain(chainId: string): Promise<unknown>;
   addChain(params: AddEthereumChainParameter): Promise<unknown>;
-  on<TEvent extends keyof EVMProviderEventMap>(event: TEvent, handler: (payload: EVMProviderEventMap[TEvent]) => void): void;
-  off<TEvent extends keyof EVMProviderEventMap>(event: TEvent, handler: (payload: EVMProviderEventMap[TEvent]) => void): void;
+  on<TEvent extends keyof EVMProviderEventMap>(
+    event: TEvent,
+    handler: (payload: EVMProviderEventMap[TEvent]) => void,
+  ): void;
+  off<TEvent extends keyof EVMProviderEventMap>(
+    event: TEvent,
+    handler: (payload: EVMProviderEventMap[TEvent]) => void,
+  ): void;
 };

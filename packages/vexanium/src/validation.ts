@@ -1,9 +1,5 @@
-import { Bytes, Checksum256, Name } from "@wharfkit/antelope";
-import type {
-  VexaniumCaip2ChainId,
-  VexaniumChainId,
-  VexaniumFullChainId,
-} from "./types.js";
+import { hexToBytes, nameToBigInt } from "@windstack/abi";
+import type { VexaniumCaip2ChainId, VexaniumChainId, VexaniumFullChainId } from "./types.js";
 
 const FULL_CHAIN_ID_PATTERN = /^[0-9a-f]{64}$/;
 const CAIP2_CHAIN_ID_PATTERN = /^antelope:[0-9a-f]{32}$/;
@@ -38,7 +34,8 @@ export function sameVexaniumChain(left: VexaniumChainId, right: VexaniumChainId)
 export function isAntelopeName(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0) return false;
   try {
-    return Name.from(value).toString() === value;
+    nameToBigInt(value);
+    return true;
   } catch {
     return false;
   }
@@ -47,8 +44,7 @@ export function isAntelopeName(value: unknown): value is string {
 export function isHexBytes(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0) return false;
   try {
-    const bytes = Bytes.from(value);
-    return bytes.length > 0 && bytes.hexString.toLowerCase() === value.toLowerCase();
+    return hexToBytes(value).length > 0;
   } catch {
     return false;
   }
@@ -57,7 +53,7 @@ export function isHexBytes(value: unknown): value is string {
 export function isChecksum256(value: unknown): value is string {
   if (typeof value !== "string") return false;
   try {
-    return Checksum256.from(value).hexString.toLowerCase() === value.toLowerCase();
+    return /^[0-9a-f]{64}$/.test(value) && hexToBytes(value).length === 32;
   } catch {
     return false;
   }

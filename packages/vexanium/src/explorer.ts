@@ -9,7 +9,8 @@ export type BuildExplorerUrlOptions = {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "");
 const encodePath = (value: string | number): string => encodeURIComponent(String(value));
-const nativeBase = (baseUrl?: string): string => trimTrailingSlash(baseUrl ?? vexNative.explorerUrl);
+const nativeBase = (baseUrl?: string): string =>
+  trimTrailingSlash(baseUrl ?? vexNative.explorerUrl);
 const evmBase = (baseUrl?: string): string => trimTrailingSlash(baseUrl ?? vexEvm.explorerUrl);
 const evmRoutes = (baseUrl?: string) => createVexaniumEvmExplorerRoutes(evmBase(baseUrl));
 
@@ -19,19 +20,29 @@ export function buildExplorerTxUrl(txId: string, options: BuildExplorerUrlOption
     : `${nativeBase(options.baseUrl)}/tx/${encodePath(txId)}`;
 }
 
-export function buildExplorerBlockUrl(block: string | number, options: BuildExplorerUrlOptions = {}): string {
+export function buildExplorerBlockUrl(
+  block: string | number,
+  options: BuildExplorerUrlOptions = {},
+): string {
   return options.target === "evm"
     ? evmRoutes(options.baseUrl).block(block)
     : `${nativeBase(options.baseUrl)}/block/${encodePath(block)}`;
 }
 
-export function buildExplorerAccountUrl(account: string, options: BuildExplorerUrlOptions = {}): string {
+export function buildExplorerAccountUrl(
+  account: string,
+  options: BuildExplorerUrlOptions = {},
+): string {
   return options.target === "evm"
     ? evmRoutes(options.baseUrl).account(account)
     : `${nativeBase(options.baseUrl)}/account/${encodePath(account)}`;
 }
 
-export function buildExplorerTokenUrl(contract: string, symbol?: string, options: BuildExplorerUrlOptions = {}): string {
+export function buildExplorerTokenUrl(
+  contract: string,
+  symbol?: string,
+  options: BuildExplorerUrlOptions = {},
+): string {
   if (options.target === "evm") {
     return evmRoutes(options.baseUrl).token(contract);
   }
@@ -40,10 +51,16 @@ export function buildExplorerTokenUrl(contract: string, symbol?: string, options
     : `${nativeBase(options.baseUrl)}/token/${encodePath(contract)}`;
 }
 
-export function buildExplorerProducerUrl(producer: string, options: Omit<BuildExplorerUrlOptions, "target"> = {}): string {
+export function buildExplorerProducerUrl(
+  producer: string,
+  options: Omit<BuildExplorerUrlOptions, "target"> = {},
+): string {
   return `${nativeBase(options.baseUrl)}/producer/${encodePath(producer)}`;
 }
 
-export function buildExplorerActionUrl(globalSequence: string | number, options: Omit<BuildExplorerUrlOptions, "target"> = {}): string {
+export function buildExplorerActionUrl(
+  globalSequence: string | number,
+  options: Omit<BuildExplorerUrlOptions, "target"> = {},
+): string {
   return `${nativeBase(options.baseUrl)}/action/${encodePath(globalSequence)}`;
 }

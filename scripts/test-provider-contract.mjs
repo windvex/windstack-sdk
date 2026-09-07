@@ -152,7 +152,9 @@ const incompatibleClient = await createVexaniumClient({
 });
 await assert.rejects(
   () => incompatibleClient.negotiate(),
-  (error) => error instanceof VexaniumProviderError && error.code === VEXANIUM_ERROR_CODES.INCOMPATIBLE_VERSION,
+  (error) =>
+    error instanceof VexaniumProviderError &&
+    error.code === VEXANIUM_ERROR_CODES.INCOMPATIBLE_VERSION,
 );
 
 // Required unsupported capabilities use a standard error code.
@@ -175,7 +177,9 @@ const { provider: limitedProvider } = makeProvider({
 const limitedClient = await createVexaniumClient({ provider: limitedProvider, autoSync: false });
 await assert.rejects(
   () => limitedClient.negotiate([VEXANIUM_CAPABILITIES.EXACT_TRANSACTION_SIGNING]),
-  (error) => error instanceof VexaniumProviderError && error.code === VEXANIUM_ERROR_CODES.UNSUPPORTED_CAPABILITY,
+  (error) =>
+    error instanceof VexaniumProviderError &&
+    error.code === VEXANIUM_ERROR_CODES.UNSUPPORTED_CAPABILITY,
 );
 
 // Wallet errors keep their standard code through the SDK boundary.
@@ -196,10 +200,14 @@ const { provider: rejectingProvider } = makeProvider({
     throw new Error(`Unexpected method ${method}`);
   },
 });
-const rejectingClient = await createVexaniumClient({ provider: rejectingProvider, autoSync: false });
+const rejectingClient = await createVexaniumClient({
+  provider: rejectingProvider,
+  autoSync: false,
+});
 await assert.rejects(
   () => rejectingClient.connect(),
-  (error) => error instanceof VexaniumProviderError && error.code === VEXANIUM_ERROR_CODES.USER_REJECTED,
+  (error) =>
+    error instanceof VexaniumProviderError && error.code === VEXANIUM_ERROR_CODES.USER_REJECTED,
 );
 
 console.log("VexaniumProvider contract tests: PASS");

@@ -23,9 +23,18 @@ export type SolanaProvider = {
     icon?: string;
   };
   request<TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult>;
-  on?<TEvent extends keyof SolanaProviderEventMap>(event: TEvent, handler: (payload: SolanaProviderEventMap[TEvent]) => void): void;
-  off?<TEvent extends keyof SolanaProviderEventMap>(event: TEvent, handler: (payload: SolanaProviderEventMap[TEvent]) => void): void;
-  removeListener?<TEvent extends keyof SolanaProviderEventMap>(event: TEvent, handler: (payload: SolanaProviderEventMap[TEvent]) => void): void;
+  on?<TEvent extends keyof SolanaProviderEventMap>(
+    event: TEvent,
+    handler: (payload: SolanaProviderEventMap[TEvent]) => void,
+  ): void;
+  off?<TEvent extends keyof SolanaProviderEventMap>(
+    event: TEvent,
+    handler: (payload: SolanaProviderEventMap[TEvent]) => void,
+  ): void;
+  removeListener?<TEvent extends keyof SolanaProviderEventMap>(
+    event: TEvent,
+    handler: (payload: SolanaProviderEventMap[TEvent]) => void,
+  ): void;
 };
 
 export type SolanaClientOptions = {
@@ -51,6 +60,12 @@ export type SolanaClient = {
   signTransaction(transactionBase64: string): Promise<unknown>;
   signAndSendTransaction(transactionBase64: string): Promise<unknown>;
   disconnect(): Promise<void>;
-  on<TEvent extends keyof SolanaProviderEventMap>(event: TEvent, handler: (payload: SolanaProviderEventMap[TEvent]) => void): void;
-  off<TEvent extends keyof SolanaProviderEventMap>(event: TEvent, handler: (payload: SolanaProviderEventMap[TEvent]) => void): void;
+  on<TEvent extends keyof SolanaProviderEventMap>(
+    event: TEvent,
+    handler: (payload: SolanaProviderEventMap[TEvent]) => void,
+  ): void;
+  off<TEvent extends keyof SolanaProviderEventMap>(
+    event: TEvent,
+    handler: (payload: SolanaProviderEventMap[TEvent]) => void,
+  ): void;
 };

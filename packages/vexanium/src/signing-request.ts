@@ -1,7 +1,4 @@
-import {
-  SigningRequest,
-  type ZlibProvider,
-} from "@wharfkit/signing-request";
+import { SigningRequest, type ZlibProvider } from "@wharfkit/signing-request";
 import { deflateRaw, inflateRaw } from "pako";
 import { ESR_SCHEME, VSR_SCHEME } from "./constants.js";
 import type {
@@ -37,9 +34,8 @@ export function encodeSigningRequest(
   options: Pick<VexSigningRequestCreateOptions, "compress" | "slashes" | "zlib"> = {},
 ): CanonicalSigningRequestUri {
   const zlib = options.zlib ?? defaultZlib;
-  const encodableRequest = options.compress === true
-    ? SigningRequest.from(request.encode(false), { zlib })
-    : request;
+  const encodableRequest =
+    options.compress === true ? SigningRequest.from(request.encode(false), { zlib }) : request;
 
   return encodableRequest.encode(
     options.compress,

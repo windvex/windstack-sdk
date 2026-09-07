@@ -1,8 +1,4 @@
-import {
-  getRuntimeWindow,
-  resolveDappMetadata,
-  resolveDappRequestContext,
-} from "@windstack/core";
+import { getRuntimeWindow, resolveDappMetadata, resolveDappRequestContext } from "@windstack/core";
 import type { DappMetadata, RequestArguments } from "@windstack/core";
 import {
   VEXANIUM_CAPABILITIES,
@@ -48,7 +44,7 @@ import type {
   VexSigningRequestParams,
   VexSigningRequestResult,
 } from "./types.js";
-import { Signature } from "@wharfkit/antelope";
+import { Signature } from "@windstack/crypto";
 import {
   isAntelopeName,
   isChecksum256,
@@ -117,8 +113,21 @@ function cloneSession(value: VexaniumDappSession | null): VexaniumDappSession | 
   };
 }
 
-function createLocalSessionId(origin: string, chainId: VexaniumChainId, account: VexaniumAccount): string {
-  const entropy = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function createLocalSessionId(
+  origin: string,
+  chainId: VexaniumChainId,
+  account: VexaniumAccount,
+): string {
+  const crypto = globalThis.crypto;
+  let entropy: string;
+  if (crypto?.randomUUID) entropy = crypto.randomUUID();
+  else if (crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    entropy = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  } else {
+    throw new Error("Secure platform randomness is required to create a Vexanium session id");
+  }
   return `vex:${origin}:${chainId}:${account.permissionLevel}:${entropy}`;
 }
 
@@ -126,8 +135,11 @@ function compactParams<T extends Record<string, unknown>>(params: T): T {
   return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined)) as T;
 }
 
-function normalizeSyncOptions(value: VexaniumClientOptions["autoSync"]): Required<VexaniumSessionSyncOptions> {
-  if (value === false) return { providerEvents: false, windowFocus: false, visibilityChange: false };
+function normalizeSyncOptions(
+  value: VexaniumClientOptions["autoSync"],
+): Required<VexaniumSessionSyncOptions> {
+  if (value === false)
+    return { providerEvents: false, windowFocus: false, visibilityChange: false };
   if (value === true || value === undefined) return DEFAULT_SYNC_OPTIONS;
   return { ...DEFAULT_SYNC_OPTIONS, ...value };
 }
@@ -150,7 +162,11 @@ function assertAccountsResponse(value: unknown): asserts value is VexaniumAccoun
 }
 
 function assertValidSignatures(value: unknown, method: string): asserts value is string[] {
-  if (!Array.isArray(value) || value.length === 0 || !value.every((item) => typeof item === "string")) {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    !value.every((item) => typeof item === "string")
+  ) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_REQUEST,
       `Malformed ${method} response: expected at least one signature`,
@@ -158,7 +174,7 @@ function assertValidSignatures(value: unknown, method: string): asserts value is
     );
   }
   try {
-    for (const signature of value) Signature.from(signature);
+    for (const signature of value) Signature.fromString(signature);
   } catch {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_REQUEST,
@@ -170,7 +186,10 @@ function assertValidSignatures(value: unknown, method: string): asserts value is
 
 function assertSignTransactionParams(params: VexSignTransactionParams): void {
   if (!isVexaniumFullChainId(params.chainId)) {
-    throw new VexaniumProviderError(VEXANIUM_ERROR_CODES.INVALID_PARAMS, "Invalid Antelope chain ID");
+    throw new VexaniumProviderError(
+      VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+      "Invalid Antelope chain ID",
+    );
   }
   if (!isHexBytes(params.serializedTransaction)) {
     throw new VexaniumProviderError(
@@ -204,7 +223,9 @@ function addClientListener<TEvent extends keyof VexaniumClientEventMap>(
   event: TEvent,
   handler: Listener<VexaniumClientEventMap[TEvent]>,
 ): void {
-  const current = listeners.get(event) ?? new Set<Listener<VexaniumClientEventMap[keyof VexaniumClientEventMap]>>();
+  const current =
+    listeners.get(event) ??
+    new Set<Listener<VexaniumClientEventMap[keyof VexaniumClientEventMap]>>();
   current.add(handler as Listener<VexaniumClientEventMap[keyof VexaniumClientEventMap]>);
   listeners.set(event, current);
 }
@@ -214,7 +235,9 @@ function removeClientListener<TEvent extends keyof VexaniumClientEventMap>(
   event: TEvent,
   handler: Listener<VexaniumClientEventMap[TEvent]>,
 ): void {
-  listeners.get(event)?.delete(handler as Listener<VexaniumClientEventMap[keyof VexaniumClientEventMap]>);
+  listeners
+    .get(event)
+    ?.delete(handler as Listener<VexaniumClientEventMap[keyof VexaniumClientEventMap]>);
 }
 
 function emitClientEvent<TEvent extends keyof VexaniumClientEventMap>(
@@ -229,11 +252,15 @@ function emitClientEvent<TEvent extends keyof VexaniumClientEventMap>(
   }
 }
 
-export async function createVexaniumClient(options: VexaniumClientOptions = {}): Promise<VexaniumClient> {
-  let provider: VexaniumProvider | null = options.provider ?? await getVexaniumProvider({
-    timeoutMs: options.discoveryTimeoutMs,
-    rdns: options.providerRdns,
-  });
+export async function createVexaniumClient(
+  options: VexaniumClientOptions = {},
+): Promise<VexaniumClient> {
+  let provider: VexaniumProvider | null =
+    options.provider ??
+    (await getVexaniumProvider({
+      timeoutMs: options.discoveryTimeoutMs,
+      rdns: options.providerRdns,
+    }));
 
   if (provider && !isVexaniumProvider(provider)) {
     throw new VexaniumProviderError(
@@ -264,10 +291,15 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
     return provider;
   };
 
-  const request = async <TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult> => {
+  const request = async <TResult = unknown, TParams = unknown>(
+    args: RequestArguments<TParams>,
+  ): Promise<TResult> => {
     try {
       if (destroyed) {
-        throw new VexaniumProviderError(VEXANIUM_ERROR_CODES.DISCONNECTED, "Vexanium client has been destroyed");
+        throw new VexaniumProviderError(
+          VEXANIUM_ERROR_CODES.DISCONNECTED,
+          "Vexanium client has been destroyed",
+        );
       }
       return await requireProvider().request<TResult, TParams>(args);
     } catch (error) {
@@ -280,7 +312,8 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
   ): Promise<VexaniumCapabilitiesResponse> => {
     if (negotiation) {
       for (const capability of requiredCapabilities) {
-        if (!negotiation.capabilities.includes(capability)) throw vexaniumUnsupportedCapability(capability);
+        if (!negotiation.capabilities.includes(capability))
+          throw vexaniumUnsupportedCapability(capability);
       }
       return negotiation;
     }
@@ -293,36 +326,41 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
           version: VEXANIUM_PROVIDER_VERSION,
           requiredCapabilities,
         },
-      }).then((response) => {
-        assertVexaniumCapabilitiesResponse(response, requiredCapabilities);
-        assertCapabilityMethods(response);
-        const info = requireProvider().providerInfo;
-        for (const capability of response.capabilities) {
-          if (!info.capabilities.includes(capability)) {
-            throw new VexaniumProviderError(
-              VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-              `Provider negotiated undeclared capability: ${capability}`,
-            );
+      })
+        .then((response) => {
+          assertVexaniumCapabilitiesResponse(response, requiredCapabilities);
+          assertCapabilityMethods(response);
+          const info = requireProvider().providerInfo;
+          for (const capability of response.capabilities) {
+            if (!info.capabilities.includes(capability)) {
+              throw new VexaniumProviderError(
+                VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+                `Provider negotiated undeclared capability: ${capability}`,
+              );
+            }
           }
-        }
-        for (const chainId of response.chains) {
-          if (!info.chains.some((declaredChainId) => sameVexaniumChain(chainId, declaredChainId))) {
-            throw new VexaniumProviderError(
-              VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-              `Provider negotiated undeclared chain: ${chainId}`,
-            );
+          for (const chainId of response.chains) {
+            if (
+              !info.chains.some((declaredChainId) => sameVexaniumChain(chainId, declaredChainId))
+            ) {
+              throw new VexaniumProviderError(
+                VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+                `Provider negotiated undeclared chain: ${chainId}`,
+              );
+            }
           }
-        }
-        negotiation = response;
-        return response;
-      }).finally(() => {
-        negotiationInFlight = null;
-      });
+          negotiation = response;
+          return response;
+        })
+        .finally(() => {
+          negotiationInFlight = null;
+        });
     }
 
     const response = await negotiationInFlight;
     for (const capability of requiredCapabilities) {
-      if (!response.capabilities.includes(capability)) throw vexaniumUnsupportedCapability(capability);
+      if (!response.capabilities.includes(capability))
+        throw vexaniumUnsupportedCapability(capability);
     }
     return response;
   };
@@ -348,9 +386,10 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
       const sessionDapp = cloneDappMetadata(nextDapp ?? session?.dapp ?? dapp);
       const sessionAccounts = cloneAccounts(accounts);
       session = {
-        id: session?.walletSessionId === walletSessionId
-          ? session.id
-          : createLocalSessionId(requestContext.origin, chainId, accounts[0]),
+        id:
+          session?.walletSessionId === walletSessionId
+            ? session.id
+            : createLocalSessionId(requestContext.origin, chainId, accounts[0]),
         walletSessionId,
         dapp: sessionDapp,
         origin: session?.origin ?? requestContext.origin,
@@ -375,7 +414,10 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
   const getChain = async (): Promise<VexaniumChainId> => {
     const chainId = await request<VexaniumChainId>({ method: VEXANIUM_METHODS.GET_CHAIN });
     if (!isVexaniumChainId(chainId)) {
-      throw new VexaniumProviderError(VEXANIUM_ERROR_CODES.INVALID_REQUEST, "Malformed vex_getChain response");
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+        "Malformed vex_getChain response",
+      );
     }
     return chainId;
   };
@@ -384,7 +426,9 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
     if (syncInFlight) return syncInFlight;
     syncInFlight = (async () => {
       await negotiate([VEXANIUM_CAPABILITIES.ACCOUNTS]);
-      const rawResponse = await request<VexaniumAccountsResponse>({ method: VEXANIUM_METHODS.GET_ACCOUNTS });
+      const rawResponse = await request<VexaniumAccountsResponse>({
+        method: VEXANIUM_METHODS.GET_ACCOUNTS,
+      });
       assertAccountsResponse(rawResponse);
       const accounts = normalizeVexaniumAccounts(rawResponse.accounts, rawResponse.chainId);
       return updateSession({
@@ -405,7 +449,10 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
     const requestDapp = params.dapp ?? dapp;
     const requiredCapabilities = params.requiredCapabilities ?? DEFAULT_CONNECT_CAPABILITIES;
     if (params.chainId && !isVexaniumChainId(params.chainId)) {
-      throw new VexaniumProviderError(VEXANIUM_ERROR_CODES.INVALID_PARAMS, "Invalid Vexanium chain ID");
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+        "Invalid Vexanium chain ID",
+      );
     }
     await negotiate(requiredCapabilities);
 
@@ -439,7 +486,8 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
       );
     }
     for (const capability of requiredCapabilities) {
-      if (!rawResponse.capabilities.includes(capability)) throw vexaniumUnsupportedCapability(capability);
+      if (!rawResponse.capabilities.includes(capability))
+        throw vexaniumUnsupportedCapability(capability);
     }
 
     const accounts = normalizeVexaniumAccounts(rawResponse.accounts, rawResponse.chainId);
@@ -554,7 +602,9 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
         if (runtimeWindow.document.visibilityState === "visible") syncSilently();
       };
       runtimeWindow.document.addEventListener("visibilitychange", onVisibilityChange);
-      cleanupCallbacks.add(() => runtimeWindow.document.removeEventListener("visibilitychange", onVisibilityChange));
+      cleanupCallbacks.add(() =>
+        runtimeWindow.document.removeEventListener("visibilitychange", onVisibilityChange),
+      );
     }
   };
 
@@ -661,7 +711,10 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
 
     async signMessage(message: string | Uint8Array, account?: string) {
       if (account && !isAntelopeName(account)) {
-        throw new VexaniumProviderError(VEXANIUM_ERROR_CODES.INVALID_PARAMS, "Invalid Antelope account name");
+        throw new VexaniumProviderError(
+          VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+          "Invalid Antelope account name",
+        );
       }
       await negotiate([VEXANIUM_CAPABILITIES.MESSAGE_SIGNING]);
       const params: VexSignMessageParams = compactParams({
@@ -675,10 +728,16 @@ export async function createVexaniumClient(options: VexaniumClientOptions = {}):
 
     async signDigest(digest: string, account?: string) {
       if (!isChecksum256(digest)) {
-        throw new VexaniumProviderError(VEXANIUM_ERROR_CODES.INVALID_PARAMS, "Digest must be 32-byte hexadecimal");
+        throw new VexaniumProviderError(
+          VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+          "Digest must be 32-byte hexadecimal",
+        );
       }
       if (account && !isAntelopeName(account)) {
-        throw new VexaniumProviderError(VEXANIUM_ERROR_CODES.INVALID_PARAMS, "Invalid Antelope account name");
+        throw new VexaniumProviderError(
+          VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+          "Invalid Antelope account name",
+        );
       }
       await negotiate([VEXANIUM_CAPABILITIES.DIGEST_SIGNING]);
       const params: VexSignDigestParams = compactParams({

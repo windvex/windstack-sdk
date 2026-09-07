@@ -6,17 +6,16 @@ import type {
   ProviderDetail,
   RequestArguments,
 } from "@windstack/core";
-import type { SigningRequestCreateArguments, SigningRequestEncodingOptions } from "@wharfkit/signing-request";
-import {
-  VEXANIUM_CAPABILITIES,
-  VEXANIUM_PROVIDER_STANDARD,
-} from "./constants.js";
+import type {
+  SigningRequestCreateArguments,
+  SigningRequestEncodingOptions,
+} from "@wharfkit/signing-request";
+import { VEXANIUM_CAPABILITIES, VEXANIUM_PROVIDER_STANDARD } from "./constants.js";
 
 export type VexaniumFullChainId = string;
 export type VexaniumCaip2ChainId = `antelope:${string}`;
 export type VexaniumChainId = VexaniumFullChainId | VexaniumCaip2ChainId;
-export type VexaniumCapability =
-  (typeof VEXANIUM_CAPABILITIES)[keyof typeof VEXANIUM_CAPABILITIES];
+export type VexaniumCapability = (typeof VEXANIUM_CAPABILITIES)[keyof typeof VEXANIUM_CAPABILITIES];
 
 export type VexaniumPermissionLevel = {
   actor: string;
@@ -116,9 +115,18 @@ export type VexaniumProviderEventMap = {
 export type VexaniumProvider = {
   providerInfo: VexaniumProviderInfo;
   request<TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult>;
-  on?<TEvent extends keyof VexaniumProviderEventMap>(event: TEvent, handler: (payload: VexaniumProviderEventMap[TEvent]) => void): void;
-  off?<TEvent extends keyof VexaniumProviderEventMap>(event: TEvent, handler: (payload: VexaniumProviderEventMap[TEvent]) => void): void;
-  removeListener?<TEvent extends keyof VexaniumProviderEventMap>(event: TEvent, handler: (payload: VexaniumProviderEventMap[TEvent]) => void): void;
+  on?<TEvent extends keyof VexaniumProviderEventMap>(
+    event: TEvent,
+    handler: (payload: VexaniumProviderEventMap[TEvent]) => void,
+  ): void;
+  off?<TEvent extends keyof VexaniumProviderEventMap>(
+    event: TEvent,
+    handler: (payload: VexaniumProviderEventMap[TEvent]) => void,
+  ): void;
+  removeListener?<TEvent extends keyof VexaniumProviderEventMap>(
+    event: TEvent,
+    handler: (payload: VexaniumProviderEventMap[TEvent]) => void,
+  ): void;
 };
 
 export type VexaniumClientSessionChangeReason =
@@ -218,7 +226,9 @@ export type VexaniumClient = {
   getRequestContext(): DappRequestContext;
   getSession(): VexaniumDappSession | null;
   request<TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult>;
-  negotiate(requiredCapabilities?: readonly VexaniumCapability[]): Promise<VexaniumCapabilitiesResponse>;
+  negotiate(
+    requiredCapabilities?: readonly VexaniumCapability[],
+  ): Promise<VexaniumCapabilitiesResponse>;
   connect(params?: VexaniumConnectParams): Promise<VexaniumAccount[]>;
   connectOne(params?: VexaniumConnectParams): Promise<VexaniumAccount>;
   getAccounts(): Promise<VexaniumAccount[]>;
@@ -229,8 +239,16 @@ export type VexaniumClient = {
   signDigest(digest: string, account?: string): Promise<unknown>;
   signTransaction(params: VexSignTransactionParams): Promise<VexSignTransactionResult>;
   disconnect(): Promise<void>;
-  on<TEvent extends keyof VexaniumClientEventMap>(event: TEvent, handler: (payload: VexaniumClientEventMap[TEvent]) => void): void;
-  off<TEvent extends keyof VexaniumClientEventMap>(event: TEvent, handler: (payload: VexaniumClientEventMap[TEvent]) => void): void;
-  subscribeSession(handler: (payload: VexaniumClientEventMap["sessionChanged"]) => void): () => void;
+  on<TEvent extends keyof VexaniumClientEventMap>(
+    event: TEvent,
+    handler: (payload: VexaniumClientEventMap[TEvent]) => void,
+  ): void;
+  off<TEvent extends keyof VexaniumClientEventMap>(
+    event: TEvent,
+    handler: (payload: VexaniumClientEventMap[TEvent]) => void,
+  ): void;
+  subscribeSession(
+    handler: (payload: VexaniumClientEventMap["sessionChanged"]) => void,
+  ): () => void;
   destroy(): void;
 };

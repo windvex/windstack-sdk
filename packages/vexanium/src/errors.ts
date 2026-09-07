@@ -2,8 +2,7 @@ import { WISP_ERROR_CODES } from "@windstack/core";
 
 export const VEXANIUM_ERROR_CODES = WISP_ERROR_CODES;
 
-export type VexaniumErrorCode =
-  (typeof VEXANIUM_ERROR_CODES)[keyof typeof VEXANIUM_ERROR_CODES];
+export type VexaniumErrorCode = (typeof VEXANIUM_ERROR_CODES)[keyof typeof VEXANIUM_ERROR_CODES];
 
 export class VexaniumProviderError<TData = unknown> extends Error {
   readonly code: VexaniumErrorCode | number;
@@ -18,12 +17,13 @@ export class VexaniumProviderError<TData = unknown> extends Error {
 }
 
 export function isVexaniumProviderError(value: unknown): value is VexaniumProviderError {
-  return value instanceof VexaniumProviderError || (
-    typeof value === "object" &&
-    value !== null &&
-    "code" in value &&
-    typeof (value as { code: unknown }).code === "number" &&
-    Number.isInteger((value as { code: number }).code)
+  return (
+    value instanceof VexaniumProviderError ||
+    (typeof value === "object" &&
+      value !== null &&
+      "code" in value &&
+      typeof (value as { code: unknown }).code === "number" &&
+      Number.isInteger((value as { code: number }).code))
   );
 }
 
@@ -33,7 +33,9 @@ export function normalizeVexaniumProviderError(error: unknown): VexaniumProvider
     const candidate = error as { code: number; message?: unknown; data?: unknown };
     return new VexaniumProviderError(
       candidate.code,
-      typeof candidate.message === "string" ? candidate.message : "Vexanium provider request failed",
+      typeof candidate.message === "string"
+        ? candidate.message
+        : "Vexanium provider request failed",
       candidate.data,
     );
   }

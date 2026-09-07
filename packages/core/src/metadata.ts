@@ -51,7 +51,10 @@ function normalizeUrl(
   }
 }
 
-function normalizeImageUrl(value: string | undefined, base: string | undefined): string | undefined {
+function normalizeImageUrl(
+  value: string | undefined,
+  base: string | undefined,
+): string | undefined {
   if (typeof value === "string" && /^data:image\/(?:gif|jpeg|png|webp);base64,/i.test(value)) {
     return value;
   }
@@ -77,8 +80,12 @@ export function readDappMetadataFromDocument(): DappMetadataInput {
   const origin = getLocationOrigin();
   const url = getLocationHref();
   const base = origin ?? url;
-  const favicon = getLinkHref('link[rel~="icon"]') ?? getLinkHref('link[rel="shortcut icon"]') ?? getLinkHref('link[rel="apple-touch-icon"]');
-  const image = getMetaContent('meta[property="og:image"]') ?? getMetaContent('meta[name="twitter:image"]');
+  const favicon =
+    getLinkHref('link[rel~="icon"]') ??
+    getLinkHref('link[rel="shortcut icon"]') ??
+    getLinkHref('link[rel="apple-touch-icon"]');
+  const image =
+    getMetaContent('meta[property="og:image"]') ?? getMetaContent('meta[name="twitter:image"]');
   const icon = normalizeImageUrl(favicon ?? image, base);
   const imageUrl = normalizeImageUrl(image, base);
 
@@ -109,10 +116,12 @@ export function resolveDappMetadata(input: DappMetadataInput = {}): DappMetadata
   const inputUrl = safeTrim(input.url);
   const detectedUrl = safeTrim(detected.url);
   const runtimeOrigin = getLocationOrigin();
-  const baseOrigin = runtimeOrigin ?? originFromUrl(inputUrl) ?? originFromUrl(detectedUrl) ?? DEFAULT_ORIGIN;
-  const url = normalizeUrl(inputUrl, baseOrigin, ["http:", "https:"])
-    ?? normalizeUrl(detectedUrl, baseOrigin, ["http:", "https:"])
-    ?? baseOrigin;
+  const baseOrigin =
+    runtimeOrigin ?? originFromUrl(inputUrl) ?? originFromUrl(detectedUrl) ?? DEFAULT_ORIGIN;
+  const url =
+    normalizeUrl(inputUrl, baseOrigin, ["http:", "https:"]) ??
+    normalizeUrl(detectedUrl, baseOrigin, ["http:", "https:"]) ??
+    baseOrigin;
   const icon = normalizeImageUrl(safeTrim(input.icon) ?? safeTrim(detected.icon), baseOrigin);
   const icons = uniq([
     icon,
@@ -140,6 +149,9 @@ export function resolveDappRequestContext(): DappRequestContext {
   return { origin: DEFAULT_ORIGIN, source: "unknown" };
 }
 
-export function sameDappRequestOrigin(left: DappRequestContext, right: DappRequestContext): boolean {
+export function sameDappRequestOrigin(
+  left: DappRequestContext,
+  right: DappRequestContext,
+): boolean {
   return left.origin === right.origin;
 }

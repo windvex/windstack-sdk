@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@windstack/wallet-plugin-wisp` connects SessionKit applications to Wisp Wallet on Vexanium Mainnet. It handles wallet discovery, account authorization, exact transaction signing, chain validation, and conversion of wallet signatures into the format expected by the connected session.
+`@windstack/wallet-plugin-wisp` connects `@windstack/session` applications to Wisp Wallet on Vexanium Mainnet. It handles wallet discovery, account authorization, exact transaction signing, chain validation, and signer integration.
 
 The plugin is restricted to Vexanium Mainnet and selects the Wisp provider identified by `com.wisp.wallet` unless a provider or client is supplied explicitly.
 
@@ -15,30 +15,28 @@ npm install @windstack/wallet-plugin-wisp
 ## Usage
 
 ```ts
-import { SessionKit } from "@wharfkit/session";
+import { VEXANIUM_MAINNET } from "@windstack/antelope/vexanium";
+import { SessionKit } from "@windstack/session";
 import { WispWalletPlugin } from "@windstack/wallet-plugin-wisp";
-import { vexNative } from "@windstack/vexanium";
 
 const sessionKit = new SessionKit({
   appName: "My Vexanium App",
-  chains: [{ id: vexNative.chainId, url: vexNative.rpcUrl }],
+  chains: [{
+    id: VEXANIUM_MAINNET.chainId,
+    url: VEXANIUM_MAINNET.endpoints,
+    contracts: VEXANIUM_MAINNET.contracts,
+  }],
   walletPlugins: [new WispWalletPlugin()],
 });
 
-const { session } = await sessionKit.login();
+const session = await sessionKit.login();
+
+const action = await session
+  .account()
+  .transfer("receiver", "1.0000 VEX", "WindStack");
 
 await session.transact({
-  action: {
-    account: "vex.token",
-    name: "transfer",
-    authorization: [session.permissionLevel],
-    data: {
-      from: session.actor,
-      to: "receiver",
-      quantity: "1.0000 VEX",
-      memo: "WindStack",
-    },
-  },
+  actions: [action],
 });
 ```
 

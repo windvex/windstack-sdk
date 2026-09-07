@@ -1,19 +1,12 @@
 import assert from "node:assert/strict";
 import { Asset, Name } from "@wharfkit/antelope";
-import {
-  resolveDappMetadata,
-} from "../packages/core/dist/index.js";
+import { resolveDappMetadata } from "../packages/core/dist/index.js";
 import {
   createEVMClient,
   discoverEVMProviders,
   getEVMProvider,
   isEIP6963ProviderDetail,
 } from "../packages/evm/dist/index.js";
-import {
-  createWispSessionClient,
-  isEVMScope,
-  isVexaniumScope,
-} from "../packages/session/dist/index.js";
 import {
   VEXANIUM_CAPABILITIES,
   VEXANIUM_MAINNET_CHAIN_ID,
@@ -27,6 +20,7 @@ import {
   buildExplorerTxUrl,
   createVexaniumClient,
   formatAsset,
+  isVexaniumCaip2ChainId,
   normalizeVexaniumAccount,
   parseAsset,
   parsePermissionLevel,
@@ -109,17 +103,19 @@ assert.equal(Object.isFrozen(discovered[0]), true);
 assert.equal(await getEVMProvider(0), firstProvider);
 
 const lateProvider = makeEIP1193Provider("0x1a50");
-runtimeWindow.dispatchEvent(new CustomEvent("eip6963:announceProvider", {
-  detail: {
-    info: {
-      uuid: "f6924454-a838-46af-a89c-2c6a8d7f8421",
-      name: "Late wallet",
-      icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>",
-      rdns: "com.example.latewallet",
+runtimeWindow.dispatchEvent(
+  new CustomEvent("eip6963:announceProvider", {
+    detail: {
+      info: {
+        uuid: "f6924454-a838-46af-a89c-2c6a8d7f8421",
+        name: "Late wallet",
+        icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>",
+        rdns: "com.example.latewallet",
+      },
+      provider: lateProvider,
     },
-    provider: lateProvider,
-  },
-}));
+  }),
+);
 discovered = await discoverEVMProviders(0);
 assert.equal(discovered.length, 2);
 
@@ -143,7 +139,8 @@ assert.deepEqual(parsePermissionLevel("windstack"), {
 });
 assert.throws(() => parsePermissionLevel("wind@active@owner"), VexaniumProviderError);
 assert.throws(
-  () => normalizeVexaniumAccount({ actor: "UPPER", permission: "active" }, VEXANIUM_MAINNET_CHAIN_ID),
+  () =>
+    normalizeVexaniumAccount({ actor: "UPPER", permission: "active" }, VEXANIUM_MAINNET_CHAIN_ID),
   VexaniumProviderError,
 );
 assert.equal(sameVexaniumChain(VEXANIUM_MAINNET_CHAIN_ID, VEXANIUM_MAINNET_SCOPE), true);
@@ -165,10 +162,8 @@ assert.equal(
 );
 assert.equal(buildExplorerTxUrl("0xabc", { target: "evm" }), vexEvm.routes.tx("0xabc"));
 assert.equal(buildExplorerAccountUrl("0x123", { target: "evm" }), vexEvm.routes.account("0x123"));
-assert.equal(isVexaniumScope(VEXANIUM_MAINNET_SCOPE), true);
-assert.equal(isVexaniumScope("antelope:not-a-chain"), false);
-assert.equal(isEVMScope("eip155:6736"), true);
-assert.equal(isEVMScope("eip155:-1"), false);
+assert.equal(isVexaniumCaip2ChainId(VEXANIUM_MAINNET_SCOPE), true);
+assert.equal(isVexaniumCaip2ChainId("antelope:not-a-chain"), false);
 
 const vexAccount = {
   actor: "windstack",
@@ -224,33 +219,17 @@ sessionSnapshot.walletSessionId = "mutated-session";
 assert.equal(vexClient.getSession().accounts[0].actor, "windstack");
 assert.equal(vexClient.getSession().walletSessionId, "session-1");
 await assert.rejects(
-  () => vexClient.signTransaction({
-    chainId: VEXANIUM_MAINNET_CHAIN_ID,
-    serializedTransaction: "00",
-    account: "windstack",
-    permission: "active",
-  }),
+  () =>
+    vexClient.signTransaction({
+      chainId: VEXANIUM_MAINNET_CHAIN_ID,
+      serializedTransaction: "00",
+      account: "windstack",
+      permission: "active",
+    }),
   { code: -32600 },
 );
 const signCall = vexCalls.find(({ method }) => method === VEXANIUM_METHODS.SIGN_TRANSACTION);
 assert.equal(signCall.params.sessionId, "session-1");
-
-const wrongChainSession = await createWispSessionClient({
-  evm: {
-    isAvailable: () => true,
-    getProvider: () => null,
-    request: async () => null,
-    connect: async () => ["0x0000000000000000000000000000000000000001"],
-    getAccounts: async () => [],
-    getChainId: async () => "0x1",
-    switchChain: async () => null,
-    addChain: async () => null,
-    on() {},
-    off() {},
-  },
-});
-await assert.rejects(() => wrongChainSession.connect(["eip155:6736"]), { code: -32602 });
-assert.equal(wrongChainSession.getSession(), null);
 
 await vexClient.disconnect();
 vexClient.destroy();
