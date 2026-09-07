@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const registry = "https://registry.npmjs.org/";
+const visibilityAttempts = 240;
+const visibilityIntervalMs = 5_000;
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 function run(command, args, options = {}) {
@@ -144,29 +146,73 @@ async function verifyRegistryAuthentication() {
     throw new Error(`npm registry authentication failed with HTTP ${response.status}`);
   }
   console.log("npm registry authentication accepted.");
+  return token;
 }
 
-function publishedVersion(name, version) {
-  const result = run(
-    "npm",
-    ["view", `${name}@${version}`, "version", "--json", "--registry", registry],
-    { capture: true, allowFailure: true },
+async function publishedVersion(name, version) {
+  let response;
+  try {
+    response = await fetch(
+      `${registry}${encodeURIComponent(name)}/${encodeURIComponent(version)}`,
+      {
+        headers: { accept: "application/json", "cache-control": "no-cache" },
+      },
+    );
+  } catch (error) {
+    throw new Error(`Unable to query npm for ${name}@${version}: ${error.message}`);
+  }
+  if (response.status === 200) return true;
+  if (response.status === 404) return false;
+  throw new Error(`Unable to query npm for ${name}@${version}: HTTP ${response.status}`);
+}
+
+async function versionLifecycleStatus(name, version, token) {
+  let response;
+  try {
+    response = await fetch(
+      `${registry}-/package/${encodeURIComponent(name)}/version/${encodeURIComponent(version)}/status`,
+      { headers: { authorization: `Bearer ${token}`, accept: "application/json" } },
+    );
+  } catch (error) {
+    throw new Error(
+      `Unable to query npm lifecycle status for ${name}@${version}: ${error.message}`,
+    );
+  }
+  if (response.status === 403 || response.status === 404) return null;
+  if (response.status !== 200) {
+    throw new Error(
+      `Unable to query npm lifecycle status for ${name}@${version}: HTTP ${response.status}`,
+    );
+  }
+  const payload = await response.json();
+  return typeof payload.status === "string" ? payload.status : "submitted";
+}
+
+async function waitForPublishedVersions(entries) {
+  let pending = entries;
+  for (let attempt = 1; attempt <= visibilityAttempts; attempt += 1) {
+    const checks = await Promise.all(
+      pending.map(async (entry) => ({
+        entry,
+        published: await publishedVersion(entry.manifest.name, entry.manifest.version),
+      })),
+    );
+    pending = checks.filter(({ published }) => !published).map(({ entry }) => entry);
+    if (!pending.length) return;
+    if (attempt === 1 || attempt % 12 === 0) {
+      console.log(
+        `Waiting for npm package scanning and visibility (${pending.length} remaining): ${pending
+          .map(({ manifest }) => `${manifest.name}@${manifest.version}`)
+          .join(", ")}`,
+      );
+    }
+    await sleep(visibilityIntervalMs);
+  }
+  throw new Error(
+    `npm did not make these versions public within 20 minutes: ${pending
+      .map(({ manifest }) => `${manifest.name}@${manifest.version}`)
+      .join(", ")}`,
   );
-  if (result.status === 0) {
-    const parsed = JSON.parse(result.stdout || "null");
-    return parsed === version;
-  }
-  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-  if (/E404|404 Not Found|No match found for version/i.test(output)) return false;
-  throw new Error(`Unable to query npm for ${name}@${version}: ${output.trim()}`);
-}
-
-async function waitForPublishedVersion(name, version) {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    if (publishedVersion(name, version)) return;
-    await sleep(2000);
-  }
-  throw new Error(`npm did not confirm ${name}@${version} after publish`);
 }
 
 requireReleaseState();
@@ -175,25 +221,25 @@ console.log(
   `WindStack publish order:\n${releaseEntries.map(({ manifest }) => `- ${manifest.name}@${manifest.version}`).join("\n")}`,
 );
 
-await verifyRegistryAuthentication();
+const npmToken = await verifyRegistryAuthentication();
 run("npm", ["run", "release:dry-run"]);
 
 for (const { manifest } of releaseEntries) {
   const { name, version } = manifest;
-  if (publishedVersion(name, version)) {
+  if (await publishedVersion(name, version)) {
     console.log(`${name}@${version} is already published; skipping.`);
+    continue;
+  }
+  const lifecycleStatus = await versionLifecycleStatus(name, version, npmToken);
+  if (lifecycleStatus) {
+    console.log(`${name}@${version} is already submitted (${lifecycleStatus}); skipping upload.`);
     continue;
   }
 
   console.log(`Publishing ${name}@${version}...`);
   run("npm", ["publish", "--workspace", name, "--access", "public", "--registry", registry]);
-  await waitForPublishedVersion(name, version);
 }
 
-for (const { manifest } of releaseEntries) {
-  if (!publishedVersion(manifest.name, manifest.version)) {
-    throw new Error(`Final registry verification failed for ${manifest.name}@${manifest.version}`);
-  }
-}
+await waitForPublishedVersions(releaseEntries);
 
 console.log("All WindStack 1.0 release packages are published and verified.");
