@@ -41,6 +41,7 @@ export type SignRequest = {
   chainId: string;
   transaction: Transaction;
   serializedTransaction: Uint8Array;
+  serializedContextFreeData: Uint8Array;
   digest: Uint8Array;
   requiredKeys: string[];
 };
@@ -52,7 +53,7 @@ export type TransactArgs = {
   actions: Action[];
   signer: Signer;
   contextFreeActions?: Action[];
-  contextFreeData?: Uint8Array;
+  contextFreeData?: Uint8Array[];
   transactionExtensions?: TransactionExtension[];
   broadcast?: boolean;
   expireSeconds?: number;
@@ -61,6 +62,7 @@ export type TransactArgs = {
 export type TransactResult<T = Record<string, unknown>> = {
   transaction: Transaction;
   serializedTransaction: Uint8Array;
+  serializedContextFreeData: Uint8Array;
   signatures: string[];
   response?: T;
 };
@@ -121,7 +123,9 @@ export function serializeTransaction(transaction: Transaction): Uint8Array {
   writer.writeUint32(assertUint(expirationSeconds, 0xffffffff, "expiration"));
   writer.writeUint16(assertUint(transaction.ref_block_num, 0xffff, "ref_block_num"));
   writer.writeUint32(assertUint(transaction.ref_block_prefix, 0xffffffff, "ref_block_prefix"));
-  writer.writeVarUint(assertUint(transaction.max_net_usage_words, 0xffffffff, "max_net_usage_words"));
+  writer.writeVarUint(
+    assertUint(transaction.max_net_usage_words, 0xffffffff, "max_net_usage_words"),
+  );
   writer.writeByte(assertUint(transaction.max_cpu_usage_ms, 0xff, "max_cpu_usage_ms"));
   writer.writeVarUint(assertUint(transaction.delay_sec, 0xffffffff, "delay_sec"));
   writer.writeVarUint(transaction.context_free_actions.length);
@@ -136,17 +140,36 @@ export function serializeTransaction(transaction: Transaction): Uint8Array {
   return writer.toBytes();
 }
 
+export function serializeContextFreeData(items: Uint8Array[]): Uint8Array {
+  if (!Array.isArray(items)) throw new TypeError("Context-free data must be an array");
+  const writer = new BinaryWriter();
+  writer.writeVarUint(items.length);
+  for (const item of items) {
+    if (!(item instanceof Uint8Array)) {
+      throw new TypeError("Each context-free data item must be Uint8Array");
+    }
+    writer.writeVarBytes(item);
+  }
+  return writer.toBytes();
+}
+
 export function transactionDigest(
   chainId: string,
   serializedTransaction: Uint8Array,
   contextFreeDataHash = new Uint8Array(32),
 ): Uint8Array {
-  const id = cryptoHexToBytes(chainId);
-  if (id.length !== 32) throw new TypeError("Antelope chain id must be 32 bytes");
+  if (!/^[0-9a-f]{64}$/i.test(chainId)) {
+    throw new TypeError("Antelope chain id must be exactly 64 hexadecimal characters");
+  }
+  if (!(serializedTransaction instanceof Uint8Array)) {
+    throw new TypeError("Serialized transaction must be Uint8Array");
+  }
   if (!(contextFreeDataHash instanceof Uint8Array) || contextFreeDataHash.length !== 32) {
     throw new TypeError("Context-free data hash must be 32 bytes");
   }
-  return sha256Digest(concatBytes(id, serializedTransaction, contextFreeDataHash));
+  return sha256Digest(
+    concatBytes(cryptoHexToBytes(chainId), serializedTransaction, contextFreeDataHash),
+  );
 }
 
 export type PrivateKeySignerOptions = {
@@ -198,9 +221,8 @@ export class AntelopeClient {
   readonly contracts: Readonly<ChainContracts>;
 
   constructor(options: AntelopeClientOptions) {
-    if (options.chainId) {
-      const chainId = cryptoHexToBytes(options.chainId);
-      if (chainId.length !== 32) throw new TypeError("Configured Antelope chain id must be 32 bytes");
+    if (options.chainId && !/^[0-9a-f]{64}$/i.test(options.chainId)) {
+      throw new TypeError("Configured Antelope chain id must be exactly 64 hexadecimal characters");
     }
     this.rpc = new RpcClient(options);
     this.abiCache = options.abiCache ?? new AbiCache();
@@ -221,7 +243,10 @@ export class AntelopeClient {
   }
 
   async transact<T = Record<string, unknown>>(args: TransactArgs): Promise<TransactResult<T>> {
-    if (!args.actions.length) throw new TypeError("Transaction must include at least one action");
+    const contextFreeActions = args.contextFreeActions ?? [];
+    if (!args.actions.length && !contextFreeActions.length) {
+      throw new TypeError("Transaction must include at least one action");
+    }
     const expireSeconds = args.expireSeconds ?? 120;
     if (!Number.isInteger(expireSeconds) || expireSeconds < 1 || expireSeconds > 3600) {
       throw new RangeError("expireSeconds must be an integer between 1 and 3600");
@@ -247,52 +272,89 @@ export class AntelopeClient {
       max_net_usage_words: 0,
       max_cpu_usage_ms: 0,
       delay_sec: 0,
-      context_free_actions: args.contextFreeActions ?? [],
+      context_free_actions: contextFreeActions,
       actions: args.actions,
       transaction_extensions: args.transactionExtensions ?? [],
     };
 
     const serializedTransaction = serializeTransaction(transaction);
-    const contextFreeDataHash = args.contextFreeData?.length
-      ? sha256Digest(args.contextFreeData)
+    const contextFreeData = args.contextFreeData ?? [];
+    const serializedContextFreeData = contextFreeData.length
+      ? serializeContextFreeData(contextFreeData)
+      : new Uint8Array();
+    const contextFreeDataHash = serializedContextFreeData.length
+      ? sha256Digest(serializedContextFreeData)
       : new Uint8Array(32);
     const digest = transactionDigest(actualChainId, serializedTransaction, contextFreeDataHash);
-    const availableKeys = await args.signer.getAvailableKeys();
+
+    const availableKeys = [...new Set(await args.signer.getAvailableKeys())];
     if (!availableKeys.length) throw new Error("Signer returned no available keys");
+    for (const key of availableKeys) PublicKey.fromString(key);
+
     const { required_keys: requiredKeys } = await this.rpc.getRequiredKeys(
       transactionForRpc(transaction),
       availableKeys,
       args.signal,
     );
+    if (!Array.isArray(requiredKeys)) throw new TypeError("RPC returned invalid required keys");
+    const normalizedRequiredKeys = requiredKeys.map((key) => PublicKey.fromString(key).toString());
+    if (new Set(normalizedRequiredKeys).size !== normalizedRequiredKeys.length) {
+      throw new TypeError("RPC returned duplicate required keys");
+    }
+
     const signed = await args.signer.sign({
       chainId: actualChainId,
       transaction,
       serializedTransaction,
+      serializedContextFreeData,
       digest,
       requiredKeys,
     });
-    const signatures = signed.map((signature) =>
-      typeof signature === "string" ? Signature.fromString(signature).toString() : signature.toString(),
+    const parsedSignatures = signed.map((value) =>
+      typeof value === "string" ? Signature.fromString(value) : value,
     );
-    if (signatures.length !== requiredKeys.length) {
+    if (parsedSignatures.length !== requiredKeys.length) {
       throw new Error(
-        `Signer returned ${signatures.length} signatures for ${requiredKeys.length} required keys`,
+        `Signer returned ${parsedSignatures.length} signatures for ${requiredKeys.length} required keys`,
       );
     }
 
+    const recoveredKeys = parsedSignatures.map((signature) =>
+      signature.recoverDigest(digest).toString(),
+    );
+    const requiredSet = new Set(normalizedRequiredKeys);
+    if (
+      new Set(recoveredKeys).size !== recoveredKeys.length ||
+      recoveredKeys.some((key) => !requiredSet.has(key))
+    ) {
+      throw new Error("Signer returned a signature that does not match the required keys");
+    }
+
+    const signatures = parsedSignatures.map((signature) => signature.toString());
     if (args.broadcast === false) {
-      return { transaction, serializedTransaction, signatures };
+      return {
+        transaction,
+        serializedTransaction,
+        serializedContextFreeData,
+        signatures,
+      };
     }
 
     const response = await this.rpc.pushTransaction<T>(
       {
         signatures,
         compression: 0,
-        packed_context_free_data: args.contextFreeData ? bytesToHex(args.contextFreeData) : "",
+        packed_context_free_data: bytesToHex(serializedContextFreeData),
         packed_trx: bytesToHex(serializedTransaction),
       },
       args.signal,
     );
-    return { transaction, serializedTransaction, signatures, response };
+    return {
+      transaction,
+      serializedTransaction,
+      serializedContextFreeData,
+      signatures,
+      response,
+    };
   }
 }
