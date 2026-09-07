@@ -4,6 +4,21 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const releasePackages = [
+  "core",
+  "crypto",
+  "abi",
+  "rpc",
+  "contract",
+  "account",
+  "antelope",
+  "signing-request",
+  "session",
+  "evm",
+  "solana",
+  "vexanium",
+  "wallet-plugin-wisp",
+];
 const nativePackages = [
   "crypto",
   "abi",
@@ -15,6 +30,7 @@ const nativePackages = [
   "session",
 ];
 const forbiddenDependencies = ["elliptic", "bn.js", "crypto-browserify", "randombytes"];
+const forbiddenPublicKeywords = new Set(["wharfkit", "sessionkit", "eos", "eosio"]);
 const forbiddenMarkdown = [
   { pattern: /\b(?:generated|written|built) by (?:an )?AI\b/i, label: "generated wording" },
   {
@@ -83,8 +99,18 @@ const rootPackage = await readJson("package.json");
 assert.equal(rootPackage.private, true, "Root package must remain private");
 assert.match(rootPackage.version, /^\d+\.\d+\.\d+$/, "Root version must be semantic");
 
+const packageDirectories = (await readdir(path.join(root, "packages"), { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+assert.deepEqual(
+  packageDirectories,
+  [...releasePackages].sort(),
+  "Every package workspace must be part of the coordinated release",
+);
+
 const manifests = new Map();
-for (const packageDirectory of nativePackages) {
+for (const packageDirectory of releasePackages) {
   const manifest = await readJson(`packages/${packageDirectory}/package.json`);
   assert.equal(manifest.name, `@windstack/${packageDirectory}`);
   manifests.set(manifest.name, manifest);
@@ -103,6 +129,11 @@ for (const packageDirectory of nativePackages) {
   );
   assert.equal(typeof manifest.description, "string", `${manifest.name} must have a description`);
   assert.ok(manifest.description.trim().length >= 20, `${manifest.name} description is too short`);
+  assert.doesNotMatch(
+    manifest.description,
+    /\b(?:WharfKit|EOSIO|EOS)\b/i,
+    `${manifest.name} description contains legacy branding`,
+  );
   assert.equal(manifest.main, "./dist/index.js", `${manifest.name} main entry is invalid`);
   assert.equal(manifest.types, "./dist/index.d.ts", `${manifest.name} type entry is invalid`);
   assert.ok(manifest.exports?.["."], `${manifest.name} must export its primary entrypoint`);
@@ -131,6 +162,12 @@ for (const packageDirectory of nativePackages) {
     manifest.files.includes("README.md") && manifest.files.includes("LICENSE"),
     `${manifest.name} must publish documentation and license`,
   );
+  for (const keyword of manifest.keywords ?? []) {
+    assert.ok(
+      !forbiddenPublicKeywords.has(String(keyword).toLowerCase()),
+      `${manifest.name} contains legacy public keyword ${keyword}`,
+    );
+  }
 
   const readme = await readFile(path.join(root, `packages/${packageDirectory}/README.md`), "utf8");
   assert.ok(readme.startsWith(`# ${manifest.name}\n`), `${manifest.name} README title is invalid`);
@@ -147,39 +184,29 @@ for (const packageDirectory of nativePackages) {
 
 const visiting = new Set();
 const visited = new Set();
-function visitNative(name) {
-  if (visiting.has(name)) throw new TypeError(`Circular native dependency detected at ${name}`);
+function visitRelease(name) {
+  if (visiting.has(name)) throw new TypeError(`Circular release dependency detected at ${name}`);
   if (visited.has(name)) return;
   visiting.add(name);
   for (const dependency of Object.keys(manifests.get(name)?.dependencies ?? {})) {
-    if (manifests.has(dependency)) visitNative(dependency);
+    if (manifests.has(dependency)) visitRelease(dependency);
   }
   visiting.delete(name);
   visited.add(name);
 }
-for (const name of manifests.keys()) visitNative(name);
+for (const name of manifests.keys()) visitRelease(name);
 
 for (const [name, manifest] of manifests) {
-  for (const [dependency, version] of Object.entries(manifest.dependencies ?? {})) {
-    assertDependencyAllowed(name, dependency);
-    if (manifests.has(dependency)) {
-      assert.equal(
-        version,
-        rootPackage.version,
-        `${name} must pin ${dependency} to ${rootPackage.version}`,
-      );
-    }
-  }
-}
-
-const packageDirectories = (await readdir(path.join(root, "packages"), { withFileTypes: true }))
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => entry.name);
-for (const packageDirectory of packageDirectories) {
-  const manifest = await readJson(`packages/${packageDirectory}/package.json`);
   for (const section of dependencySections(manifest)) {
-    for (const dependency of Object.keys(section)) {
-      assertDependencyAllowed(manifest.name ?? packageDirectory, dependency);
+    for (const [dependency, version] of Object.entries(section)) {
+      assertDependencyAllowed(name, dependency);
+      if (manifests.has(dependency) && dependency.startsWith("@windstack/")) {
+        assert.equal(
+          version,
+          rootPackage.version,
+          `${name} must pin ${dependency} to ${rootPackage.version}`,
+        );
+      }
     }
   }
 }
@@ -235,39 +262,32 @@ for (const file of markdownFiles) {
 }
 
 const lock = await readJson("package-lock.json");
-assert.equal(
-  lock.version,
-  rootPackage.version,
-  "package-lock root version must match package.json",
-);
+assert.equal(lock.version, rootPackage.version, "package-lock root version must match package.json");
 assert.equal(
   lock.packages?.[""]?.version,
   rootPackage.version,
   "package-lock root package version is stale",
 );
-for (const packageDirectory of nativePackages) {
-  const manifest = await readJson(`packages/${packageDirectory}/package.json`);
-  assert.equal(
-    lock.packages?.[`packages/${packageDirectory}`]?.version,
-    manifest.version,
-    `package-lock entry for ${manifest.name} is stale`,
-  );
-  assert.deepEqual(
-    lock.packages?.[`packages/${packageDirectory}`]?.dependencies ?? {},
-    manifest.dependencies ?? {},
-    `package-lock dependencies for ${manifest.name} are stale`,
-  );
-}
-for (const packageDirectory of packageDirectories) {
+for (const packageDirectory of releasePackages) {
   const manifest = await readJson(`packages/${packageDirectory}/package.json`);
   const lockManifest = lock.packages?.[`packages/${packageDirectory}`];
   assert.ok(lockManifest, `package-lock is missing ${manifest.name}`);
+  assert.equal(
+    lockManifest.version,
+    manifest.version,
+    `package-lock entry for ${manifest.name} is stale`,
+  );
   for (const sectionName of [
     "dependencies",
     "optionalDependencies",
     "peerDependencies",
     "devDependencies",
   ]) {
+    assert.deepEqual(
+      lockManifest?.[sectionName] ?? {},
+      manifest?.[sectionName] ?? {},
+      `package-lock ${sectionName} for ${manifest.name} is stale`,
+    );
     for (const dependency of Object.keys(lockManifest?.[sectionName] ?? {})) {
       assertDependencyAllowed(`${manifest.name} lockfile`, dependency);
     }
@@ -287,7 +307,9 @@ for (const manifest of manifests.values()) {
   for (const dependency of Object.keys(manifest.dependencies ?? {})) visitDependency(dependency);
 }
 for (const dependency of reachable) {
-  assertDependencyAllowed("Native dependency graph", dependency);
+  assertDependencyAllowed("Release dependency graph", dependency);
 }
 
-console.log(`Release guard passed for WindStack ${rootPackage.version}`);
+console.log(
+  `Release guard passed for ${releasePackages.length} WindStack packages at ${rootPackage.version}`,
+);
