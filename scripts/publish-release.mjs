@@ -1,24 +1,16 @@
+/**
+ * WindStack Antelope SDK
+ * Created by Gilang Ramadan
+ * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+ * SPDX-License-Identifier: MIT
+ */
 import { execFileSync, spawnSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const packageDirectories = [
-  "core",
-  "crypto",
-  "abi",
-  "rpc",
-  "contract",
-  "account",
-  "antelope",
-  "signing-request",
-  "session",
-  "evm",
-  "solana",
-  "vexanium",
-  "wallet-plugin-wisp",
-];
+const registry = "https://registry.npmjs.org/";
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 function run(command, args, options = {}) {
@@ -35,32 +27,90 @@ function run(command, args, options = {}) {
   return result;
 }
 
-function requireCleanMain() {
-  const branch = execFileSync("git", ["branch", "--show-current"], {
-    cwd: root,
-    encoding: "utf8",
-  }).trim();
+function git(args) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+}
+
+function requireReleaseState() {
+  const branch = git(["branch", "--show-current"]);
   if (branch !== "main") {
     throw new Error(`Release must run from main; current branch is ${branch || "detached"}`);
   }
-  const status = execFileSync("git", ["status", "--porcelain"], {
-    cwd: root,
-    encoding: "utf8",
-  }).trim();
-  if (status) throw new Error("Release requires a clean working tree");
+  if (git(["status", "--porcelain"])) {
+    throw new Error("Release requires a clean working tree");
+  }
+
+  run("git", ["fetch", "--quiet", "origin", "main"]);
+  const head = git(["rev-parse", "HEAD"]);
+  const remoteHead = git(["rev-parse", "origin/main"]);
+  if (head !== remoteHead) {
+    throw new Error("Release requires local main to match origin/main exactly");
+  }
+}
+
+async function loadReleaseManifests() {
+  const rootManifest = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+  const entries = (await readdir(path.join(root, "packages"), { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+
+  const manifests = [];
+  for (const directory of entries) {
+    const manifest = JSON.parse(
+      await readFile(path.join(root, "packages", directory, "package.json"), "utf8"),
+    );
+    if (!manifest.name?.startsWith("@windstack/")) {
+      throw new Error(`Unexpected workspace package name in packages/${directory}`);
+    }
+    if (manifest.version !== rootManifest.version) {
+      throw new Error(`${manifest.name} does not match root version ${rootManifest.version}`);
+    }
+    manifests.push({ directory, manifest });
+  }
+  return manifests;
+}
+
+function dependencyNames(manifest) {
+  return new Set([
+    ...Object.keys(manifest.dependencies ?? {}),
+    ...Object.keys(manifest.optionalDependencies ?? {}),
+    ...Object.keys(manifest.peerDependencies ?? {}),
+  ]);
+}
+
+function sortForPublish(entries) {
+  const byName = new Map(entries.map((entry) => [entry.manifest.name, entry]));
+  const ordered = [];
+  const visiting = new Set();
+  const visited = new Set();
+
+  function visit(entry) {
+    const name = entry.manifest.name;
+    if (visited.has(name)) return;
+    if (visiting.has(name)) throw new Error(`Circular release dependency detected at ${name}`);
+    visiting.add(name);
+
+    const internalDependencies = [...dependencyNames(entry.manifest)]
+      .filter((dependency) => byName.has(dependency))
+      .sort();
+    for (const dependency of internalDependencies) visit(byName.get(dependency));
+
+    visiting.delete(name);
+    visited.add(name);
+    ordered.push(entry);
+  }
+
+  for (const entry of [...entries].sort((a, b) => a.manifest.name.localeCompare(b.manifest.name))) {
+    visit(entry);
+  }
+  return ordered;
 }
 
 function publishedVersion(name, version) {
   const result = run(
     "npm",
-    [
-      "view",
-      `${name}@${version}`,
-      "version",
-      "--json",
-      "--registry",
-      "https://registry.npmjs.org/",
-    ],
+    ["view", `${name}@${version}`, "version", "--json", "--registry", registry],
     { capture: true, allowFailure: true },
   );
   if (result.status === 0) {
@@ -72,14 +122,24 @@ function publishedVersion(name, version) {
   throw new Error(`Unable to query npm for ${name}@${version}: ${output.trim()}`);
 }
 
-requireCleanMain();
+async function waitForPublishedVersion(name, version) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    if (publishedVersion(name, version)) return;
+    await sleep(2000);
+  }
+  throw new Error(`npm did not confirm ${name}@${version} after publish`);
+}
+
+requireReleaseState();
+const releaseEntries = sortForPublish(await loadReleaseManifests());
+console.log(
+  `WindStack publish order:\n${releaseEntries.map(({ manifest }) => `- ${manifest.name}@${manifest.version}`).join("\n")}`,
+);
+
 run("npm", ["whoami"]);
 run("npm", ["run", "release:dry-run"]);
 
-for (const directory of packageDirectories) {
-  const manifest = JSON.parse(
-    await readFile(path.join(root, "packages", directory, "package.json"), "utf8"),
-  );
+for (const { manifest } of releaseEntries) {
   const { name, version } = manifest;
   if (publishedVersion(name, version)) {
     console.log(`${name}@${version} is already published; skipping.`);
@@ -94,18 +154,15 @@ for (const directory of packageDirectories) {
     "--access",
     "public",
     "--registry",
-    "https://registry.npmjs.org/",
+    registry,
   ]);
+  await waitForPublishedVersion(name, version);
+}
 
-  let verified = false;
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    if (publishedVersion(name, version)) {
-      verified = true;
-      break;
-    }
-    await sleep(1500);
+for (const { manifest } of releaseEntries) {
+  if (!publishedVersion(manifest.name, manifest.version)) {
+    throw new Error(`Final registry verification failed for ${manifest.name}@${manifest.version}`);
   }
-  if (!verified) throw new Error(`npm did not confirm ${name}@${version} after publish`);
 }
 
 console.log("All WindStack 1.0 release packages are published and verified.");
