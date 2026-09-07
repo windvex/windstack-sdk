@@ -1,57 +1,49 @@
 # @windstack/core
 
-Shared provider types and browser-safe utilities for the Wind Stack SDK.
+## Overview
+
+`@windstack/core` contains shared provider contracts, error types, event utilities, browser helpers, and application metadata utilities used across WindStack wallet-facing packages.
+
+The exported `WISP_PROVIDER_CONTRACT` keeps provider identity, error codes, Vexanium provider identifiers, EVM chain identifiers, method names, capabilities, and discovery events consistent across packages.
+
+## Installation
 
 ```bash
 npm install @windstack/core
 ```
 
-## Provider contract
-
-`WISP_PROVIDER_CONTRACT` is the runtime single source used by the WindStack EVM
-and Vexanium packages for provider identity, method names, discovery events,
-chain identifiers, protocol version, capabilities, and provider error codes.
+## Usage
 
 ```ts
-import { WISP_PROVIDER_CONTRACT } from "@windstack/core";
-
-console.log(WISP_PROVIDER_CONTRACT.vex.standard); // VexaniumProvider
-console.log(WISP_PROVIDER_CONTRACT.evm.chainIdHex); // 0x1a50
-console.log(WISP_PROVIDER_CONTRACT.errors.userRejected); // 4001
-```
-
-The machine-readable repository specification at
-`specs/wisp-provider-contract.json` is regression-tested against this export.
-Wisp Wallet synchronizes its provider runtime from that specification.
-
-## dApp metadata
-
-`resolveDappMetadata()` combines explicit values with the current document title, description, URL, and icons. URLs are restricted to safe web/image schemes.
-
-```ts
-import { resolveDappMetadata } from "@windstack/core";
+import {
+  WISP_PROVIDER_CONTRACT,
+  WispEventEmitter,
+  normalizeProviderError,
+  resolveDappMetadata,
+} from "@windstack/core";
 
 const metadata = resolveDappMetadata({
   name: "My App",
   url: "https://app.example",
   icon: "https://app.example/icon.png",
 });
+
+console.log(WISP_PROVIDER_CONTRACT.vex.standard);
+console.log(WISP_PROVIDER_CONTRACT.evm.chainIdHex);
 ```
 
-Metadata is only for display. A wallet must derive the trusted origin from its transport, such as the browser extension sender, rather than accepting an origin supplied by a dApp.
+`resolveDappMetadata()` combines explicit application metadata with safe values available from the current document. Provider error normalization preserves numeric wallet error codes, while `WispEventEmitter` supplies typed listener registration and cleanup for provider clients.
 
-## Errors and events
+## Security
 
-```ts
-import {
-  WispEventEmitter,
-  WispProviderError,
-  normalizeProviderError,
-} from "@windstack/core";
-```
+Application metadata is display information only. Wallet permission state should be bound to an authoritative transport origin, such as the browser extension sender origin, instead of trusting an origin supplied by application content.
 
-`WISP_ERROR_CODES` is derived from the provider contract. `normalizeProviderError()` preserves numeric provider error codes. `WispEventEmitter` provides typed `on`, `off`, `once`, and listener cleanup methods for SDK packages.
+## Runtime
+
+The package is browser-safe and contains no chain-signing implementation. It is designed to be shared by provider clients without requiring a blockchain runtime or private-key dependency.
 
 ## License
 
-MIT, PT WIND KRIPTOGRAFI TEKNOLOGI.
+MIT License.
+
+Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.
