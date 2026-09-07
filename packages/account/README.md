@@ -68,7 +68,7 @@ await account.updatePermission(
 );
 ```
 
-The package also exposes `deletePermission()`, `linkPermission()`, `unlinkPermission()`, `createAccount()`, `registerProxy()`, `unregisterProducer()`, `claimRewards()`, `refund()`, `buyRamSelf()`, and `buyRamBytes()`.
+The package also exposes `deletePermission()`, `linkPermission()`, `unlinkPermission()`, `createAccount()`, `registerProxy()`, `unregisterProxy()`, `unregisterProducer()`, `claimRewards()`, `refund()`, `buyRamSelf()`, and `buyRamBytes()`.
 
 ## Runtime
 

@@ -6,6 +6,7 @@
  */
 import { nameToBigInt } from "@windstack/abi";
 import { AbiCache, Contract, type ContractAction } from "@windstack/contract";
+import { PublicKey } from "@windstack/crypto";
 import { RpcClient } from "@windstack/rpc";
 
 export type AccountClientOptions = {
@@ -34,6 +35,7 @@ function validateName(value: string, label: string): string {
 }
 
 function validateOptionalName(value: string, label: string): string {
+  if (typeof value !== "string") throw new TypeError(`${label} must be a string`);
   if (value) nameToBigInt(value);
   return value;
 }
@@ -41,6 +43,62 @@ function validateOptionalName(value: string, label: string): string {
 function validateLocation(value: number): number {
   if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
     throw new RangeError("Producer location must be an integer between 0 and 65535");
+  }
+  return value;
+}
+
+function validateAuthority(authority: Authority, label: string): Authority {
+  if (!authority || typeof authority !== "object") throw new TypeError(`${label} is required`);
+  if (
+    !Number.isInteger(authority.threshold) ||
+    authority.threshold < 1 ||
+    authority.threshold > 0xffffffff
+  ) {
+    throw new RangeError(`${label} threshold must be an integer between 1 and 4294967295`);
+  }
+  if (
+    !Array.isArray(authority.keys) ||
+    !Array.isArray(authority.accounts) ||
+    !Array.isArray(authority.waits)
+  ) {
+    throw new TypeError(`${label} keys, accounts, and waits must be arrays`);
+  }
+
+  const keyIds = new Set<string>();
+  const keys = authority.keys.map((item) => {
+    const key = PublicKey.fromString(item.key).toString();
+    if (keyIds.has(key)) throw new TypeError(`${label} contains duplicate public keys`);
+    keyIds.add(key);
+    return { key: item.key, weight: validateWeight(item.weight, `${label} key weight`) };
+  });
+  const accountIds = new Set<string>();
+  const accounts = authority.accounts.map((item) => {
+    const actor = validateName(item.permission.actor, `${label} account actor`);
+    const permission = validateName(item.permission.permission, `${label} account permission`);
+    const id = `${actor}@${permission}`;
+    if (accountIds.has(id)) throw new TypeError(`${label} contains duplicate permission levels`);
+    accountIds.add(id);
+    return {
+      permission: { actor, permission },
+      weight: validateWeight(item.weight, `${label} account weight`),
+    };
+  });
+  const waits = authority.waits.map((item) => {
+    if (!Number.isInteger(item.wait_sec) || item.wait_sec < 0 || item.wait_sec > 0xffffffff) {
+      throw new RangeError(`${label} wait_sec must fit in uint32`);
+    }
+    return { wait_sec: item.wait_sec, weight: validateWeight(item.weight, `${label} wait weight`) };
+  });
+  const totalWeight = [...keys, ...accounts, ...waits].reduce((sum, item) => sum + item.weight, 0);
+  if (authority.threshold > totalWeight) {
+    throw new RangeError(`${label} threshold exceeds the total available weight`);
+  }
+  return { threshold: authority.threshold, keys, accounts, waits };
+}
+
+function validateWeight(value: number, label: string): number {
+  if (!Number.isInteger(value) || value < 1 || value > 0xffff) {
+    throw new RangeError(`${label} must be an integer between 1 and 65535`);
   }
   return value;
 }
@@ -157,6 +215,16 @@ export class AccountClient {
     );
   }
 
+  stake(
+    receiver: string,
+    stakeNetQuantity: string,
+    stakeCpuQuantity: string,
+    transfer = false,
+    signal?: AbortSignal,
+  ): Promise<ContractAction> {
+    return this.delegate(receiver, stakeNetQuantity, stakeCpuQuantity, transfer, signal);
+  }
+
   undelegate(
     receiver: string,
     unstakeNetQuantity: string,
@@ -174,6 +242,15 @@ export class AccountClient {
       "active",
       signal,
     );
+  }
+
+  unstake(
+    receiver: string,
+    unstakeNetQuantity: string,
+    unstakeCpuQuantity: string,
+    signal?: AbortSignal,
+  ): Promise<ContractAction> {
+    return this.undelegate(receiver, unstakeNetQuantity, unstakeCpuQuantity, signal);
   }
 
   buyRam(receiver: string, quantity: string, signal?: AbortSignal): Promise<ContractAction> {
@@ -278,6 +355,13 @@ export class AccountClient {
     );
   }
 
+  unregisterProxy(
+    options: SystemActionOptions = {},
+    signal?: AbortSignal,
+  ): Promise<ContractAction> {
+    return this.registerProxy(false, options, signal);
+  }
+
   registerProducer(
     producerKey: string,
     url: string,
@@ -286,6 +370,7 @@ export class AccountClient {
     signal?: AbortSignal,
   ): Promise<ContractAction> {
     if (typeof url !== "string") throw new TypeError("Producer URL must be a string");
+    PublicKey.fromString(producerKey);
     return this.systemAction(
       "regproducer",
       {
@@ -311,10 +396,7 @@ export class AccountClient {
     );
   }
 
-  claimRewards(
-    options: SystemActionOptions = {},
-    signal?: AbortSignal,
-  ): Promise<ContractAction> {
+  claimRewards(options: SystemActionOptions = {}, signal?: AbortSignal): Promise<ContractAction> {
     return this.systemAction(
       "claimrewards",
       { owner: this.name },
@@ -335,8 +417,8 @@ export class AccountClient {
       {
         creator: this.name,
         name: validateName(accountName, "New account name"),
-        owner,
-        active,
+        owner: validateAuthority(owner, "Owner authority"),
+        active: validateAuthority(active, "Active authority"),
       },
       options.permission ?? "active",
       signal,
@@ -357,7 +439,7 @@ export class AccountClient {
         account: this.name,
         permission: validateName(permission, "Permission"),
         parent: validateOptionalName(parent, "Parent permission"),
-        auth: authority,
+        auth: validateAuthority(authority, "Permission authority"),
         authorized_by: authorizedBy
           ? validateName(authorizedBy, "Authorized-by permission")
           : undefined,

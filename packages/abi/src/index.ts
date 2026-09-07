@@ -7,15 +7,52 @@
 import { PublicKey, Signature } from "@windstack/crypto";
 
 const encoder = new TextEncoder();
-const decoder = new TextDecoder();
+const decoder = new TextDecoder("utf-8", { fatal: true });
 const NAME_CHARS = ".12345abcdefghijklmnopqrstuvwxyz";
 const BLOCK_TIMESTAMP_EPOCH_MS = Date.UTC(2000, 0, 1);
+const PRIMITIVE_TYPES = new Set([
+  "asset",
+  "block_timestamp_type",
+  "bool",
+  "bytes",
+  "checksum160",
+  "checksum256",
+  "checksum512",
+  "extended_asset",
+  "float128",
+  "float32",
+  "float64",
+  "int128",
+  "int16",
+  "int32",
+  "int64",
+  "int8",
+  "name",
+  "public_key",
+  "publickey",
+  "signature",
+  "string",
+  "symbol",
+  "symbol_code",
+  "time_point",
+  "time_point_sec",
+  "uint128",
+  "uint16",
+  "uint32",
+  "uint64",
+  "uint8",
+  "varint",
+  "varint32",
+  "varuint",
+  "varuint32",
+]);
 
 export type AbiField = { name: string; type: string };
 export type AbiStruct = { name: string; base?: string; fields: AbiField[] };
 export type AbiTypeDef = { new_type_name: string; type: string };
 export type AbiAction = { name: string; type: string; ricardian_contract?: string };
 export type AbiVariant = { name: string; types: string[] };
+export type AbiActionResult = { name: string; result_type: string };
 export type AbiTable = {
   name: string;
   index_type: string;
@@ -30,6 +67,7 @@ export type Abi = {
   actions?: AbiAction[];
   tables?: AbiTable[];
   variants?: AbiVariant[];
+  action_results?: AbiActionResult[];
   [key: string]: unknown;
 };
 
@@ -45,12 +83,19 @@ function assertBigIntRange(value: bigint, bits: number, signed: boolean, label: 
   const min = signed ? -(1n << (width - 1n)) : 0n;
   const max = signed ? (1n << (width - 1n)) - 1n : (1n << width) - 1n;
   if (value < min || value > max) {
-    throw new RangeError(`${label} is outside the ${signed ? "signed" : "unsigned"} ${bits}-bit range`);
+    throw new RangeError(
+      `${label} is outside the ${signed ? "signed" : "unsigned"} ${bits}-bit range`,
+    );
   }
   return value;
 }
 
 function toBigInt(value: unknown, label: string): bigint {
+  if (typeof value === "number" && !Number.isSafeInteger(value)) {
+    throw new TypeError(
+      `${label} must use bigint or a decimal string outside the safe integer range`,
+    );
+  }
   try {
     return BigInt(value as string | number | bigint);
   } catch {
@@ -250,11 +295,12 @@ export class BinaryReader {
 
   readUint32(): number {
     return (
-      this.readByte() |
-      (this.readByte() << 8) |
-      (this.readByte() << 16) |
-      (this.readByte() << 24)
-    ) >>> 0;
+      (this.readByte() |
+        (this.readByte() << 8) |
+        (this.readByte() << 16) |
+        (this.readByte() << 24)) >>>
+      0
+    );
   }
 
   readInt32(): number {
@@ -333,13 +379,42 @@ export class BinaryReader {
   }
 }
 
-function parseAsset(value: string): { amount: bigint; precision: number; symbol: string } {
-  const match = /^(-?)(\d+)(?:\.(\d+))? ([A-Z]{1,7})$/.exec(value);
+export type AssetValue = Readonly<{
+  amount: bigint;
+  precision: number;
+  symbol: string;
+  value: string;
+}>;
+
+export function parseAsset(value: string): AssetValue {
+  const match = /^(-?)(0|[1-9]\d*)(?:\.(\d+))? ([A-Z]{1,7})$/.exec(value);
   if (!match) throw new TypeError(`Invalid asset: ${value}`);
   const fraction = match[3] ?? "";
+  assertInteger(fraction.length, 0, 18, "asset precision");
   const amount = BigInt(`${match[1]}${match[2]}${fraction}`);
   assertBigIntRange(amount, 64, true, "asset amount");
-  return { amount, precision: fraction.length, symbol: match[4]! };
+  return Object.freeze({
+    amount,
+    precision: fraction.length,
+    symbol: match[4]!,
+    value,
+  });
+}
+
+export function formatAsset(
+  amount: bigint | string | number,
+  precision: number,
+  symbol: string,
+): string {
+  const units = assertBigIntRange(toBigInt(amount, "asset amount"), 64, true, "asset amount");
+  validateSymbol(symbol);
+  assertInteger(precision, 0, 18, "symbol precision");
+  const negative = units < 0n;
+  const digits = (negative ? -units : units).toString().padStart(precision + 1, "0");
+  const quantity = precision
+    ? `${digits.slice(0, -precision)}.${digits.slice(-precision)}`
+    : digits;
+  return `${negative ? "-" : ""}${quantity} ${symbol}`;
 }
 
 function validateSymbol(symbol: string): string {
@@ -363,7 +438,8 @@ function symbolFromBigInt(raw: bigint): { precision: number; symbol: string } {
   let symbol = "";
   while (value > 0n) {
     const code = Number(value & 0xffn);
-    if (code === 0 || code < 65 || code > 90) throw new TypeError("Invalid encoded Antelope symbol");
+    if (code === 0 || code < 65 || code > 90)
+      throw new TypeError("Invalid encoded Antelope symbol");
     symbol += String.fromCharCode(code);
     value >>= 8n;
   }
@@ -375,7 +451,8 @@ function timePointToMicros(value: unknown): bigint {
   if (typeof value === "bigint" || typeof value === "number") {
     return assertBigIntRange(toBigInt(value, "time_point"), 64, true, "time_point");
   }
-  if (typeof value !== "string") throw new TypeError("time_point expects an ISO timestamp or microseconds");
+  if (typeof value !== "string")
+    throw new TypeError("time_point expects an ISO timestamp or microseconds");
   if (/^-?\d+$/.test(value)) return assertBigIntRange(BigInt(value), 64, true, "time_point");
   const match = /^(.+T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})?$/.exec(value);
   if (!match) throw new TypeError(`Invalid time_point: ${value}`);
@@ -397,13 +474,20 @@ function microsToTimePoint(value: bigint): string {
 
 function blockTimestampToSlot(value: unknown): number {
   if (typeof value === "number") return assertInteger(value, 0, 0xffffffff, "block_timestamp_type");
-  if (typeof value !== "string") throw new TypeError("block_timestamp_type expects an ISO timestamp or slot number");
-  if (/^\d+$/.test(value)) return assertInteger(Number(value), 0, 0xffffffff, "block_timestamp_type");
+  if (typeof value !== "string")
+    throw new TypeError("block_timestamp_type expects an ISO timestamp or slot number");
+  if (/^\d+$/.test(value))
+    return assertInteger(Number(value), 0, 0xffffffff, "block_timestamp_type");
   const timestamp = Date.parse(/(?:Z|[+-]\d\d:\d\d)$/.test(value) ? value : `${value}Z`);
   if (!Number.isFinite(timestamp) || timestamp < BLOCK_TIMESTAMP_EPOCH_MS) {
     throw new TypeError(`Invalid block_timestamp_type: ${value}`);
   }
-  return assertInteger(Math.floor((timestamp - BLOCK_TIMESTAMP_EPOCH_MS) / 500), 0, 0xffffffff, "block_timestamp_type");
+  return assertInteger(
+    Math.floor((timestamp - BLOCK_TIMESTAMP_EPOCH_MS) / 500),
+    0,
+    0xffffffff,
+    "block_timestamp_type",
+  );
 }
 
 function decodeAsset(reader: BinaryReader): string {
@@ -449,9 +533,102 @@ export class AbiSerializer {
       throw new TypeError("A valid Antelope ABI is required");
     }
     this.abi = abi;
-    for (const type of abi.types ?? []) this.#aliases.set(type.new_type_name, type.type);
-    for (const struct of abi.structs ?? []) this.#structs.set(struct.name, struct);
-    for (const variant of abi.variants ?? []) this.#variants.set(variant.name, variant);
+    for (const type of abi.types ?? []) {
+      if (this.#aliases.has(type.new_type_name)) {
+        throw new TypeError(`Duplicate ABI alias: ${type.new_type_name}`);
+      }
+      this.#aliases.set(type.new_type_name, type.type);
+    }
+    for (const struct of abi.structs ?? []) {
+      if (this.#structs.has(struct.name))
+        throw new TypeError(`Duplicate ABI struct: ${struct.name}`);
+      this.#structs.set(struct.name, struct);
+    }
+    for (const variant of abi.variants ?? []) {
+      if (this.#variants.has(variant.name)) {
+        throw new TypeError(`Duplicate ABI variant: ${variant.name}`);
+      }
+      this.#variants.set(variant.name, variant);
+    }
+    this.validate();
+  }
+
+  validate(): void {
+    for (const [name] of this.#aliases) this.#validateTypeReference(name, `alias ${name}`);
+
+    for (const struct of this.#structs.values()) {
+      if (struct.base) this.#validateBase(struct.name, new Set());
+      let extensionStarted = false;
+      const fieldNames = new Set<string>();
+      for (const field of struct.fields) {
+        if (!field.name || fieldNames.has(field.name)) {
+          throw new TypeError(
+            `Invalid or duplicate field in ABI struct ${struct.name}: ${field.name}`,
+          );
+        }
+        fieldNames.add(field.name);
+        if (field.type.endsWith("$")) extensionStarted = true;
+        else if (extensionStarted) {
+          throw new TypeError(`Binary-extension fields must be last in ABI struct ${struct.name}`);
+        }
+        this.#validateTypeReference(field.type, `field ${struct.name}.${field.name}`);
+      }
+    }
+
+    for (const variant of this.#variants.values()) {
+      if (!variant.types.length)
+        throw new TypeError(`ABI variant ${variant.name} has no alternatives`);
+      for (const type of variant.types) {
+        this.#validateTypeReference(type, `variant ${variant.name}`);
+      }
+    }
+
+    this.#validateNamedTypes(this.abi.actions ?? [], "action", (item) => item.type);
+    this.#validateNamedTypes(this.abi.tables ?? [], "table", (item) => item.type);
+    this.#validateNamedTypes(
+      this.abi.action_results ?? [],
+      "action result",
+      (item) => item.result_type,
+    );
+  }
+
+  #validateNamedTypes<T extends { name: string }>(
+    items: readonly T[],
+    label: string,
+    getType: (item: T) => string,
+  ): void {
+    const names = new Set<string>();
+    for (const item of items) {
+      if (!item.name || names.has(item.name))
+        throw new TypeError(`Invalid or duplicate ABI ${label}: ${item.name}`);
+      names.add(item.name);
+      this.#validateTypeReference(getType(item), `${label} ${item.name}`);
+    }
+  }
+
+  #validateBase(name: string, seen: Set<string>): void {
+    if (seen.has(name))
+      throw new TypeError(`Cyclic ABI struct inheritance: ${[...seen, name].join(" -> ")}`);
+    const struct = this.#structs.get(name);
+    if (!struct?.base) return;
+    const base = this.resolveType(struct.base);
+    if (!this.#structs.has(base))
+      throw new TypeError(`Unknown ABI base struct ${struct.base} for ${name}`);
+    this.#validateBase(base, new Set([...seen, name]));
+  }
+
+  #validateTypeReference(rawType: string, context: string): void {
+    if (typeof rawType !== "string" || !rawType)
+      throw new TypeError(`Missing ABI type for ${context}`);
+    if (rawType.endsWith("[]")) return this.#validateTypeReference(rawType.slice(0, -2), context);
+    if (rawType.endsWith("?") || rawType.endsWith("$")) {
+      return this.#validateTypeReference(rawType.slice(0, -1), context);
+    }
+    const type = this.resolveType(rawType);
+    if (type !== rawType) return this.#validateTypeReference(type, context);
+    if (!PRIMITIVE_TYPES.has(type) && !this.#structs.has(type) && !this.#variants.has(type)) {
+      throw new TypeError(`Unsupported ABI type ${type} referenced by ${context}`);
+    }
   }
 
   resolveType(type: string): string {
@@ -515,11 +692,16 @@ export class AbiSerializer {
       return;
     }
     if (rawType.endsWith("$")) {
-      if (value !== null && value !== undefined) this.#encodeType(writer, rawType.slice(0, -1), value);
+      if (value !== null && value !== undefined)
+        this.#encodeType(writer, rawType.slice(0, -1), value);
       return;
     }
 
     const type = this.resolveType(rawType);
+    if (type !== rawType && /(?:\[\]|\?|\$)$/.test(type)) {
+      this.#encodeType(writer, type, value);
+      return;
+    }
     const struct = this.#structs.get(type);
     if (struct) {
       if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -533,7 +715,8 @@ export class AbiSerializer {
 
     const variant = this.#variants.get(type);
     if (variant) {
-      if (value === null || value === undefined) throw new TypeError(`${type} expects a variant value`);
+      if (value === null || value === undefined)
+        throw new TypeError(`${type} expects a variant value`);
       const pair = Array.isArray(value)
         ? value
         : [String((value as { type: string }).type), (value as { value: unknown }).value];
@@ -606,7 +789,11 @@ export class AbiSerializer {
         writer.writeString(value);
         return;
       case "bytes":
-        writer.writeVarBytes(typeof value === "string" ? hexToBytes(value) : assertHexBytes(value, (value as Uint8Array).length, type));
+        writer.writeVarBytes(
+          typeof value === "string"
+            ? hexToBytes(value)
+            : assertHexBytes(value, (value as Uint8Array).length, type),
+        );
         return;
       case "checksum160":
         writer.writeBytes(assertHexBytes(value, 20, type));
@@ -645,9 +832,12 @@ export class AbiSerializer {
         writer.writeInt64(timePointToMicros(value));
         return;
       case "time_point_sec": {
-        const seconds = typeof value === "string"
-          ? Math.floor(Date.parse(/(?:Z|[+-]\d\d:\d\d)$/.test(value) ? value : `${value}Z`) / 1000)
-          : toNumber(value, type);
+        const seconds =
+          typeof value === "string"
+            ? Math.floor(
+                Date.parse(/(?:Z|[+-]\d\d:\d\d)$/.test(value) ? value : `${value}Z`) / 1000,
+              )
+            : toNumber(value, type);
         writer.writeUint32(assertInteger(seconds, 0, 0xffffffff, type));
         return;
       }
@@ -679,7 +869,8 @@ export class AbiSerializer {
     }
     if (rawType.endsWith("?")) {
       const present = reader.readByte();
-      if (present !== 0 && present !== 1) throw new TypeError(`Invalid optional marker: ${present}`);
+      if (present !== 0 && present !== 1)
+        throw new TypeError(`Invalid optional marker: ${present}`);
       return present ? this.#decodeType(reader, rawType.slice(0, -1)) : null;
     }
     if (rawType.endsWith("$")) {
@@ -687,6 +878,9 @@ export class AbiSerializer {
     }
 
     const type = this.resolveType(rawType);
+    if (type !== rawType && /(?:\[\]|\?|\$)$/.test(type)) {
+      return this.#decodeType(reader, type);
+    }
     const struct = this.#structs.get(type);
     if (struct) {
       const out: Record<string, unknown> = {};
@@ -787,12 +981,14 @@ export class AbiSerializer {
       case "public_key":
       case "publickey": {
         const keyType = reader.readByte();
-        if (keyType !== 0 && keyType !== 1) throw new TypeError(`Unsupported public-key type: ${keyType}`);
+        if (keyType !== 0 && keyType !== 1)
+          throw new TypeError(`Unsupported public-key type: ${keyType}`);
         return PublicKey.fromBytes(keyType === 0 ? "K1" : "R1", reader.readBytes(33)).toString();
       }
       case "signature": {
         const keyType = reader.readByte();
-        if (keyType !== 0 && keyType !== 1) throw new TypeError(`Unsupported signature type: ${keyType}`);
+        if (keyType !== 0 && keyType !== 1)
+          throw new TypeError(`Unsupported signature type: ${keyType}`);
         return Signature.fromBytes(keyType === 0 ? "K1" : "R1", reader.readBytes(65)).toString();
       }
       default:

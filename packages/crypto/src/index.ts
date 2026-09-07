@@ -18,6 +18,11 @@ function curveFor(type: KeyType) {
   return type === "K1" ? secp256k1 : p256;
 }
 
+function assertKeyType(type: KeyType): void {
+  if (type !== "K1" && type !== "R1")
+    throw new TypeError(`Unsupported Antelope key type: ${String(type)}`);
+}
+
 function assertBytes(value: Uint8Array, length: number, label: string): void {
   if (!(value instanceof Uint8Array) || value.length !== length) {
     throw new TypeError(`${label} must be ${length} bytes`);
@@ -141,6 +146,7 @@ export class PublicKey {
   readonly #data: Uint8Array;
 
   private constructor(type: KeyType, data: Uint8Array) {
+    assertKeyType(type);
     assertBytes(data, 33, "Public key");
     if (!curveFor(type).utils.isValidPublicKey(data)) {
       throw new TypeError(`Invalid ${type} public key`);
@@ -198,9 +204,17 @@ export class Signature {
   readonly #data: Uint8Array;
 
   private constructor(type: KeyType, data: Uint8Array) {
+    assertKeyType(type);
     assertBytes(data, 65, "Signature");
     if (data[0]! < 31 || data[0]! > 34) {
       throw new TypeError("Invalid Antelope recovery header");
+    }
+    try {
+      const parsed = curveFor(type).Signature.fromBytes(data.slice(1), "compact");
+      if (parsed.hasHighS()) throw new TypeError("Antelope signatures must use low-S form");
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes("low-S")) throw error;
+      throw new TypeError(`Invalid ${type} compact signature`);
     }
     this.type = type;
     this.#data = data.slice();
@@ -259,6 +273,7 @@ export class PrivateKey {
   readonly #data: Uint8Array;
 
   private constructor(type: KeyType, data: Uint8Array) {
+    assertKeyType(type);
     assertBytes(data, 32, "Private key");
     if (!curveFor(type).utils.isValidSecretKey(data)) {
       throw new TypeError(`Invalid ${type} private key`);

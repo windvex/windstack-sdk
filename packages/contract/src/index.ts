@@ -39,19 +39,35 @@ function normalizeTableScope(value: TableScope): string {
   if (typeof value !== "string" || !value.trim()) {
     throw new TypeError("Table scope must be a non-empty string or non-negative integer");
   }
-  return value;
+  const normalized = value.trim();
+  if (/^\d+$/.test(normalized)) {
+    const integer = BigInt(normalized);
+    if (integer > 0xffffffffffffffffn) {
+      throw new RangeError("Table scope integer must fit in uint64");
+    }
+    return integer.toString();
+  }
+  if (/^[A-Z]{1,7}$/.test(normalized)) return normalized;
+  try {
+    nameToBigInt(normalized);
+  } catch {
+    throw new TypeError("Table scope must be name-like, symbol-like, or a uint64 value");
+  }
+  return normalized;
 }
 
 export class AbiCache {
   readonly #entries = new Map<string, { abi: Abi; expiresAt: number }>();
+  readonly #pending = new Map<string, Promise<Abi>>();
 
   constructor(readonly ttlMs = 5 * 60_000) {
-    if (!Number.isFinite(ttlMs) || ttlMs < 0) throw new RangeError("ABI cache TTL must be non-negative");
+    if (!Number.isFinite(ttlMs) || ttlMs < 0)
+      throw new RangeError("ABI cache TTL must be non-negative");
   }
 
   get(account: string): Abi | undefined {
     const entry = this.#entries.get(account);
-    if (!entry || entry.expiresAt < Date.now()) {
+    if (!entry || entry.expiresAt <= Date.now()) {
       this.#entries.delete(account);
       return undefined;
     }
@@ -68,6 +84,23 @@ export class AbiCache {
 
   clear(): void {
     this.#entries.clear();
+  }
+
+  async getOrLoad(account: string, loader: () => Promise<Abi>): Promise<Abi> {
+    const cached = this.get(account);
+    if (cached) return cached;
+    const pending = this.#pending.get(account);
+    if (pending) return pending;
+    const request = loader()
+      .then((abi) => {
+        this.set(account, abi);
+        return abi;
+      })
+      .finally(() => {
+        this.#pending.delete(account);
+      });
+    this.#pending.set(account, request);
+    return request;
   }
 }
 
@@ -93,7 +126,6 @@ export class Contract {
   readonly account: string;
   readonly rpc: RpcClient;
   readonly abiCache: AbiCache;
-  #pendingAbi: Promise<Abi> | null = null;
 
   constructor(account: string, rpc: RpcClient, abiCache = new AbiCache()) {
     this.account = validateName(account, "Contract account");
@@ -105,7 +137,6 @@ export class Contract {
     if (!force) {
       const cached = this.abiCache.get(this.account);
       if (cached) return cached;
-      if (this.#pendingAbi) return this.#pendingAbi;
     }
 
     const load = async (): Promise<Abi> => {
@@ -115,15 +146,23 @@ export class Contract {
       }
       const abi = result.abi as Abi;
       new AbiSerializer(abi);
-      this.abiCache.set(this.account, abi);
       return abi;
     };
 
-    if (force) return load();
-    this.#pendingAbi = load().finally(() => {
-      this.#pendingAbi = null;
-    });
-    return this.#pendingAbi;
+    if (force) {
+      const abi = await load();
+      this.abiCache.set(this.account, abi);
+      return abi;
+    }
+    return this.abiCache.getOrLoad(this.account, load);
+  }
+
+  refreshAbi(signal?: AbortSignal): Promise<Abi> {
+    return this.getAbi(true, signal);
+  }
+
+  deleteAbi(): void {
+    this.abiCache.delete(this.account);
   }
 
   async action(

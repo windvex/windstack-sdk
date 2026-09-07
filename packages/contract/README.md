@@ -36,7 +36,7 @@ const action = await token.action(
 const rows = await token.tableRows("accounts", "alice");
 ```
 
-Concurrent ABI reads for the same `Contract` instance share one in-flight request. Cached ABIs can be refreshed explicitly or removed through `AbiCache` when an application knows a contract has changed.
+Concurrent ABI reads that use the same `AbiCache` share one in-flight request, including reads from different `Contract` instances. Use `refreshAbi()` for an explicit refresh and `deleteAbi()` or `AbiCache.clear()` when an application knows a contract has changed.
 
 ## Runtime
 

@@ -6,7 +6,7 @@
  */
 export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 export type RpcClientOptions = {
-  endpoints: string | string[];
+  endpoints: string | readonly string[];
   fetch?: FetchLike;
   timeoutMs?: number;
   retries?: number;
@@ -65,6 +65,16 @@ export type TableByScopeRow = {
   payer: string;
   count: number;
 };
+export type PackedTransaction = {
+  signatures: string[];
+  compression?: number;
+  packed_context_free_data?: string;
+  packed_trx: string;
+};
+export type SendTransaction2Request = PackedTransaction & {
+  return_failure_trace?: boolean;
+  retry_trx?: boolean;
+};
 
 export class RpcError extends Error {
   readonly status: number;
@@ -92,6 +102,13 @@ export class RpcTimeoutError extends Error {
   }
 }
 
+export class RpcResponseError extends RpcError {
+  constructor(endpoint: string, status: number, payload: string) {
+    super(`RPC response from ${endpoint} is not valid JSON`, status, endpoint, payload);
+    this.name = "RpcResponseError";
+  }
+}
+
 function rpcMessage(payload: unknown, fallback: string): string {
   if (!payload || typeof payload !== "object") return fallback;
   const record = payload as Record<string, unknown>;
@@ -101,7 +118,10 @@ function rpcMessage(payload: unknown, fallback: string): string {
     if (typeof error.what === "string" && error.what) return error.what;
     if (Array.isArray(error.details)) {
       const detail = error.details.find(
-        (item) => item && typeof item === "object" && typeof (item as Record<string, unknown>).message === "string",
+        (item) =>
+          item &&
+          typeof item === "object" &&
+          typeof (item as Record<string, unknown>).message === "string",
       ) as Record<string, unknown> | undefined;
       if (detail?.message) return String(detail.message);
     }
@@ -111,8 +131,11 @@ function rpcMessage(payload: unknown, fallback: string): string {
 
 function isRetriable(error: unknown): boolean {
   if (error instanceof RpcTimeoutError) return true;
+  if (error instanceof RpcResponseError) return true;
   if (error instanceof RpcError) {
-    return error.status === 408 || error.status === 425 || error.status === 429 || error.status >= 500;
+    return (
+      error.status === 408 || error.status === 425 || error.status === 429 || error.status >= 500
+    );
   }
   return error instanceof TypeError || (error instanceof Error && error.name === "AbortError");
 }
@@ -125,9 +148,13 @@ export class RpcClient {
   #cursor = 0;
 
   constructor(options: RpcClientOptions) {
-    const endpoints = (Array.isArray(options.endpoints) ? options.endpoints : [options.endpoints])
-      .map((endpoint) => endpoint.trim().replace(/\/+$/, ""))
-      .filter(Boolean);
+    const endpoints = [
+      ...new Set(
+        (typeof options.endpoints === "string" ? [options.endpoints] : options.endpoints)
+          .map((endpoint) => endpoint.trim().replace(/\/+$/, ""))
+          .filter(Boolean),
+      ),
+    ];
     if (!endpoints.length || endpoints.some((endpoint) => !/^https?:\/\//.test(endpoint))) {
       throw new TypeError("At least one http(s) RPC endpoint is required");
     }
@@ -137,10 +164,12 @@ export class RpcClient {
     }
     const timeoutMs = options.timeoutMs ?? 10_000;
     const retries = options.retries ?? Math.max(0, endpoints.length - 1);
-    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new RangeError("timeoutMs must be greater than zero");
-    if (!Number.isInteger(retries) || retries < 0) throw new RangeError("retries must be a non-negative integer");
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
+      throw new RangeError("timeoutMs must be greater than zero");
+    if (!Number.isInteger(retries) || retries < 0)
+      throw new RangeError("retries must be a non-negative integer");
 
-    this.endpoints = Object.freeze([...new Set(endpoints)]);
+    this.endpoints = Object.freeze(endpoints);
     this.#fetch = fetchImplementation.bind(globalThis);
     this.#timeoutMs = timeoutMs;
     this.#retries = retries;
@@ -158,6 +187,9 @@ export class RpcClient {
     }
 
     const retries = options.retries ?? this.#retries;
+    if (!Number.isInteger(retries) || retries < 0) {
+      throw new RangeError("RPC request retries must be a non-negative integer");
+    }
     const attempts = retries + 1;
     let lastError: unknown;
 
@@ -185,6 +217,7 @@ export class RpcClient {
         try {
           payload = text ? JSON.parse(text) : null;
         } catch {
+          if (response.ok) throw new RpcResponseError(endpoint, response.status, text);
           payload = text;
         }
         if (!response.ok) {
@@ -220,11 +253,21 @@ export class RpcClient {
     return this.request("/v1/chain/get_block", { block_num_or_id: blockNumOrId }, signal);
   }
 
+  getBlockInfo(blockNum: number, signal?: AbortSignal): Promise<GetBlockResponse> {
+    if (!Number.isInteger(blockNum) || blockNum < 0 || blockNum > 0xffffffff) {
+      throw new RangeError("Block number must be a uint32 integer");
+    }
+    return this.request("/v1/chain/get_block_info", { block_num: blockNum }, signal);
+  }
+
   getAccount<T = Record<string, unknown>>(accountName: string, signal?: AbortSignal): Promise<T> {
     return this.request("/v1/chain/get_account", { account_name: accountName }, signal);
   }
 
-  getAbi(accountName: string, signal?: AbortSignal): Promise<{ account_name: string; abi: unknown }> {
+  getAbi(
+    accountName: string,
+    signal?: AbortSignal,
+  ): Promise<{ account_name: string; abi: unknown }> {
     return this.request("/v1/chain/get_abi", { account_name: accountName }, signal);
   }
 
@@ -284,16 +327,35 @@ export class RpcClient {
   }
 
   pushTransaction<T = Record<string, unknown>>(
-    transaction: {
-      signatures: string[];
-      compression?: number;
-      packed_context_free_data?: string;
-      packed_trx: string;
-    },
+    transaction: PackedTransaction,
     signal?: AbortSignal,
   ): Promise<T> {
     return this.request(
       "/v1/chain/push_transaction",
+      { compression: 0, packed_context_free_data: "", ...transaction },
+      signal,
+      { retries: 0 },
+    );
+  }
+
+  sendTransaction<T = Record<string, unknown>>(
+    transaction: PackedTransaction,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.request(
+      "/v1/chain/send_transaction",
+      { compression: 0, packed_context_free_data: "", ...transaction },
+      signal,
+      { retries: 0 },
+    );
+  }
+
+  sendTransaction2<T = Record<string, unknown>>(
+    transaction: SendTransaction2Request,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.request(
+      "/v1/chain/send_transaction2",
       { compression: 0, packed_context_free_data: "", ...transaction },
       signal,
       { retries: 0 },

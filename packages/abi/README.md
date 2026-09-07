@@ -4,7 +4,7 @@
 
 `@windstack/abi` serializes and deserializes Antelope ABI values without requiring Node.js buffer APIs. It supports ABI aliases, structs and inheritance, arrays, optional values, binary extensions, variants, action types, table types, names, assets, symbols, keys, signatures, timestamps, checksums, integer types, floating-point values, and raw bytes.
 
-The package also exposes `BinaryWriter`, `BinaryReader`, `nameToBigInt()`, `bigIntToName()`, `hexToBytes()`, and `bytesToHex()` for applications that need direct access to Antelope binary primitives.
+The package also exposes `BinaryWriter`, `BinaryReader`, `nameToBigInt()`, `bigIntToName()`, `parseAsset()`, `formatAsset()`, `hexToBytes()`, and `bytesToHex()` for applications that need direct access to Antelope values and binary primitives.
 
 ## Installation
 
