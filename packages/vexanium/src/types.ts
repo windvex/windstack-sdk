@@ -171,8 +171,8 @@ export type VexaniumClientOptions = {
 };
 
 export type CanonicalSigningRequestUri = `vsr:${string}`;
-/** VSR is canonical; ESR is accepted for Antelope protocol interoperability. */
-export type VexSigningRequestUri = string;
+/** Public Vexanium signing-request URIs always use the canonical `vsr:` scheme. */
+export type VexSigningRequestUri = CanonicalSigningRequestUri;
 
 export type VexSigningRequestZlibProvider = {
   deflateRaw(data: Uint8Array): Uint8Array;
