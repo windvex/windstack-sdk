@@ -35,7 +35,5 @@ export const VEX_EVM_ANTELOPE_CONTRACT = "vex.evm" as const;
 
 /** Canonical URI scheme for Vexanium Signing Requests. */
 export const VSR_SCHEME = "vsr:" as const;
-/** Interoperability input scheme for existing Antelope ESR tooling. */
-export const ESR_SCHEME = "esr:" as const;
 
 export const DEFAULT_PROVIDER_DISCOVERY_TIMEOUT_MS = 120;
