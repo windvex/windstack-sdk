@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { formatAsset, parseAsset } from "../packages/abi/dist/index.js";
+import { bytesToHex, formatAsset, parseAsset } from "../packages/abi/dist/index.js";
+import { serializeTransaction } from "../packages/antelope/dist/index.js";
 import { resolveDappMetadata } from "../packages/core/dist/index.js";
 import {
   createEVMClient,
@@ -225,11 +226,42 @@ const sessionSnapshot = vexClient.getSession();
 sessionSnapshot.walletSessionId = "mutated-session";
 assert.equal(vexClient.getSession().accounts[0].actor, "windstack");
 assert.equal(vexClient.getSession().walletSessionId, "session-1");
+
+const signCallsBeforeMalformed = vexCalls.filter(
+  ({ method }) => method === VEXANIUM_METHODS.SIGN_TRANSACTION,
+).length;
 await assert.rejects(
   () =>
     vexClient.signTransaction({
       chainId: VEXANIUM_MAINNET_CHAIN_ID,
       serializedTransaction: "00",
+      account: "windstack",
+      permission: "active",
+    }),
+  { code: -32602 },
+);
+assert.equal(
+  vexCalls.filter(({ method }) => method === VEXANIUM_METHODS.SIGN_TRANSACTION).length,
+  signCallsBeforeMalformed,
+);
+
+const canonicalTransaction = {
+  expiration: "2026-09-10T12:00:00",
+  ref_block_num: 1,
+  ref_block_prefix: 2,
+  max_net_usage_words: 0,
+  max_cpu_usage_ms: 0,
+  delay_sec: 0,
+  context_free_actions: [],
+  actions: [],
+  transaction_extensions: [],
+};
+await assert.rejects(
+  () =>
+    vexClient.signTransaction({
+      chainId: VEXANIUM_MAINNET_CHAIN_ID,
+      serializedTransaction: bytesToHex(serializeTransaction(canonicalTransaction)),
+      transaction: canonicalTransaction,
       account: "windstack",
       permission: "active",
     }),
