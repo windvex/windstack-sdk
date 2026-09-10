@@ -1,5 +1,6 @@
 import { bytesToHex } from "@windstack/abi";
 import {
+  AntelopeClient,
   deserializeTransaction,
   serializeTransaction,
   type Transaction,
@@ -7,20 +8,21 @@ import {
 import { getRuntimeWindow, resolveDappMetadata, resolveDappRequestContext } from "@windstack/core";
 import type { DappMetadata, RequestArguments } from "@windstack/core";
 import { Signature } from "@windstack/crypto";
+import { normalizeVexaniumAccounts } from "./accounts.js";
+import { vexNative } from "./chains.js";
 import {
   VEXANIUM_CAPABILITIES,
   VEXANIUM_METHODS,
   VEXANIUM_PROVIDER_STANDARD,
   VEXANIUM_PROVIDER_VERSION,
 } from "./constants.js";
+import { getVexaniumProvider, isVexaniumProvider } from "./discovery.js";
 import {
   VEXANIUM_ERROR_CODES,
   VexaniumProviderError,
   normalizeVexaniumProviderError,
   vexaniumUnsupportedCapability,
 } from "./errors.js";
-import { getVexaniumProvider, isVexaniumProvider } from "./discovery.js";
-import { normalizeVexaniumAccounts } from "./accounts.js";
 import { parseSigningRequest } from "./signing-request.js";
 import {
   assertVexaniumCapabilitiesResponse,
@@ -30,6 +32,7 @@ import {
 import type {
   VexaniumAccount,
   VexaniumAccountsResponse,
+  VexaniumActionInput,
   VexaniumCapabilitiesResponse,
   VexaniumCapability,
   VexaniumChainId,
@@ -41,9 +44,11 @@ import type {
   VexaniumConnectRequest,
   VexaniumConnectResponse,
   VexaniumDappSession,
+  VexaniumPermissionLevel,
   VexaniumProvider,
   VexaniumProviderEventMap,
   VexaniumSessionSyncOptions,
+  VexaniumTransactArgs,
   VexSignDigestParams,
   VexSignMessageParams,
   VexSignTransactionParams,
@@ -150,6 +155,17 @@ function normalizeSyncOptions(
   return { ...DEFAULT_SYNC_OPTIONS, ...value };
 }
 
+function normalizeOptionalHex(value: string | undefined, label: string): string {
+  if (value === undefined) return "";
+  if (typeof value !== "string" || !/^(?:[0-9a-f]{2})*$/i.test(value)) {
+    throw new VexaniumProviderError(
+      VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+      `${label} must be even-length hexadecimal bytes`,
+    );
+  }
+  return value.toLowerCase();
+}
+
 function assertAccountsResponse(value: unknown): asserts value is VexaniumAccountsResponse {
   if (
     typeof value !== "object" ||
@@ -192,7 +208,7 @@ function assertValidSignatures(value: unknown, method: string): asserts value is
 
 function normalizeSignTransactionParams(
   params: VexSignTransactionParams,
-): VexSignTransactionParams & { transaction: Transaction } {
+): VexSignTransactionParams & { transaction: Transaction; serializedContextFreeData: string } {
   if (!isVexaniumFullChainId(params.chainId)) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_PARAMS,
@@ -224,6 +240,10 @@ function normalizeSignTransactionParams(
   }
 
   const serializedTransaction = bytesToHex(serializeTransaction(transaction));
+  const serializedContextFreeData = normalizeOptionalHex(
+    params.serializedContextFreeData,
+    "serializedContextFreeData",
+  );
   if (params.transaction) {
     let suppliedTransaction: string;
     try {
@@ -246,6 +266,7 @@ function normalizeSignTransactionParams(
   return {
     ...params,
     serializedTransaction,
+    serializedContextFreeData,
     transaction,
   };
 }
@@ -314,6 +335,15 @@ export async function createVexaniumClient(
     );
   }
 
+  const antelope = new AntelopeClient({
+    endpoints: options.rpcUrl ?? vexNative.rpcUrl,
+    fetch: options.fetch,
+    chainId: vexNative.chainId,
+    contracts: {
+      system: vexNative.contracts.system,
+      token: vexNative.contracts.token,
+    },
+  });
   const dapp = resolveDappMetadata(options.dapp);
   const requestContext = resolveDappRequestContext();
   const listeners: ClientListenerStore = new Map();
@@ -334,6 +364,39 @@ export async function createVexaniumClient(
     }
     assertVexaniumProviderInfo(provider.providerInfo);
     return provider;
+  };
+
+  const requireSigner = (requested?: VexaniumPermissionLevel): VexaniumAccount => {
+    if (requested) {
+      if (!isAntelopeName(requested.actor) || !isAntelopeName(requested.permission)) {
+        throw new VexaniumProviderError(
+          VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+          "Invalid Vexanium signer account or permission",
+        );
+      }
+    }
+    const accounts = session?.accounts ?? [];
+    const selected = requested
+      ? accounts.find(
+          (account) =>
+            account.actor === requested.actor && account.permission === requested.permission,
+        )
+      : accounts[0];
+    if (!selected) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.UNAUTHORIZED,
+        requested
+          ? `Wallet session does not authorize ${requested.actor}@${requested.permission}`
+          : "Connect a Vexanium wallet before creating or signing transaction actions",
+      );
+    }
+    if (!sameVexaniumChain(selected.chainId, vexNative.chainId)) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.UNSUPPORTED_CHAIN,
+        "Connected account is not on Vexanium Mainnet",
+      );
+    }
+    return selected;
   };
 
   const request = async <TResult = unknown, TParams = unknown>(
@@ -357,8 +420,9 @@ export async function createVexaniumClient(
   ): Promise<VexaniumCapabilitiesResponse> => {
     if (negotiation) {
       for (const capability of requiredCapabilities) {
-        if (!negotiation.capabilities.includes(capability))
+        if (!negotiation.capabilities.includes(capability)) {
           throw vexaniumUnsupportedCapability(capability);
+        }
       }
       return negotiation;
     }
@@ -404,8 +468,9 @@ export async function createVexaniumClient(
 
     const response = await negotiationInFlight;
     for (const capability of requiredCapabilities) {
-      if (!response.capabilities.includes(capability))
+      if (!response.capabilities.includes(capability)) {
         throw vexaniumUnsupportedCapability(capability);
+      }
     }
     return response;
   };
@@ -493,7 +558,8 @@ export async function createVexaniumClient(
   const connect = async (params: VexaniumConnectParams = {}): Promise<VexaniumAccount[]> => {
     const requestDapp = params.dapp ?? dapp;
     const requiredCapabilities = params.requiredCapabilities ?? DEFAULT_CONNECT_CAPABILITIES;
-    if (params.chainId && !isVexaniumChainId(params.chainId)) {
+    const requestedChainId = params.chainId ?? vexNative.chainId;
+    if (!isVexaniumChainId(requestedChainId)) {
       throw new VexaniumProviderError(
         VEXANIUM_ERROR_CODES.INVALID_PARAMS,
         "Invalid Vexanium chain ID",
@@ -505,7 +571,7 @@ export async function createVexaniumClient(
       standard: VEXANIUM_PROVIDER_STANDARD,
       version: VEXANIUM_PROVIDER_VERSION,
       dapp: requestDapp,
-      chainId: params.chainId,
+      chainId: requestedChainId,
       sessionId: params.sessionId,
       requiredCapabilities,
     });
@@ -524,15 +590,16 @@ export async function createVexaniumClient(
       );
     }
 
-    if (params.chainId && !sameVexaniumChain(rawResponse.chainId, params.chainId)) {
+    if (!sameVexaniumChain(rawResponse.chainId, requestedChainId)) {
       throw new VexaniumProviderError(
         VEXANIUM_ERROR_CODES.UNSUPPORTED_CHAIN,
-        `Wallet connected to ${rawResponse.chainId}, but dApp requested ${params.chainId}`,
+        `Wallet connected to ${rawResponse.chainId}, but dApp requested ${requestedChainId}`,
       );
     }
     for (const capability of requiredCapabilities) {
-      if (!rawResponse.capabilities.includes(capability))
+      if (!rawResponse.capabilities.includes(capability)) {
         throw vexaniumUnsupportedCapability(capability);
+      }
     }
 
     const accounts = normalizeVexaniumAccounts(rawResponse.accounts, rawResponse.chainId);
@@ -703,6 +770,119 @@ export async function createVexaniumClient(
     return result;
   };
 
+  const signTransaction = async (
+    params: VexSignTransactionParams,
+  ): Promise<VexSignTransactionResult> => {
+    const normalizedParams = normalizeSignTransactionParams(params);
+    await negotiate([VEXANIUM_CAPABILITIES.EXACT_TRANSACTION_SIGNING]);
+    const result = await request<VexSignTransactionResult, VexSignTransactionParams>({
+      method: VEXANIUM_METHODS.SIGN_TRANSACTION,
+      params: compactParams({
+        ...normalizedParams,
+        sessionId: normalizedParams.sessionId ?? session?.walletSessionId,
+        dapp: normalizedParams.dapp ?? (session ? undefined : dapp),
+      }),
+    });
+    if (typeof result !== "object" || result === null) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+        "Malformed vex_signTransaction response",
+        result,
+      );
+    }
+    assertValidSignatures(result.signatures, VEXANIUM_METHODS.SIGN_TRANSACTION);
+    if (result.signer !== undefined && result.signer !== normalizedParams.account) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+        "Wallet signed with a different Vexanium account",
+        result,
+      );
+    }
+    if (
+      result.signerPermission !== undefined &&
+      result.signerPermission !== normalizedParams.permission
+    ) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+        "Wallet signed with a different Vexanium permission",
+        result,
+      );
+    }
+    return result;
+  };
+
+  const buildAction = async (
+    input: VexaniumActionInput,
+    defaultAuthorization: readonly string[],
+    signal?: AbortSignal,
+  ) =>
+    antelope.contract(input.account).action(
+      input.name,
+      input.data,
+      input.authorization ? [...input.authorization] : [...defaultAuthorization],
+      signal,
+    );
+
+  const transact = async <T = Record<string, unknown>>(args: VexaniumTransactArgs) => {
+    const signer = requireSigner(args.signer);
+    const defaultAuthorization = [signer.permissionLevel];
+    const actions = await Promise.all(
+      args.actions.map((input) => buildAction(input, defaultAuthorization, args.signal)),
+    );
+    const contextFreeActions = await Promise.all(
+      (args.contextFreeActions ?? []).map((input) => buildAction(input, [], args.signal)),
+    );
+    const prepared = await antelope.prepareTransaction({
+      actions,
+      contextFreeActions,
+      contextFreeData: args.contextFreeData,
+      transactionExtensions: args.transactionExtensions,
+      expireSeconds: args.expireSeconds,
+      signal: args.signal,
+    });
+    if (!sameVexaniumChain(prepared.chainId, signer.chainId)) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.CHAIN_DISCONNECTED,
+        "Connected wallet chain does not match the configured Vexanium RPC chain",
+      );
+    }
+
+    const signed = await signTransaction({
+      chainId: prepared.chainId,
+      serializedTransaction: bytesToHex(prepared.serializedTransaction),
+      serializedContextFreeData: bytesToHex(prepared.serializedContextFreeData),
+      transaction: prepared.transaction,
+      account: signer.actor,
+      permission: signer.permission,
+    });
+    const signatures = [...signed.signatures];
+    if (args.broadcast === false) {
+      return {
+        transaction: prepared.transaction,
+        serializedTransaction: prepared.serializedTransaction,
+        serializedContextFreeData: prepared.serializedContextFreeData,
+        signatures,
+      };
+    }
+
+    const response = await antelope.rpc.pushTransaction<T>(
+      {
+        signatures,
+        compression: 0,
+        packed_context_free_data: bytesToHex(prepared.serializedContextFreeData),
+        packed_trx: bytesToHex(prepared.serializedTransaction),
+      },
+      args.signal,
+    );
+    return {
+      transaction: prepared.transaction,
+      serializedTransaction: prepared.serializedTransaction,
+      serializedContextFreeData: prepared.serializedContextFreeData,
+      signatures,
+      response,
+    };
+  };
+
   return {
     isAvailable() {
       return Boolean(provider && isVexaniumProvider(provider));
@@ -752,6 +932,20 @@ export async function createVexaniumClient(
     syncAccounts,
     getChain,
 
+    contract(account: string) {
+      return antelope.contract(account);
+    },
+
+    account(name?: string) {
+      return antelope.account(name ?? requireSigner().actor);
+    },
+
+    action(input: VexaniumActionInput, signal?: AbortSignal) {
+      const signer = requireSigner();
+      return buildAction(input, [signer.permissionLevel], signal);
+    },
+
+    transact,
     signSigningRequest,
 
     async signMessage(message: string | Uint8Array, account?: string) {
@@ -794,44 +988,7 @@ export async function createVexaniumClient(
       return request({ method: VEXANIUM_METHODS.SIGN_DIGEST, params });
     },
 
-    async signTransaction(params: VexSignTransactionParams) {
-      const normalizedParams = normalizeSignTransactionParams(params);
-      await negotiate([VEXANIUM_CAPABILITIES.EXACT_TRANSACTION_SIGNING]);
-      const result = await request<VexSignTransactionResult, VexSignTransactionParams>({
-        method: VEXANIUM_METHODS.SIGN_TRANSACTION,
-        params: compactParams({
-          ...normalizedParams,
-          sessionId: normalizedParams.sessionId ?? session?.walletSessionId,
-          dapp: normalizedParams.dapp ?? (session ? undefined : dapp),
-        }),
-      });
-      if (typeof result !== "object" || result === null) {
-        throw new VexaniumProviderError(
-          VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-          "Malformed vex_signTransaction response",
-          result,
-        );
-      }
-      assertValidSignatures(result.signatures, VEXANIUM_METHODS.SIGN_TRANSACTION);
-      if (result.signer !== undefined && result.signer !== normalizedParams.account) {
-        throw new VexaniumProviderError(
-          VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-          "Wallet signed with a different Vexanium account",
-          result,
-        );
-      }
-      if (
-        result.signerPermission !== undefined &&
-        result.signerPermission !== normalizedParams.permission
-      ) {
-        throw new VexaniumProviderError(
-          VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-          "Wallet signed with a different Vexanium permission",
-          result,
-        );
-      }
-      return result;
-    },
+    signTransaction,
 
     async disconnect() {
       try {
