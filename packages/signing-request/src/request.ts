@@ -47,11 +47,11 @@ const decoder = new TextDecoder();
 const serializer = new AbiSerializer(SIGNING_REQUEST_ABI);
 const serializerV2 = new AbiSerializer(SIGNING_REQUEST_ABI_V2);
 const REQUEST_SIGNATURE_WIRE_BYTES = 74;
+const CHAIN_IDS_INFO_KEY = "chain_ids";
 
 function serializerForVersion(version: number): AbiSerializer {
   return version === 2 ? serializerV2 : serializer;
 }
-const CHAIN_IDS_INFO_KEY = "chain_ids";
 
 function validateName(value: string, label: string): string {
   if (typeof value !== "string" || value.length === 0) {
@@ -192,10 +192,13 @@ async function normalizeTransaction(
 }
 
 function normalizeIdentity(identity: SigningRequestIdentity): SigningRequestIdentity {
-  if (!identity || typeof identity !== "object")
+  if (!identity || typeof identity !== "object") {
     throw new TypeError("Identity request is required");
+  }
   return {
-    scope: validateName(identity.scope ?? "", "Identity scope"),
+    ...(identity.scope !== undefined
+      ? { scope: validateName(identity.scope, "Identity scope") }
+      : {}),
     permission: identity.permission
       ? normalizePermissionLevel(identity.permission, "Identity permission")
       : null,
@@ -287,6 +290,15 @@ async function createPayload(
     };
   }
   return { type: "identity", value: normalizeIdentity(args.identity!) };
+}
+
+function selectProtocolVersion(
+  chainId: SigningRequestChain,
+  request: SigningRequestPayload,
+): number {
+  if (chainId.type === "chain_alias" && chainId.value === 0) return 3;
+  if (request.type === "identity" && request.value.scope !== undefined) return 3;
+  return 2;
 }
 
 function clonePermissionLevel(value: SigningRequestPermissionLevel): SigningRequestPermissionLevel {
@@ -431,14 +443,14 @@ function parseUri(uri: string): {
   slashes: boolean;
 } {
   if (typeof uri !== "string" || !uri.length || uri !== uri.trim()) {
-    throw new TypeError("Invalid signing-request URI");
+    throw new TypeError("Invalid Vexanium Signing Request URI");
   }
-  const match = /^(vsr|esr):(\/\/)?([A-Za-z0-9_-]+)$/i.exec(uri);
-  if (!match) throw new TypeError("Signing-request URI must use a valid vsr: or esr: payload");
+  const match = /^vsr:(\/\/)?([A-Za-z0-9_-]+)$/i.exec(uri);
+  if (!match) throw new TypeError("Vexanium Signing Request URI must use a valid vsr: payload");
   return {
-    scheme: match[1]!.toLowerCase() as SigningRequestScheme,
-    slashes: Boolean(match[2]),
-    payload: match[3]!,
+    scheme: "vsr",
+    slashes: Boolean(match[1]),
+    payload: match[2]!,
   };
 }
 
@@ -487,8 +499,9 @@ export class SigningRequest {
       (args.background ? SIGNING_REQUEST_FLAG_BACKGROUND : 0);
     const chainId = normalizeChain(args);
     const info = normalizeAllowedChains(args.allowedChains, chainId, normalizeInfo(args.info));
+    const version = selectProtocolVersion(chainId, request);
     return new SigningRequest({
-      version: SIGNING_REQUEST_PROTOCOL_VERSION,
+      version,
       data: { chainId, request, flags, callback, info },
     });
   }
@@ -636,7 +649,7 @@ export class SigningRequest {
   serializePayload(): Uint8Array {
     const body = this.serializeBody();
     if (!this.#requestSignature) return body;
-    const signature = serializer.encode("request_signature", {
+    const signature = serializerForVersion(this.version).encode("request_signature", {
       signer: this.#requestSignature.signer,
       signature: this.#requestSignature.signature.toString(),
     });
@@ -646,7 +659,7 @@ export class SigningRequest {
   encode(
     compress = false,
     slashes = false,
-    scheme: SigningRequestScheme = "esr",
+    scheme: SigningRequestScheme = "vsr",
     compressionProvider: CompressionProvider = pakoCompressionProvider,
   ): string {
     const raw = this.serializePayload();
