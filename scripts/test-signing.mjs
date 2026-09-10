@@ -96,6 +96,19 @@ const canonicalVsr = encodeSigningRequest(nativeRequest, {
 
 assert.ok(canonicalVsr.startsWith(`${VSR_SCHEME}//`));
 assert.equal(parseSigningRequest(canonicalVsr).encode(false, true, "vsr"), canonicalVsr);
+await assert.rejects(
+  () =>
+    createSigningRequest({
+      chainId: "11".repeat(32),
+      transaction: portableTransaction,
+    }),
+  /Vexanium Mainnet/,
+);
+const foreignRequest = await SigningRequest.create({
+  chainId: "11".repeat(32),
+  transaction: portableTransaction,
+});
+assert.throws(() => encodeSigningRequest(foreignRequest), /Vexanium Mainnet/);
 
 const compressedSigningInput = {
   chainId: VEXANIUM_MAINNET_CHAIN_ID,
@@ -167,7 +180,6 @@ globalThis.fetch = async (input, init) => {
 };
 try {
   const structuredVsr = await createSigningRequest({
-    chainId: VEXANIUM_MAINNET_CHAIN_ID,
     action: {
       account: "vex.token",
       name: "transfer",
@@ -190,7 +202,63 @@ try {
   globalThis.fetch = originalFetch;
 }
 
-const client = await createVexaniumClient({ provider, autoSync: false });
+const clientAbiFetches = new Map();
+const clientFetch = async (input, init) => {
+  const url = String(input);
+  const body = JSON.parse(String(init?.body ?? "{}"));
+  if (url.endsWith("/get_abi")) {
+    const account = String(body.account_name);
+    assert.ok(account === "vex.token" || account === "token.wind");
+    clientAbiFetches.set(account, (clientAbiFetches.get(account) ?? 0) + 1);
+    return Response.json({ account_name: account, abi: vexTokenAbi });
+  }
+  return Response.json({ message: "not found" }, { status: 404 });
+};
+const client = await createVexaniumClient({
+  provider,
+  autoSync: false,
+  rpcUrl: "https://unit.test",
+  fetch: clientFetch,
+});
+const clientVsr = await client.createSigningRequest({
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      authorization: [{ actor: "alice", permission: "active" }],
+      data: {
+        from: "alice",
+        to: "bob",
+        quantity: "1.0000 VEX",
+        memo: "first",
+      },
+    },
+    {
+      account: "token.wind",
+      name: "transfer",
+      authorization: [{ actor: "alice", permission: "active" }],
+      data: {
+        from: "alice",
+        to: "bob",
+        quantity: "2.0000 VEX",
+        memo: "second",
+      },
+    },
+  ],
+});
+assert.match(clientVsr, /^vsr:\/\//);
+const clientParsed = client.parseSigningRequest(clientVsr);
+assert.equal(clientParsed.data.request.type, "action[]");
+assert.equal(clientParsed.data.request.value.length, 2);
+assert.equal(clientParsed.data.request.value[0].account, "vex.token");
+assert.equal(clientParsed.data.request.value[1].account, "token.wind");
+assert.equal(clientAbiFetches.get("vex.token"), 1);
+assert.equal(clientAbiFetches.get("token.wind"), 1);
+assert.throws(
+  () => client.parseSigningRequest(foreignRequest.encode(false, true, "vsr")),
+  /Vexanium Mainnet|configured Vexanium chain/,
+);
+
 await client.signSigningRequest({ request: canonicalVsr, broadcast: false });
 
 const portableCalls = calls.filter((call) => call.method === VEXANIUM_METHODS.SIGNING_REQUEST);
