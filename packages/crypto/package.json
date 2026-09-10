@@ -1,6 +1,6 @@
 {
   "name": "@windstack/crypto",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Portable Antelope K1/R1 keys, canonical signatures, recovery, WIF, and legacy key compatibility.",
   "type": "module",
   "main": "./dist/index.js",
