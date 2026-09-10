@@ -1,3 +1,5 @@
+import { bytesToHex } from "@windstack/abi";
+import { deserializeTransaction, serializeTransaction, type Transaction } from "@windstack/antelope";
 import { getRuntimeWindow, resolveDappMetadata, resolveDappRequestContext } from "@windstack/core";
 import type { DappMetadata, RequestArguments } from "@windstack/core";
 import {
@@ -184,7 +186,9 @@ function assertValidSignatures(value: unknown, method: string): asserts value is
   }
 }
 
-function assertSignTransactionParams(params: VexSignTransactionParams): void {
+function normalizeSignTransactionParams(
+  params: VexSignTransactionParams,
+): VexSignTransactionParams & { transaction: Transaction } {
   if (!isVexaniumFullChainId(params.chainId)) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_PARAMS,
@@ -203,6 +207,43 @@ function assertSignTransactionParams(params: VexSignTransactionParams): void {
       "Invalid Antelope account or permission name",
     );
   }
+
+  let transaction: Transaction;
+  try {
+    transaction = deserializeTransaction(params.serializedTransaction);
+  } catch (error) {
+    throw new VexaniumProviderError(
+      VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+      "serializedTransaction must contain a canonical Antelope transaction",
+      error,
+    );
+  }
+
+  const serializedTransaction = bytesToHex(serializeTransaction(transaction));
+  if (params.transaction) {
+    let suppliedTransaction: string;
+    try {
+      suppliedTransaction = bytesToHex(serializeTransaction(params.transaction));
+    } catch (error) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+        "transaction must be a valid Antelope transaction",
+        error,
+      );
+    }
+    if (suppliedTransaction !== serializedTransaction) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+        "transaction does not match serializedTransaction",
+      );
+    }
+  }
+
+  return {
+    ...params,
+    serializedTransaction,
+    transaction,
+  };
 }
 
 function assertCapabilityMethods(response: VexaniumCapabilitiesResponse): void {
@@ -750,14 +791,14 @@ export async function createVexaniumClient(
     },
 
     async signTransaction(params: VexSignTransactionParams) {
-      assertSignTransactionParams(params);
+      const normalizedParams = normalizeSignTransactionParams(params);
       await negotiate([VEXANIUM_CAPABILITIES.EXACT_TRANSACTION_SIGNING]);
       const result = await request<VexSignTransactionResult, VexSignTransactionParams>({
         method: VEXANIUM_METHODS.SIGN_TRANSACTION,
         params: compactParams({
-          ...params,
-          sessionId: params.sessionId ?? session?.walletSessionId,
-          dapp: params.dapp ?? (session ? undefined : dapp),
+          ...normalizedParams,
+          sessionId: normalizedParams.sessionId ?? session?.walletSessionId,
+          dapp: normalizedParams.dapp ?? (session ? undefined : dapp),
         }),
       });
       if (typeof result !== "object" || result === null) {
@@ -768,14 +809,17 @@ export async function createVexaniumClient(
         );
       }
       assertValidSignatures(result.signatures, VEXANIUM_METHODS.SIGN_TRANSACTION);
-      if (result.signer !== undefined && result.signer !== params.account) {
+      if (result.signer !== undefined && result.signer !== normalizedParams.account) {
         throw new VexaniumProviderError(
           VEXANIUM_ERROR_CODES.INVALID_REQUEST,
           "Wallet signed with a different Vexanium account",
           result,
         );
       }
-      if (result.signerPermission !== undefined && result.signerPermission !== params.permission) {
+      if (
+        result.signerPermission !== undefined &&
+        result.signerPermission !== normalizedParams.permission
+      ) {
         throw new VexaniumProviderError(
           VEXANIUM_ERROR_CODES.INVALID_REQUEST,
           "Wallet signed with a different Vexanium permission",
