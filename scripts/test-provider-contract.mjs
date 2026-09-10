@@ -167,6 +167,20 @@ assert.equal(negotiated.standard, VEXANIUM_PROVIDER_STANDARD);
 assert.equal(negotiated.version, VEXANIUM_PROVIDER_VERSION);
 assert.ok(negotiated.capabilities.includes(VEXANIUM_CAPABILITIES.EXACT_TRANSACTION_SIGNING));
 
+const explicitAction = await client.action({
+  account: "vex.token",
+  name: "transfer",
+  authorization: [{ actor: "windstack", permission: "active" }],
+  data: {
+    from: "windstack",
+    to: "receiver",
+    quantity: "1.0000 VEX",
+    memo: "explicit authorization",
+  },
+});
+assert.deepEqual(explicitAction.authorization, [{ actor: "windstack", permission: "active" }]);
+assert.equal(client.getSession(), null);
+
 const accounts = await client.connect({ chainId: VEXANIUM_MAINNET_CHAIN_ID });
 assert.equal(accounts[0].permissionLevel, "windstack@active");
 assert.equal(client.getSession().walletSessionId, "wallet-session-v1");
@@ -189,6 +203,17 @@ assert.equal(signCall.params.sessionId, "wallet-session-v1");
 assert.equal(signCall.params.serializedTransaction, exactSerializedTransaction);
 assert.equal(signCall.params.serializedContextFreeData, "");
 assert.deepEqual(signCall.params.transaction, exactTransaction);
+await assert.rejects(
+  () =>
+    client.signTransaction({
+      serializedTransaction: exactSerializedTransaction,
+      chainId: "11".repeat(32),
+      account: "windstack",
+      permission: "active",
+    }),
+  (error) =>
+    error instanceof VexaniumProviderError && error.code === VEXANIUM_ERROR_CODES.UNSUPPORTED_CHAIN,
+);
 await assert.rejects(
   () =>
     client.signTransaction({
