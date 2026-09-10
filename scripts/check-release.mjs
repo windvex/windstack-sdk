@@ -99,12 +99,16 @@ const dirtyFiles = git(["status", "--porcelain"])
   .filter(Boolean)
   .map((line) => line.slice(3));
 const configuredBaseline = process.env.RELEASE_BASE_REF?.trim();
+const latestReleaseTag = git(
+  ["describe", "--tags", "--match", "v[0-9]*", "--abbrev=0"],
+  true,
+);
 const baseline =
   configuredBaseline && !/^0+$/.test(configuredBaseline)
     ? configuredBaseline
     : dirtyFiles.length
       ? "HEAD"
-      : "HEAD^";
+      : latestReleaseTag || "HEAD^";
 const changedFiles = dirtyFiles.length
   ? dirtyFiles
   : git(["diff", "--name-only", baseline, "HEAD"], true).split("\n").filter(Boolean);
