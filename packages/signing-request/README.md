@@ -2,7 +2,7 @@
 
 ## Overview
 
-`@windstack/signing-request` creates, parses, resolves, signs, and verifies portable signing requests for Antelope applications. It supports single actions, multiple actions, full transactions, identity requests, callbacks, request signatures, compression, full chain IDs, multi-chain requests, and ABI-aware placeholder resolution.
+`@windstack/signing-request` creates, parses, resolves, signs, verifies, and inspects portable signing requests for Antelope applications. It supports single actions, multiple actions, full transactions, identity requests, callbacks, request signatures, compression, full chain IDs, multi-chain requests, and ABI-aware placeholder resolution.
 
 Vexanium applications can use the canonical `vsr:` scheme. Existing `esr:` requests are accepted for protocol interoperability.
 
@@ -67,6 +67,26 @@ const resolved = await resolveSigningRequestWithRpc(parsed, {
 console.log(resolved.serializedTransaction);
 console.log(resolved.digest);
 ```
+
+## Action inspection
+
+Applications and wallets do not need separate parsing branches for `action`, `action[]`, and full transaction requests. WindStack exposes one action inspection path for all executable request forms:
+
+```ts
+import {
+  decodeSigningRequestActions,
+  getSigningRequestActions,
+} from "@windstack/signing-request";
+
+const actions = getSigningRequestActions(parsed);
+const decoded = await decodeSigningRequestActions(parsed, abiProvider);
+
+for (const action of decoded) {
+  console.log(action.account, action.name, action.data);
+}
+```
+
+`decodeSigningRequestActions` loads each required contract ABI once per inspection pass, decodes every action independently, preserves authorization data and action order, and supports multi-contract multi-action requests. Context-free actions can be included with `{ includeContextFree: true }`.
 
 ## Request Types
 
