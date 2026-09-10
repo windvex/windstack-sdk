@@ -128,7 +128,7 @@ function timestampSeconds(value: string): number {
 
 function assertUint(value: number, max: number, label: string): number {
   if (!Number.isInteger(value) || value < 0 || value > max) {
-    throw new RangeError(`${label} must be an integer between ${min} and ${max}`);
+    throw new RangeError(`${label} must be an integer between 0 and ${max}`);
   }
   return value;
 }
