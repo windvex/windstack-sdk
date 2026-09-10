@@ -21,7 +21,9 @@ VEX EVM metadata is included for chain ID `6736` (`0x1a50`).
 npm install @windstack/vexanium
 ```
 
-## Configure and connect
+## Usage
+
+### Configure and connect
 
 ```ts
 import { createVexaniumClient } from "@windstack/vexanium";
