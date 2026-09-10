@@ -2,7 +2,7 @@
 
 ## Overview
 
-`VexaniumProvider` defines the browser-facing contract between a Vexanium dApp and a compatible wallet provider. It standardizes provider identity, capability negotiation, account access, exact transaction signing, portable signing requests, events, errors, discovery, and the security boundary used for wallet permissions.
+`VexaniumProvider` defines the browser-facing contract between a Vexanium application and a compatible wallet. It standardizes provider identity, capability negotiation, account access, exact transaction signing, Vexanium Signing Requests, events, errors, discovery, and the security boundary used for wallet permissions.
 
 Protocol identifier: `VexaniumProvider`
 
@@ -24,7 +24,7 @@ interface VexaniumProvider {
 }
 ```
 
-`providerInfo` is required and contains the provider identity and supported Vexanium capabilities:
+`providerInfo` is required and contains provider identity and supported Vexanium capabilities:
 
 ```ts
 interface VexaniumProviderInfo {
@@ -63,6 +63,8 @@ vex.events
 
 A provider declares its static capabilities in `providerInfo.capabilities` and returns the negotiated set from `vex_getCapabilities`.
 
+Capabilities may be requested incrementally. A client that has already negotiated account/session capabilities may negotiate an additional signing capability later without rebuilding the wallet session.
+
 ## Capability negotiation
 
 Request:
@@ -90,7 +92,7 @@ Response:
 }
 ```
 
-The client rejects an incompatible major version or a missing required capability before account or signing flows continue.
+The client rejects an incompatible major version, undeclared chain/capability, or missing required capability before the affected operation continues.
 
 ## Account access
 
@@ -121,7 +123,7 @@ Response:
 }
 ```
 
-`sessionId` is required. `chainId` in a response is the complete 64-character Vexanium chain ID. A request may use either the complete chain ID or its `antelope:<32 hex characters>` CAIP-2 scope. Clients compare the two forms by their shared chain prefix.
+`sessionId` is required. `chainId` in a response is the complete 64-character Vexanium chain ID. A request may use either the complete chain ID or the Vexanium CAIP-2 scope. Clients compare supported forms against the configured Vexanium chain.
 
 `vex_getAccounts` is the non-interactive restore/read path and returns:
 
@@ -135,11 +137,12 @@ Response:
 
 ## Exact transaction signing
 
-`vex_signTransaction` signs the exact serialized Vexanium transaction supplied by the application or session layer.
+`vex_signTransaction` signs the exact canonical Vexanium transaction supplied by WindStack.
 
 ```ts
 {
   serializedTransaction: string;
+  serializedContextFreeData?: string;
   transaction?: Transaction;
   chainId: string;
   account: string;
@@ -148,11 +151,13 @@ Response:
 }
 ```
 
-`serializedTransaction` is the authoritative byte representation and contains non-empty, even-length hexadecimal bytes. `transaction` is the canonical structured representation of those same bytes and is intended for wallet review, policy checks, and action inspection. WindStack session signers preserve this structure through the provider boundary instead of forcing wallets to reconstruct multi-action transactions from opaque bytes.
+`serializedTransaction` is the authoritative byte representation and contains non-empty, even-length hexadecimal bytes. `transaction` is the canonical structured representation of those exact bytes and is intended for wallet review, policy checks, and action inspection. WindStack preserves this structure through the provider boundary so wallets do not need to reconstruct multi-action transactions from opaque bytes.
 
-If `transaction` is present, a wallet must verify that serializing it produces exactly `serializedTransaction` before approval or signing. Wallets may also decode the packed bytes with `deserializeTransaction` and compare the result. A wallet must never display one structure to the user and sign different bytes.
+`serializedContextFreeData` is the canonical packed context-free-data byte representation. An empty or omitted value means no context-free data. Wallets that compute or verify the transaction signing digest must include this value according to the Vexanium transaction digest rules.
 
-`account` and `permission` must be valid Antelope names. A successful response contains at least one valid signature:
+If `transaction` is present, the wallet must verify that serializing it produces exactly `serializedTransaction` before approval or signing. A wallet must never display one transaction structure to the user and sign different bytes.
+
+`account` and `permission` must be valid Vexanium account/permission names. A successful response contains at least one valid signature:
 
 ```ts
 {
@@ -162,21 +167,23 @@ If `transaction` is present, a wallet must verify that serializing it produces e
 }
 ```
 
+When `signer` or `signerPermission` is returned, it must match the requested wallet permission.
+
 ## Vexanium Signing Requests
 
-`vex_signingRequest` is used for a request transported through a QR code, deep link, clipboard, or external wallet flow.
+`vex_signingRequest` handles portable Vexanium requests transported through QR codes, deep links, clipboard flows, or wallet bridges.
 
-The canonical Vexanium URI scheme is:
+The Vexanium URI scheme is exclusively:
 
 ```text
 vsr://...
 ```
 
-The payload follows the compatible Antelope signing-request format used by existing ecosystem tooling. Compatible input using the established alternate URI scheme may be accepted for interoperability, while newly created Vexanium requests use `vsr:`.
+A `VexaniumProvider` v1 implementation must treat other signing-request URI schemes as invalid input. Newly created and accepted provider-level signing requests target the configured Vexanium chain.
 
-A successful signing-request response contains `signatures: string[]` and `broadcast: boolean`. Empty or malformed signature lists are rejected.
+A successful response contains `signatures: string[]` and `broadcast: boolean`. Empty or malformed signature lists are rejected.
 
-Wallets can use the WindStack signing-request inspection API to enumerate and ABI-decode single actions, action arrays, and full-transaction requests through one code path.
+Wallets can use WindStack's signing-request inspection API to enumerate and ABI-decode single actions, action arrays, and full transactions through one code path. Multi-action order and authorization data must be preserved.
 
 ## Errors
 
@@ -229,7 +236,9 @@ A discovered provider must expose valid mandatory `providerInfo` before it is ac
 
 `DappMetadata` is display metadata only. Wallet permission state must bind to an authoritative runtime or transport origin, such as the browser extension sender origin. A wallet must not use an origin supplied by application content as the permission boundary.
 
-Exact transaction signing must preserve the bytes approved by the application and must not substitute a rebuilt transaction after user approval. Structured transaction review data must be verified against the authoritative serialized bytes before it is trusted for display or policy decisions.
+Exact transaction signing must preserve the canonical bytes approved by the application and must not substitute a rebuilt transaction after user approval. Structured transaction review data must be verified against the authoritative serialized bytes before it is trusted for display or policy decisions.
+
+VSR input and packed transactions are untrusted input. Implementations must enforce supported chain, payload bounds, canonical transaction encoding, provider capability checks, and explicit user approval policies before signing.
 
 ## Runtime
 
