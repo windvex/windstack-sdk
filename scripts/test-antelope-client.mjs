@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import {
   AntelopeClient,
   PrivateKeySigner,
+  deserializeTransaction,
   serializeContextFreeData,
   serializeTransaction,
   transactionDigest,
@@ -101,6 +102,20 @@ assert.equal(result.transaction.ref_block_num, 99);
 assert.equal(result.transaction.ref_block_prefix, 123456789);
 assert.deepEqual(result.serializedContextFreeData, serializeContextFreeData(contextFreeData));
 assert.deepEqual(result.serializedTransaction, serializeTransaction(result.transaction));
+assert.deepEqual(deserializeTransaction(result.serializedTransaction), result.transaction);
+assert.deepEqual(deserializeTransaction(Buffer.from(result.serializedTransaction).toString("hex")), result.transaction);
+assert.deepEqual(lastSignRequest.transaction, result.transaction);
+
+const multiTransaction = {
+  ...result.transaction,
+  actions: [action, { ...action, data: action.data }],
+};
+const multiSerialized = serializeTransaction(multiTransaction);
+const multiDecoded = deserializeTransaction(multiSerialized);
+assert.equal(multiDecoded.actions.length, 2);
+assert.deepEqual(multiDecoded, multiTransaction);
+assert.deepEqual(serializeTransaction(multiDecoded), multiSerialized);
+
 const expectedDigest = sha256Digest(
   concatBytes(
     hexToBytes(chainId),
@@ -166,5 +181,7 @@ await assert.rejects(
 );
 assert.throws(() => serializeContextFreeData(["not bytes"]), /Uint8Array/);
 assert.throws(() => transactionDigest("bad", new Uint8Array()), /chain id/);
+assert.throws(() => deserializeTransaction(new Uint8Array()), /cannot be empty/);
+assert.throws(() => deserializeTransaction(Uint8Array.of(0)), /Unexpected end/);
 
 console.log("Antelope transaction and signer tests passed");
