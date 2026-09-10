@@ -4,7 +4,15 @@
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
  */
-import type { Transaction } from "@windstack/antelope";
+import type {
+  AccountClient,
+  Action,
+  AuthorizationInput,
+  Contract,
+  Transaction,
+  TransactionExtension,
+  TransactResult,
+} from "@windstack/antelope";
 import type {
   DappMetadata,
   DappMetadataInput,
@@ -13,6 +21,7 @@ import type {
   ProviderDetail,
   RequestArguments,
 } from "@windstack/core";
+import type { FetchLike } from "@windstack/rpc";
 import type {
   SigningRequestCreateArguments,
   SigningRequestEncodingOptions,
@@ -166,8 +175,31 @@ export type VexaniumClientOptions = {
   provider?: VexaniumProvider;
   /** Optional provider reverse-DNS identifier used during multi-wallet discovery. */
   providerRdns?: string;
+  /** Vexanium RPC endpoint or ordered endpoint list. */
+  rpcUrl?: string | readonly string[];
+  /** Optional fetch implementation shared by the Vexanium RPC client. */
+  fetch?: FetchLike;
   discoveryTimeoutMs?: number;
   autoSync?: boolean | VexaniumSessionSyncOptions;
+};
+
+export type VexaniumActionInput = {
+  account: string;
+  name: string;
+  data: unknown;
+  /** Defaults to the connected signer permission for normal transaction actions. */
+  authorization?: AuthorizationInput[];
+};
+
+export type VexaniumTransactArgs = {
+  actions: VexaniumActionInput[];
+  contextFreeActions?: VexaniumActionInput[];
+  contextFreeData?: Uint8Array[];
+  transactionExtensions?: TransactionExtension[];
+  signer?: VexaniumPermissionLevel;
+  broadcast?: boolean;
+  expireSeconds?: number;
+  signal?: AbortSignal;
 };
 
 export type CanonicalSigningRequestUri = `vsr:${string}`;
@@ -220,9 +252,11 @@ export type VexSignDigestParams = DappRequestMetadataParams & {
   permission?: string;
 };
 
-/** Exact resolved Antelope transaction signing parameters. */
+/** Exact resolved Vexanium transaction signing parameters. */
 export type VexSignTransactionParams = DappRequestMetadataParams & {
   serializedTransaction: string;
+  /** Canonical packed context-free data. Empty string means no context-free data. */
+  serializedContextFreeData?: string;
   /**
    * Canonical structured representation of `serializedTransaction`.
    * When omitted, WindStack decodes the packed bytes before forwarding the request to a wallet.
@@ -256,6 +290,10 @@ export type VexaniumClient = {
   getAccounts(): Promise<VexaniumAccount[]>;
   syncAccounts(): Promise<VexaniumAccount[]>;
   getChain(): Promise<VexaniumChainId>;
+  contract(account: string): Contract;
+  account(name?: string): AccountClient;
+  action(input: VexaniumActionInput, signal?: AbortSignal): Promise<Action>;
+  transact<T = Record<string, unknown>>(args: VexaniumTransactArgs): Promise<TransactResult<T>>;
   signSigningRequest(params: VexSigningRequestParams): Promise<VexSigningRequestResult>;
   signMessage(message: string | Uint8Array, account?: string): Promise<unknown>;
   signDigest(digest: string, account?: string): Promise<unknown>;
