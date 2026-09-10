@@ -58,6 +58,7 @@ class WispSigner implements Signer {
     }
     const result = await this.client.signTransaction({
       serializedTransaction: bytesToHex(request.serializedTransaction),
+      serializedContextFreeData: bytesToHex(request.serializedContextFreeData),
       transaction: request.transaction,
       chainId: request.chainId,
       account: this.account.actor,
