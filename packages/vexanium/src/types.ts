@@ -23,6 +23,7 @@ import type {
 } from "@windstack/core";
 import type { FetchLike } from "@windstack/rpc";
 import type {
+  SigningRequest,
   SigningRequestCreateArguments,
   SigningRequestEncodingOptions,
   SigningRequestParseOptions,
@@ -294,6 +295,14 @@ export type VexaniumClient = {
   account(name?: string): AccountClient;
   action(input: VexaniumActionInput, signal?: AbortSignal): Promise<Action>;
   transact<T = Record<string, unknown>>(args: VexaniumTransactArgs): Promise<TransactResult<T>>;
+  createSigningRequest(
+    args: VexSigningRequestCreateInput,
+    options?: VexSigningRequestCreateOptions,
+  ): Promise<CanonicalSigningRequestUri>;
+  parseSigningRequest(
+    uri: VexSigningRequestUri,
+    options?: VexSigningRequestParseOptions,
+  ): SigningRequest;
   signSigningRequest(params: VexSigningRequestParams): Promise<VexSigningRequestResult>;
   signMessage(message: string | Uint8Array, account?: string): Promise<unknown>;
   signDigest(digest: string, account?: string): Promise<unknown>;
