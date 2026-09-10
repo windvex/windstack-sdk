@@ -42,7 +42,7 @@
   "contributors": [
     "PT WIND KRIPTOGRAFI TEKNOLOGI"
   ],
-  "description": "General-purpose TypeScript SDK packages for Antelope, Vexanium, EVM, Solana, signing, providers, exact assets, and protocol math.",
+  "description": "Modern TypeScript SDK for Vexanium applications, wallet connectivity, contracts, transactions, VSR, VEX EVM, and reusable chain primitives.",
   "homepage": "https://github.com/windvex/windstack-sdk#readme",
   "repository": {
     "type": "git",
