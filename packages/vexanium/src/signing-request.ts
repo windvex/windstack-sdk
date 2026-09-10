@@ -12,7 +12,7 @@ import {
   type CompressionProvider,
 } from "@windstack/signing-request";
 import { vexNative } from "./chains.js";
-import { ESR_SCHEME, VSR_SCHEME } from "./constants.js";
+import { VSR_SCHEME } from "./constants.js";
 import type {
   CanonicalSigningRequestUri,
   VexSigningRequestCreateInput,
@@ -85,16 +85,16 @@ export function encodeSigningRequest(
 
 function assertSigningRequestUri(uri: VexSigningRequestUri): VexSigningRequestUri {
   if (typeof uri !== "string" || uri.length === 0 || uri !== uri.trim()) {
-    throw new TypeError("Invalid signing-request URI");
+    throw new TypeError("Invalid Vexanium Signing Request URI");
   }
   const scheme = uri.slice(0, uri.indexOf(":") + 1).toLowerCase();
-  if (scheme !== VSR_SCHEME && scheme !== ESR_SCHEME) {
-    throw new TypeError("Signing-request URI must use the vsr: or esr: scheme");
+  if (scheme !== VSR_SCHEME) {
+    throw new TypeError("Vexanium Signing Request URI must use the vsr: scheme");
   }
   return uri;
 }
 
-/** Parse compressed or uncompressed VSR/ESR without changing the source request. */
+/** Parse a compressed or uncompressed Vexanium Signing Request. */
 export function parseSigningRequest(
   uri: VexSigningRequestUri,
   options: VexSigningRequestParseOptions = {},
