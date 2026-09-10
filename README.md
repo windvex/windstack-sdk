@@ -2,6 +2,8 @@
 
 [![Build](https://github.com/windvex/windstack-sdk/actions/workflows/validate.yml/badge.svg)](https://github.com/windvex/windstack-sdk/actions/workflows/validate.yml)
 
+## Overview
+
 WindStack is a modern TypeScript SDK that makes Vexanium application development direct and predictable.
 
 The intended developer flow is:
