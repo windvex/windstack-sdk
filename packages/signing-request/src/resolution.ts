@@ -212,6 +212,21 @@ function resolvePermissionLevel(
   };
 }
 
+function createDeduplicatedAbiProvider(
+  abiProvider: SigningRequestAbiProvider,
+): SigningRequestAbiProvider {
+  const pending = new Map<string, Promise<Abi>>();
+  return {
+    getAbi(account, signal) {
+      const existing = pending.get(account);
+      if (existing) return existing;
+      const request = abiProvider.getAbi(account, signal);
+      pending.set(account, request);
+      return request;
+    },
+  };
+}
+
 async function resolveAction(
   action: SigningRequestAction,
   signer: SigningRequestPermissionLevel,
@@ -323,6 +338,7 @@ export async function resolveSigningRequest(
   const chainId = resolveChainId(request, options);
   const requestData = request.getData();
   const payload = requestData.request;
+  const abiProvider = createDeduplicatedAbiProvider(options.abiProvider);
   let transaction: SigningRequestTransaction;
 
   if (payload.type === "identity") {
@@ -338,7 +354,7 @@ export async function resolveSigningRequest(
       delay_sec: 0,
       context_free_actions: [],
       actions: await Promise.all(
-        actions.map((action) => resolveAction(action, signer, options.abiProvider, options.signal)),
+        actions.map((action) => resolveAction(action, signer, abiProvider, options.signal)),
       ),
       transaction_extensions: [],
     };
@@ -348,13 +364,11 @@ export async function resolveSigningRequest(
       ...source,
       context_free_actions: await Promise.all(
         source.context_free_actions.map((action) =>
-          resolveAction(action, signer, options.abiProvider, options.signal),
+          resolveAction(action, signer, abiProvider, options.signal),
         ),
       ),
       actions: await Promise.all(
-        source.actions.map((action) =>
-          resolveAction(action, signer, options.abiProvider, options.signal),
-        ),
+        source.actions.map((action) => resolveAction(action, signer, abiProvider, options.signal)),
       ),
       transaction_extensions: source.transaction_extensions.map((extension) => ({ ...extension })),
     };
@@ -398,28 +412,42 @@ function timestampSeconds(value: string): number {
 
 export class RpcSigningRequestAbiProvider implements SigningRequestAbiProvider {
   readonly #cache = new Map<string, Abi>();
+  readonly #pending = new Map<string, Promise<Abi>>();
 
   constructor(readonly rpc: RpcClient) {}
 
   async getAbi(account: string, signal?: AbortSignal): Promise<Abi> {
     const cached = this.#cache.get(account);
     if (cached) return cached;
-    const result = await this.rpc.getAbi(account, signal);
-    if (!result.abi || typeof result.abi !== "object") {
-      throw new TypeError(`RPC returned no ABI for ${account}`);
-    }
-    const abi = result.abi as Abi;
-    new AbiSerializer(abi);
-    this.#cache.set(account, abi);
-    return abi;
+    const pending = this.#pending.get(account);
+    if (pending) return pending;
+
+    const request = this.rpc
+      .getAbi(account, signal)
+      .then((result) => {
+        if (!result.abi || typeof result.abi !== "object") {
+          throw new TypeError(`RPC returned no ABI for ${account}`);
+        }
+        const abi = result.abi as Abi;
+        new AbiSerializer(abi);
+        this.#cache.set(account, abi);
+        return abi;
+      })
+      .finally(() => {
+        this.#pending.delete(account);
+      });
+    this.#pending.set(account, request);
+    return request;
   }
 
   delete(account: string): void {
     this.#cache.delete(account);
+    this.#pending.delete(account);
   }
 
   clear(): void {
     this.#cache.clear();
+    this.#pending.clear();
   }
 }
 
