@@ -29,7 +29,9 @@ VEX EVM metadata is also included for chain ID `6736` (`0x1a50`).
 npm install @windstack/vexanium
 ```
 
-## Configure and connect
+## Usage
+
+### Configure and connect
 
 ```ts
 import { createVexaniumClient } from "@windstack/vexanium";
@@ -56,7 +58,7 @@ const vex = await createVexaniumClient({
 
 The configured RPC is shared by contract ABI loading, account access, transaction preparation, VSR creation, and broadcasting.
 
-## Interact with contracts
+### Interact with contracts
 
 Structured action data is ABI-encoded automatically. When `authorization` is omitted, normal transaction actions use the connected wallet permission.
 
@@ -81,7 +83,7 @@ console.log(result.response);
 
 `transact()` handles the complete normal transaction pipeline: ABI loading and caching, action encoding, authorization, TAPOS, canonical transaction serialization, wallet signing, and broadcasting.
 
-### Multi-action transactions
+#### Multi-action transactions
 
 Multiple contracts use exactly the same API. There is no separate multi-action transaction helper.
 
@@ -114,7 +116,7 @@ await vex.transact({
 
 The structured transaction remains available through the complete signing boundary so wallets can review every action without reconstructing the transaction from opaque bytes.
 
-## Contract and account access
+### Contract and account access
 
 The same configured client exposes lower-level contract and account objects when an application needs direct reads or reusable action construction:
 
@@ -128,7 +130,7 @@ const balance = await currentAccount.getTokenBalance();
 
 These APIs share the same RPC and ABI cache used by `transact()`.
 
-## Vexanium Signing Request (VSR)
+### Vexanium Signing Request (VSR)
 
 Portable wallet requests use the canonical `vsr:` scheme.
 
@@ -178,7 +180,7 @@ const signed = await vex.signSigningRequest({
 console.log(signed.signatures);
 ```
 
-## Existing wallet session
+### Existing wallet session
 
 Applications can read or observe the current session without rebuilding wallet state themselves:
 
@@ -192,7 +194,7 @@ const unsubscribe = vex.subscribeSession(({ session, reason }) => {
 unsubscribe();
 ```
 
-## Advanced exact signing
+### Advanced exact signing
 
 `signTransaction()` is an advanced escape hatch for applications that already have a canonical packed Vexanium transaction. Normal applications should prefer `transact()`.
 
@@ -248,9 +250,11 @@ if (action.name === "evmtx") {
 
 Both `evmtx_v1` and `evmtx_v3` variants are supported. RLP bytes, event fields, account names, and uint64 values are validated before being returned.
 
-## Runtime and security
+## Runtime
 
 The provider client targets browser applications with a compatible Vexanium wallet provider. RPC, metadata, VSR, decoding, and other utility surfaces can also be used where their runtime dependencies are available.
+
+## Security
 
 Wallet permissions are bound to the trusted provider/runtime session. Application display metadata is not used as an authorization boundary.
 
