@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: MIT
  */
 import { AccountClient, type AccountClientOptions } from "@windstack/account";
-import { BinaryWriter, bytesToHex, hexToBytes } from "@windstack/abi";
+import { BinaryReader, BinaryWriter, bytesToHex, hexToBytes } from "@windstack/abi";
 import { AbiCache, Contract, type ContractAction } from "@windstack/contract";
 import {
   type PrivateKey,
@@ -38,6 +38,14 @@ export type Transaction = {
   context_free_actions: Action[];
   actions: Action[];
   transaction_extensions: TransactionExtension[];
+};
+export type DeserializeTransactionOptions = {
+  maxBytes?: number;
+  maxContextFreeActions?: number;
+  maxActions?: number;
+  maxAuthorizationsPerAction?: number;
+  maxExtensions?: number;
+  requireCanonical?: boolean;
 };
 export type SignRequest = {
   chainId: string;
@@ -80,6 +88,12 @@ export type Tapos = Readonly<{
   blockId: string;
 }>;
 
+const DEFAULT_MAX_TRANSACTION_BYTES = 1024 * 1024;
+const DEFAULT_MAX_CONTEXT_FREE_ACTIONS = 1024;
+const DEFAULT_MAX_ACTIONS = 10_000;
+const DEFAULT_MAX_AUTHORIZATIONS_PER_ACTION = 1024;
+const DEFAULT_MAX_TRANSACTION_EXTENSIONS = 1024;
+
 export function taposFromBlock(
   block: Pick<GetBlockResponse, "id" | "block_num" | "ref_block_prefix">,
 ): Tapos {
@@ -113,6 +127,27 @@ function assertUint(value: number, max: number, label: string): number {
     throw new RangeError(`${label} must be an integer between 0 and ${max}`);
   }
   return value;
+}
+
+function assertPositiveLimit(value: number | undefined, fallback: number, label: string): number {
+  const limit = value ?? fallback;
+  if (!Number.isSafeInteger(limit) || limit <= 0) {
+    throw new RangeError(`${label} must be a positive safe integer`);
+  }
+  return limit;
+}
+
+function assertCollectionCount(count: number, max: number, label: string): number {
+  if (count > max) throw new RangeError(`${label} exceeds configured limit of ${max}`);
+  return count;
+}
+
+function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
 }
 
 function transactionForRpc(transaction: Transaction): Record<string, unknown> {
@@ -161,6 +196,120 @@ export function serializeTransaction(transaction: Transaction): Uint8Array {
     writer.writeVarBytes(hexToBytes(data));
   }
   return writer.toBytes();
+}
+
+function readAction(
+  reader: BinaryReader,
+  maxAuthorizationsPerAction: number,
+  label: string,
+): Action {
+  const account = reader.readName();
+  const name = reader.readName();
+  const authorizationCount = assertCollectionCount(
+    reader.readVarUint(),
+    maxAuthorizationsPerAction,
+    `${label} authorization count`,
+  );
+  const authorization = Array.from({ length: authorizationCount }, () => ({
+    actor: reader.readName(),
+    permission: reader.readName(),
+  }));
+  const data = bytesToHex(reader.readVarBytes());
+  return { account, name, authorization, data };
+}
+
+/** Decode canonical Antelope packed transaction bytes. */
+export function deserializeTransaction(
+  input: Uint8Array | string,
+  options: DeserializeTransactionOptions = {},
+): Transaction {
+  const bytes = typeof input === "string" ? hexToBytes(input) : input;
+  if (!(bytes instanceof Uint8Array)) {
+    throw new TypeError("Serialized transaction must be Uint8Array or hexadecimal");
+  }
+  const maxBytes = assertPositiveLimit(
+    options.maxBytes,
+    DEFAULT_MAX_TRANSACTION_BYTES,
+    "maxBytes",
+  );
+  if (bytes.length === 0) throw new TypeError("Serialized transaction cannot be empty");
+  if (bytes.length > maxBytes) {
+    throw new RangeError(`Serialized transaction exceeds configured limit of ${maxBytes} bytes`);
+  }
+
+  const maxContextFreeActions = assertPositiveLimit(
+    options.maxContextFreeActions,
+    DEFAULT_MAX_CONTEXT_FREE_ACTIONS,
+    "maxContextFreeActions",
+  );
+  const maxActions = assertPositiveLimit(options.maxActions, DEFAULT_MAX_ACTIONS, "maxActions");
+  const maxAuthorizationsPerAction = assertPositiveLimit(
+    options.maxAuthorizationsPerAction,
+    DEFAULT_MAX_AUTHORIZATIONS_PER_ACTION,
+    "maxAuthorizationsPerAction",
+  );
+  const maxExtensions = assertPositiveLimit(
+    options.maxExtensions,
+    DEFAULT_MAX_TRANSACTION_EXTENSIONS,
+    "maxExtensions",
+  );
+
+  const reader = new BinaryReader(bytes);
+  const expiration = new Date(reader.readUint32() * 1000).toISOString().replace(/\.000Z$/, "");
+  const ref_block_num = reader.readUint16();
+  const ref_block_prefix = reader.readUint32();
+  const max_net_usage_words = reader.readVarUint();
+  const max_cpu_usage_ms = reader.readByte();
+  const delay_sec = reader.readVarUint();
+
+  const contextFreeActionCount = assertCollectionCount(
+    reader.readVarUint(),
+    maxContextFreeActions,
+    "Context-free action count",
+  );
+  const context_free_actions = Array.from({ length: contextFreeActionCount }, (_, index) =>
+    readAction(reader, maxAuthorizationsPerAction, `Context-free action ${index}`),
+  );
+
+  const actionCount = assertCollectionCount(
+    reader.readVarUint(),
+    maxActions,
+    "Transaction action count",
+  );
+  const actions = Array.from({ length: actionCount }, (_, index) =>
+    readAction(reader, maxAuthorizationsPerAction, `Action ${index}`),
+  );
+
+  const extensionCount = assertCollectionCount(
+    reader.readVarUint(),
+    maxExtensions,
+    "Transaction extension count",
+  );
+  const transaction_extensions = Array.from(
+    { length: extensionCount },
+    (): TransactionExtension => [reader.readUint16(), bytesToHex(reader.readVarBytes())],
+  );
+
+  if (reader.remaining !== 0) {
+    throw new TypeError(`Unused packed transaction bytes: ${reader.remaining}`);
+  }
+
+  const transaction: Transaction = {
+    expiration,
+    ref_block_num,
+    ref_block_prefix,
+    max_net_usage_words,
+    max_cpu_usage_ms,
+    delay_sec,
+    context_free_actions,
+    actions,
+    transaction_extensions,
+  };
+
+  if (options.requireCanonical !== false && !equalBytes(serializeTransaction(transaction), bytes)) {
+    throw new TypeError("Serialized transaction is not canonically encoded");
+  }
+  return transaction;
 }
 
 export function serializeContextFreeData(items: Uint8Array[]): Uint8Array {
