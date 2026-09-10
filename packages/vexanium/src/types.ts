@@ -4,6 +4,7 @@
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
  */
+import type { Transaction } from "@windstack/antelope";
 import type {
   DappMetadata,
   DappMetadataInput,
@@ -222,6 +223,11 @@ export type VexSignDigestParams = DappRequestMetadataParams & {
 /** Exact resolved Antelope transaction signing parameters. */
 export type VexSignTransactionParams = DappRequestMetadataParams & {
   serializedTransaction: string;
+  /**
+   * Canonical structured representation of `serializedTransaction`.
+   * When omitted, WindStack decodes the packed bytes before forwarding the request to a wallet.
+   */
+  transaction?: Transaction;
   chainId: VexaniumFullChainId;
   account: string;
   permission: string;
