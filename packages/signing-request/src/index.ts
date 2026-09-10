@@ -22,6 +22,12 @@ export {
   parseSigningRequest,
 } from "./request.js";
 export {
+  decodeSigningRequestActions,
+  getSigningRequestActions,
+  type SigningRequestActionInspection,
+  type SigningRequestActionSelectionOptions,
+} from "./inspection.js";
+export {
   RpcSigningRequestAbiProvider,
   resolveSigningRequest,
   resolveSigningRequestWithRpc,
