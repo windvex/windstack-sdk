@@ -3,6 +3,7 @@ import {
   AntelopeClient,
   deserializeTransaction,
   serializeTransaction,
+  type AuthorizationInput,
   type Transaction,
 } from "@windstack/antelope";
 import { getRuntimeWindow, resolveDappMetadata, resolveDappRequestContext } from "@windstack/core";
@@ -886,15 +887,17 @@ export async function createVexaniumClient(
 
   const buildAction = async (
     input: VexaniumActionInput,
-    defaultAuthorization: readonly string[],
+    defaultAuthorization: readonly AuthorizationInput[],
     signal?: AbortSignal,
   ) =>
-    antelope.contract(input.account).action(
-      input.name,
-      input.data,
-      input.authorization ? [...input.authorization] : [...defaultAuthorization],
-      signal,
-    );
+    antelope
+      .contract(input.account)
+      .action(
+        input.name,
+        input.data,
+        input.authorization ? [...input.authorization] : [...defaultAuthorization],
+        signal,
+      );
 
   const transact = async <T = Record<string, unknown>>(args: VexaniumTransactArgs) => {
     const signer = requireSigner(args.signer);
