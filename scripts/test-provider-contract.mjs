@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { bytesToHex } from "../packages/abi/dist/index.js";
 import { serializeTransaction } from "../packages/antelope/dist/index.js";
 import { PrivateKey, sha256Digest } from "../packages/crypto/dist/index.js";
-import { createSigningRequest as createPortableSigningRequest } from "../packages/signing-request/dist/index.js";
 import {
   VEXANIUM_CAPABILITIES,
   VEXANIUM_ERROR_CODES,
@@ -12,6 +11,7 @@ import {
   VEXANIUM_PROVIDER_STANDARD,
   VEXANIUM_PROVIDER_VERSION,
   VexaniumProviderError,
+  createSigningRequest,
   createVexaniumClient,
   isVexaniumProvider,
 } from "../packages/vexanium/dist/index.js";
@@ -32,12 +32,10 @@ const exactTransaction = {
   transaction_extensions: [],
 };
 const exactSerializedTransaction = bytesToHex(serializeTransaction(exactTransaction));
-const portableRequest = (
-  await createPortableSigningRequest({
-    chainId: VEXANIUM_MAINNET_CHAIN_ID,
-    transaction: exactTransaction,
-  })
-).encode(false, true, "esr");
+const portableRequest = await createSigningRequest({
+  chainId: VEXANIUM_MAINNET_CHAIN_ID,
+  transaction: exactTransaction,
+});
 const account = {
   actor: "windstack",
   permission: "active",
@@ -154,10 +152,10 @@ await assert.rejects(
     error instanceof VexaniumProviderError && error.code === VEXANIUM_ERROR_CODES.INVALID_PARAMS,
 );
 
-// ESR interoperability input is validated and forwarded without rewriting it.
 await client.signSigningRequest({ request: portableRequest, broadcast: false });
 const requestCall = calls.find((call) => call.method === VEXANIUM_METHODS.SIGNING_REQUEST);
 assert.equal(requestCall.params.request, portableRequest);
+assert.match(requestCall.params.request, /^vsr:\/\//);
 
 const { provider: incompatibleProvider } = makeProvider({
   providerInfo: { version: "2.0.0" },
