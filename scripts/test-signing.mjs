@@ -6,7 +6,6 @@ import { PrivateKey, sha256Digest } from "../packages/crypto/dist/index.js";
 import { SigningRequest } from "../packages/signing-request/dist/index.js";
 import { deflateRaw, inflateRaw } from "pako";
 import {
-  ESR_SCHEME,
   VSR_SCHEME,
   VEXANIUM_CAPABILITIES,
   VEXANIUM_MAINNET_CHAIN_ID,
@@ -94,12 +93,9 @@ const canonicalVsr = encodeSigningRequest(nativeRequest, {
   compress: false,
   slashes: true,
 });
-const esr = nativeRequest.encode(false, true, "esr");
 
 assert.ok(canonicalVsr.startsWith(`${VSR_SCHEME}//`));
-assert.ok(esr.startsWith(`${ESR_SCHEME}//`));
-assert.equal(parseSigningRequest(canonicalVsr).encode(false, true, "esr"), esr);
-assert.equal(parseSigningRequest(esr).encode(false, true, "esr"), esr);
+assert.equal(parseSigningRequest(canonicalVsr).encode(false, true, "vsr"), canonicalVsr);
 
 const compressedSigningInput = {
   chainId: VEXANIUM_MAINNET_CHAIN_ID,
@@ -119,8 +115,8 @@ const compressedPayload = Buffer.from(
 
 assert.notEqual(compressedPayload[0] & 0x80, 0);
 assert.equal(
-  parseSigningRequest(compressedVsr).encode(false, true, "esr"),
-  parseSigningRequest(uncompressedVsr).encode(false, true, "esr"),
+  parseSigningRequest(compressedVsr).encode(false, true, "vsr"),
+  parseSigningRequest(uncompressedVsr).encode(false, true, "vsr"),
 );
 
 let customDeflateCalls = 0;
@@ -195,11 +191,12 @@ try {
 }
 
 const client = await createVexaniumClient({ provider, autoSync: false });
-await client.signSigningRequest({ request: esr, broadcast: false });
+await client.signSigningRequest({ request: canonicalVsr, broadcast: false });
 
 const portableCalls = calls.filter((call) => call.method === VEXANIUM_METHODS.SIGNING_REQUEST);
 assert.equal(portableCalls.length, 1);
-assert.equal(portableCalls[0].params.request, esr);
+assert.equal(portableCalls[0].params.request, canonicalVsr);
+assert.match(portableCalls[0].params.request, /^vsr:\/\//);
 
 calls.length = 0;
 const pluginClient = {
