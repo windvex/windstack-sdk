@@ -128,7 +128,7 @@ function timestampSeconds(value: string): number {
 
 function assertUint(value: number, max: number, label: string): number {
   if (!Number.isInteger(value) || value < 0 || value > max) {
-    throw new RangeError(`${label} must be an integer between 0 and ${max}`);
+    throw new RangeError(`${label} must be an integer between ${min} and ${max}`);
   }
   return value;
 }
@@ -490,13 +490,7 @@ export class AntelopeClient {
 
   async transact<T = Record<string, unknown>>(args: TransactArgs): Promise<TransactResult<T>> {
     const prepared = await this.prepareTransaction(args);
-    const {
-      chainId: actualChainId,
-      transaction,
-      serializedTransaction,
-      serializedContextFreeData,
-      digest,
-    } = prepared;
+    const { transaction, serializedTransaction, serializedContextFreeData, digest } = prepared;
 
     const availableKeys = [...new Set(await args.signer.getAvailableKeys(args.signal))];
     if (!availableKeys.length) throw new Error("Signer returned no available keys");
