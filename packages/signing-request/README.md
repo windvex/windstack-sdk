@@ -2,9 +2,9 @@
 
 ## Overview
 
-`@windstack/signing-request` creates, parses, resolves, signs, verifies, and inspects portable signing requests for Antelope applications. It supports single actions, multiple actions, full transactions, identity requests, callbacks, request signatures, compression, full chain IDs, multi-chain requests, and ABI-aware placeholder resolution.
+`@windstack/signing-request` creates, parses, resolves, signs, verifies, and inspects Vexanium Signing Requests (VSR). It supports single actions, multiple actions, full transactions, identity requests, callbacks, request signatures, compression, full chain IDs, multi-chain requests, and ABI-aware placeholder resolution.
 
-Vexanium applications can use the canonical `vsr:` scheme. Existing `esr:` requests are accepted for protocol interoperability.
+VSR uses the canonical `vsr:` URI scheme. Normal fixed-chain action, multi-action, and transaction requests use the minimal compatible protocol revision; features that require revision 3 select it automatically.
 
 ## Installation
 
@@ -21,14 +21,14 @@ import {
 } from "@windstack/signing-request";
 import { RpcClient } from "@windstack/rpc";
 
-const rpc = new RpcClient({ endpoints: "https://node.example" });
+const rpc = new RpcClient({ endpoints: "https://api.windcrypto.com" });
 const abiProvider = new RpcSigningRequestAbiProvider(rpc);
 
 const request = await createSigningRequest(
   {
-    chainId: "00".repeat(32),
+    chainId: "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f",
     action: {
-      account: "token.cntrct",
+      account: "vex.token",
       name: "transfer",
       authorization: [
         { actor: "............1", permission: "............2" },
@@ -36,8 +36,8 @@ const request = await createSigningRequest(
       data: {
         from: "............1",
         to: "receiver",
-        quantity: "1.0000 TKN",
-        memo: "example",
+        quantity: "1.0000 VEX",
+        memo: "WindStack",
       },
     },
     callback: "https://app.example/signed?tx={{tx}}",
@@ -45,7 +45,7 @@ const request = await createSigningRequest(
   { abiProvider },
 );
 
-const uri = request.encode(true, false, "esr");
+const uri = request.encode(true, true, "vsr");
 ```
 
 A wallet resolves actor and permission placeholders against the selected signer before signing:
@@ -88,15 +88,15 @@ for (const action of decoded) {
 
 `decodeSigningRequestActions` loads each required contract ABI once per inspection pass, decodes every action independently, preserves authorization data and action order, and supports multi-contract multi-action requests. Context-free actions can be included with `{ includeContextFree: true }`.
 
-## Request Types
+## Request types
 
-The package supports action, action-list, transaction, and identity requests. Identity requests produce an off-chain proof transaction and require a callback. Multi-chain requests use chain alias `0` and require the signer to select an explicit chain during resolution.
+The package supports action, action-list, transaction, and identity requests. Identity requests produce an off-chain proof transaction and require a callback. Multi-chain requests use chain alias `0` and require the signer to select an explicit chain during resolution. Nonzero aliases are resolved only through an explicit application-provided alias resolver; WindStack does not hardcode unrelated chains.
 
 Callbacks are returned as structured data. The package does not open callback URLs, send callback requests, broadcast transactions, access private keys automatically, or approve requests on behalf of a wallet.
 
 ## Vexanium
 
-Use the full Vexanium Mainnet chain ID for newly created VSR requests:
+Use the full Vexanium Mainnet chain ID for VSR requests:
 
 ```text
 f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f
@@ -110,7 +110,7 @@ The package is ESM-first and requires Node.js 20.19 or newer when used directly 
 
 ## Security
 
-Signing-request URIs are untrusted input. Parsing and resolution do not trigger signing, broadcasting, callbacks, or wallet permissions. Compressed payloads are decoded with a bounded output limit, unsupported protocol versions and flags are rejected, and structured action data is resolved through the contract ABI rather than by replacing arbitrary strings.
+VSR URIs are untrusted input. Parsing and resolution do not trigger signing, broadcasting, callbacks, or wallet permissions. Compressed payloads are decoded with a bounded output limit, unsupported protocol versions and flags are rejected, and structured action data is resolved through the contract ABI rather than by replacing arbitrary strings.
 
 Request signatures prove that request bytes were signed by a supplied public key; applications that need account-level authority verification must additionally verify that the key is authorized for the claimed account permission.
 
