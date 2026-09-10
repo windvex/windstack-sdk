@@ -1,5 +1,9 @@
 # Changelog
 
+## Overview
+
+Release history for the WindStack package set.
+
 ### 2.1.0 — 2026-09-10
 
 - Added canonical transaction deserialization with size and count limits plus canonical round-trip verification.
