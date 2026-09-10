@@ -2,18 +2,26 @@
 
 ## Overview
 
-`@windstack/vexanium` contains behavior that is specific to Vexanium: network metadata, browser wallet-provider access, Signing Requests, session observation, explorer routes, and VEX EVM bridge decoding.
+`@windstack/vexanium` is the high-level Vexanium SDK surface for applications that need chain access, wallet connection, contract interaction, transaction signing, Vexanium Signing Requests, account data, explorer routes, and VEX EVM utilities.
 
-VEX Native configuration exposed by this package uses:
+The primary developer flow is intentionally small:
+
+```text
+install WindStack → configure Vexanium → connect wallet → interact with blockchain
+```
+
+Applications should not need to create their own ABI helpers, transaction serializers, provider adapters, signing-request compatibility layers, or multi-action decoders for normal Vexanium development.
+
+VEX Native defaults:
 
 - Chain ID: `f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f`
-- RPC and API: `https://api.windcrypto.com`
+- RPC/API: `https://api.windcrypto.com`
 - System contract: `vexcore`
 - Native token contract: `vex.token`
 - Native symbol: `VEX`
 - Precision: `4`
 
-The package also exposes VEX EVM metadata for chain ID `6736` (`0x1a50`) and the WindStack EVM endpoints.
+VEX EVM metadata is also included for chain ID `6736` (`0x1a50`).
 
 ## Installation
 
@@ -21,29 +29,176 @@ The package also exposes VEX EVM metadata for chain ID `6736` (`0x1a50`) and the
 npm install @windstack/vexanium
 ```
 
-## Usage
-
-### Antelope client and local signer
+## Configure and connect
 
 ```ts
-import { PrivateKey } from "@windstack/antelope";
-import {
-  VEXANIUM_ANTELOPE_MAINNET,
-  createVexaniumAntelopeClient,
-  createVexaniumPrivateKeySigner,
-} from "@windstack/vexanium/antelope";
+import { createVexaniumClient } from "@windstack/vexanium";
 
-const client = createVexaniumAntelopeClient();
-const signer = createVexaniumPrivateKeySigner([
-  PrivateKey.fromString("PVT_K1_..."),
-]);
+const vex = await createVexaniumClient({
+  dapp: {
+    name: "My App",
+    url: "https://app.example",
+    icon: "https://app.example/icon.png",
+  },
+});
 
-console.log(VEXANIUM_ANTELOPE_MAINNET.nativeToken.symbol); // VEX
+const account = await vex.connectOne();
+console.log(account.permissionLevel);
 ```
 
-The signer announces K1 public keys with the native `VEX` prefix. Equivalent `VEX…`, `EOS…`, and `PUB_K1_…` inputs are matched by their key bytes.
+The default RPC is the WindStack Vexanium endpoint. Applications can provide an alternate Vexanium RPC endpoint without changing the rest of the API:
 
-### Network metadata
+```ts
+const vex = await createVexaniumClient({
+  rpcUrl: "https://my-vexanium-rpc.example",
+});
+```
+
+The configured RPC is shared by contract ABI loading, account access, transaction preparation, VSR creation, and broadcasting.
+
+## Interact with contracts
+
+Structured action data is ABI-encoded automatically. When `authorization` is omitted, normal transaction actions use the connected wallet permission.
+
+```ts
+const result = await vex.transact({
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      data: {
+        from: account.actor,
+        to: "receiver",
+        quantity: "1.0000 VEX",
+        memo: "WindStack",
+      },
+    },
+  ],
+});
+
+console.log(result.response);
+```
+
+`transact()` handles the complete normal transaction pipeline: ABI loading and caching, action encoding, authorization, TAPOS, canonical transaction serialization, wallet signing, and broadcasting.
+
+### Multi-action transactions
+
+Multiple contracts use exactly the same API. There is no separate multi-action transaction helper.
+
+```ts
+await vex.transact({
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      data: {
+        from: account.actor,
+        to: "swapv2.wind",
+        quantity: "2.0000 VEX",
+        memo: "liquidity",
+      },
+    },
+    {
+      account: "token.wind",
+      name: "transfer",
+      data: {
+        from: account.actor,
+        to: "swapv2.wind",
+        quantity: "3.00000000 WIND",
+        memo: "liquidity",
+      },
+    },
+  ],
+});
+```
+
+The structured transaction remains available through the complete signing boundary so wallets can review every action without reconstructing the transaction from opaque bytes.
+
+## Contract and account access
+
+The same configured client exposes lower-level contract and account objects when an application needs direct reads or reusable action construction:
+
+```ts
+const token = vex.contract("vex.token");
+const rows = await token.tableRows("accounts", account.actor);
+
+const currentAccount = vex.account();
+const balance = await currentAccount.getTokenBalance();
+```
+
+These APIs share the same RPC and ABI cache used by `transact()`.
+
+## Vexanium Signing Request (VSR)
+
+Portable wallet requests use the canonical `vsr:` scheme.
+
+```ts
+const uri = await vex.createSigningRequest({
+  broadcast: true,
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      authorization: [{ actor: account.actor, permission: account.permission }],
+      data: {
+        from: account.actor,
+        to: "receiver",
+        quantity: "1.0000 VEX",
+        memo: "VSR",
+      },
+    },
+    {
+      account: "token.wind",
+      name: "transfer",
+      authorization: [{ actor: account.actor, permission: account.permission }],
+      data: {
+        from: account.actor,
+        to: "receiver",
+        quantity: "1.00000000 WIND",
+        memo: "VSR",
+      },
+    },
+  ],
+});
+
+const request = vex.parseSigningRequest(uri);
+console.log(request.data.request.type); // action[]
+```
+
+`createSigningRequest()` uses the client's configured Vexanium chain, RPC, and ABI cache. `parseSigningRequest()` only accepts VSRs targeting Vexanium Mainnet. Single actions, multi-actions, and full transactions are represented by the native WindStack signing-request implementation.
+
+A VSR can be handed to the connected wallet directly:
+
+```ts
+const signed = await vex.signSigningRequest({
+  request: uri,
+  broadcast: false,
+});
+
+console.log(signed.signatures);
+```
+
+## Existing wallet session
+
+Applications can read or observe the current session without rebuilding wallet state themselves:
+
+```ts
+const accounts = await vex.getAccounts();
+
+const unsubscribe = vex.subscribeSession(({ session, reason }) => {
+  console.log(session, reason);
+});
+
+unsubscribe();
+```
+
+## Advanced exact signing
+
+`signTransaction()` is an advanced escape hatch for applications that already have a canonical packed Vexanium transaction. Normal applications should prefer `transact()`.
+
+WindStack validates the packed transaction, decodes it canonically, preserves its structured form for wallet review, and rejects a supplied structured transaction when it does not serialize back to the exact same bytes.
+
+## Network metadata
 
 ```ts
 import { vexEvm, vexNative } from "@windstack/vexanium";
@@ -55,98 +210,16 @@ console.log(vexNative.token.symbol); // VEX
 console.log(vexEvm.chainId); // 6736
 ```
 
-### Wallet connection
+## Explorer routes
 
 ```ts
-import { createVexaniumClient, vexNative } from "@windstack/vexanium";
-
-const client = await createVexaniumClient({
-  dapp: {
-    name: "My App",
-    url: "https://app.example",
-    icon: "https://app.example/icon.png",
-  },
-});
-
-let accounts = await client.getAccounts();
-if (accounts.length === 0) {
-  accounts = await client.connect({ chainId: vexNative.chainId });
-}
-```
-
-`getAccounts()` reads an existing wallet permission without opening a connection prompt. `connect()` requests wallet authorization for the selected Vexanium chain. Provider events and browser visibility changes keep the local session view synchronized with the wallet.
-
-```ts
-const unsubscribe = client.subscribeSession(({ session, reason }) => {
-  console.log(session, reason);
-});
-
-unsubscribe();
-client.destroy();
-```
-
-### Exact transaction signing
-
-Applications that already have serialized Vexanium transaction bytes can request signatures without rebuilding the transaction:
-
-```ts
-const result = await client.signTransaction({
-  chainId: vexNative.chainId,
-  serializedTransaction: "00a1",
-  account: "alice",
-  permission: "active",
-});
-
-console.log(result.signatures);
-```
-
-The client validates the full Vexanium chain ID, serialized hexadecimal payload, account and permission names, and returned signatures before accepting a result.
-
-### Vexanium Signing Requests
-
-VSR is available for portable requests that need to move through QR codes, links, the clipboard, or an external wallet flow.
-
-```ts
-import {
-  createSigningRequest,
-  parseSigningRequest,
-  vexNative,
-} from "@windstack/vexanium";
-
-const uri = await createSigningRequest({
-  chainId: vexNative.chainId,
-  broadcast: true,
-  action: {
-    account: "vex.token",
-    name: "transfer",
-    authorization: [{ actor: "alice", permission: "active" }],
-    data: {
-      from: "alice",
-      to: "bob",
-      quantity: "1.0000 VEX",
-      memo: "WindStack",
-    },
-  },
-});
-
-const request = parseSigningRequest(uri);
-```
-
-### Explorer routes
-
-```ts
-import {
-  buildExplorerAccountUrl,
-  buildExplorerTxUrl,
-} from "@windstack/vexanium";
+import { buildExplorerAccountUrl, buildExplorerTxUrl } from "@windstack/vexanium";
 
 const accountUrl = buildExplorerAccountUrl("gvexa");
 const transactionUrl = buildExplorerTxUrl("transaction-id");
 ```
 
-Exact asset parsing and formatting are available from `@windstack/abi`; exact decimal utilities are available from `@windstack/core`.
-
-### VEX EVM bridge primitives
+## VEX EVM bridge primitives
 
 ```ts
 import {
@@ -156,15 +229,13 @@ import {
 } from "@windstack/vexanium";
 
 const address = nativeAccountToReservedEvmAddress("alice");
-const account = reservedEvmAddressToNativeAccount(address);
+const nativeAccount = reservedEvmAddressToNativeAccount(address);
 const transfer = decodeVexEvmBridgeTransferCalldata(calldata);
 ```
 
-Reserved addresses are accepted only when their `0xbbbb…` suffix decodes to a canonical Vexanium account. Prefix-only matches, malformed ABI offsets, truncated UTF-8, and oversized memos are rejected.
+Reserved bridge addresses are accepted only when their payload decodes to a canonical Vexanium account. Malformed offsets, invalid address payloads, truncated UTF-8, and oversized memos are rejected.
 
-### VEX EVM contract actions
-
-Decoded `vex.evm::evmtx` and `vex.evm::pushtx` data can be normalized without losing uint64 values:
+## VEX EVM contract actions
 
 ```ts
 import { decodeVexEvmContractAction } from "@windstack/vexanium";
@@ -175,15 +246,15 @@ if (action.name === "evmtx") {
 }
 ```
 
-Both `evmtx_v1` and `evmtx_v3` variants are supported. RLP bytes, event fields, account names, and uint64 values are validated before being returned. Other `vex.evm` actions can be decoded from their current on-chain ABI with `AbiSerializer` from `@windstack/abi`.
+Both `evmtx_v1` and `evmtx_v3` variants are supported. RLP bytes, event fields, account names, and uint64 values are validated before being returned.
 
-## Runtime
+## Runtime and security
 
-The provider client targets browser applications with a compatible Vexanium wallet provider. Network metadata and utility functions can also be used in server-side applications.
+The provider client targets browser applications with a compatible Vexanium wallet provider. RPC, metadata, VSR, decoding, and other utility surfaces can also be used where their runtime dependencies are available.
 
-Application metadata is display information. Wallet permissions must be bound to a trusted runtime or transport origin rather than an origin supplied by application content.
+Wallet permissions are bound to the trusted provider/runtime session. Application display metadata is not used as an authorization boundary.
 
-For transaction construction, ABI serialization, RPC, contract actions, account operations, and signing, use the dedicated `@windstack/antelope` package family.
+Packed transactions and VSR payloads are treated as untrusted input. WindStack applies canonical decoding, size limits, chain validation, ABI-aware action handling, and explicit wallet capability negotiation before signing.
 
 ## License
 
