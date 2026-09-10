@@ -227,11 +227,7 @@ export function deserializeTransaction(
   if (!(bytes instanceof Uint8Array)) {
     throw new TypeError("Serialized transaction must be Uint8Array or hexadecimal");
   }
-  const maxBytes = assertPositiveLimit(
-    options.maxBytes,
-    DEFAULT_MAX_TRANSACTION_BYTES,
-    "maxBytes",
-  );
+  const maxBytes = assertPositiveLimit(options.maxBytes, DEFAULT_MAX_TRANSACTION_BYTES, "maxBytes");
   if (bytes.length === 0) throw new TypeError("Serialized transaction cannot be empty");
   if (bytes.length > maxBytes) {
     throw new RangeError(`Serialized transaction exceeds configured limit of ${maxBytes} bytes`);
