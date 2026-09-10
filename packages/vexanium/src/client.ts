@@ -23,7 +23,10 @@ import {
   normalizeVexaniumProviderError,
   vexaniumUnsupportedCapability,
 } from "./errors.js";
-import { parseSigningRequest } from "./signing-request.js";
+import {
+  createSigningRequest as createVexaniumSigningRequest,
+  parseSigningRequest as parseVexaniumSigningRequest,
+} from "./signing-request.js";
 import {
   assertVexaniumCapabilitiesResponse,
   assertVexaniumConnectResponse,
@@ -53,8 +56,12 @@ import type {
   VexSignMessageParams,
   VexSignTransactionParams,
   VexSignTransactionResult,
+  VexSigningRequestCreateInput,
+  VexSigningRequestCreateOptions,
   VexSigningRequestParams,
+  VexSigningRequestParseOptions,
   VexSigningRequestResult,
+  VexSigningRequestUri,
 } from "./types.js";
 import {
   isAntelopeName,
@@ -200,7 +207,7 @@ function assertValidSignatures(value: unknown, method: string): asserts value is
   } catch {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-      `Malformed ${method} response: invalid Antelope signature`,
+      `Malformed ${method} response: invalid Vexanium signature`,
       value,
     );
   }
@@ -212,7 +219,7 @@ function normalizeSignTransactionParams(
   if (!isVexaniumFullChainId(params.chainId)) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_PARAMS,
-      "Invalid Antelope chain ID",
+      "Invalid Vexanium chain ID",
     );
   }
   if (!isHexBytes(params.serializedTransaction)) {
@@ -224,7 +231,7 @@ function normalizeSignTransactionParams(
   if (!isAntelopeName(params.account) || !isAntelopeName(params.permission)) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_PARAMS,
-      "Invalid Antelope account or permission name",
+      "Invalid Vexanium account or permission name",
     );
   }
 
@@ -234,7 +241,7 @@ function normalizeSignTransactionParams(
   } catch (error) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_PARAMS,
-      "serializedTransaction must contain a canonical Antelope transaction",
+      "serializedTransaction must contain a canonical Vexanium transaction",
       error,
     );
   }
@@ -251,7 +258,7 @@ function normalizeSignTransactionParams(
     } catch (error) {
       throw new VexaniumProviderError(
         VEXANIUM_ERROR_CODES.INVALID_PARAMS,
-        "transaction must be a valid Antelope transaction",
+        "transaction must be a valid Vexanium transaction",
         error,
       );
     }
@@ -344,6 +351,11 @@ export async function createVexaniumClient(
       token: vexNative.contracts.token,
     },
   });
+  const signingRequestAbiProvider = {
+    getAbi(account: string, signal?: AbortSignal) {
+      return antelope.contract(account).getAbi(false, signal);
+    },
+  };
   const dapp = resolveDappMetadata(options.dapp);
   const requestContext = resolveDappRequestContext();
   const listeners: ClientListenerStore = new Map();
@@ -418,61 +430,55 @@ export async function createVexaniumClient(
   const negotiate = async (
     requiredCapabilities: readonly VexaniumCapability[] = [],
   ): Promise<VexaniumCapabilitiesResponse> => {
-    if (negotiation) {
-      for (const capability of requiredCapabilities) {
-        if (!negotiation.capabilities.includes(capability)) {
-          throw vexaniumUnsupportedCapability(capability);
+    const hasRequiredCapabilities = (response: VexaniumCapabilitiesResponse): boolean =>
+      requiredCapabilities.every((capability) => response.capabilities.includes(capability));
+
+    if (negotiation && hasRequiredCapabilities(negotiation)) return negotiation;
+
+    if (negotiationInFlight) {
+      const current = await negotiationInFlight;
+      if (hasRequiredCapabilities(current)) return current;
+    }
+
+    const requestedCapabilities = [
+      ...new Set([...(negotiation?.capabilities ?? []), ...requiredCapabilities]),
+    ];
+    negotiationInFlight = request<VexaniumCapabilitiesResponse>({
+      method: VEXANIUM_METHODS.GET_CAPABILITIES,
+      params: {
+        standard: VEXANIUM_PROVIDER_STANDARD,
+        version: VEXANIUM_PROVIDER_VERSION,
+        requiredCapabilities: requestedCapabilities,
+      },
+    })
+      .then((response) => {
+        assertVexaniumCapabilitiesResponse(response, requestedCapabilities);
+        assertCapabilityMethods(response);
+        const info = requireProvider().providerInfo;
+        for (const capability of response.capabilities) {
+          if (!info.capabilities.includes(capability)) {
+            throw new VexaniumProviderError(
+              VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+              `Provider negotiated undeclared capability: ${capability}`,
+            );
+          }
         }
-      }
-      return negotiation;
-    }
-
-    if (!negotiationInFlight) {
-      negotiationInFlight = request<VexaniumCapabilitiesResponse>({
-        method: VEXANIUM_METHODS.GET_CAPABILITIES,
-        params: {
-          standard: VEXANIUM_PROVIDER_STANDARD,
-          version: VEXANIUM_PROVIDER_VERSION,
-          requiredCapabilities,
-        },
+        for (const chainId of response.chains) {
+          if (!info.chains.some((declaredChainId) => sameVexaniumChain(chainId, declaredChainId))) {
+            throw new VexaniumProviderError(
+              VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+              `Provider negotiated undeclared chain: ${chainId}`,
+            );
+          }
+        }
+        negotiation = response;
+        return response;
       })
-        .then((response) => {
-          assertVexaniumCapabilitiesResponse(response, requiredCapabilities);
-          assertCapabilityMethods(response);
-          const info = requireProvider().providerInfo;
-          for (const capability of response.capabilities) {
-            if (!info.capabilities.includes(capability)) {
-              throw new VexaniumProviderError(
-                VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-                `Provider negotiated undeclared capability: ${capability}`,
-              );
-            }
-          }
-          for (const chainId of response.chains) {
-            if (
-              !info.chains.some((declaredChainId) => sameVexaniumChain(chainId, declaredChainId))
-            ) {
-              throw new VexaniumProviderError(
-                VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-                `Provider negotiated undeclared chain: ${chainId}`,
-              );
-            }
-          }
-          negotiation = response;
-          return response;
-        })
-        .finally(() => {
-          negotiationInFlight = null;
-        });
-    }
+      .finally(() => {
+        negotiationInFlight = null;
+      });
 
-    const response = await negotiationInFlight;
-    for (const capability of requiredCapabilities) {
-      if (!response.capabilities.includes(capability)) {
-        throw vexaniumUnsupportedCapability(capability);
-      }
-    }
-    return response;
+    return negotiationInFlight;
   };
 
   const emitSessionChanged = (reason: VexaniumClientSessionChangeReason): void => {
@@ -723,13 +729,55 @@ export async function createVexaniumClient(
   if (syncOptions.providerEvents) bindProviderEvents();
   bindWindowSync();
 
+  const parseClientSigningRequest = (
+    uri: VexSigningRequestUri,
+    options: VexSigningRequestParseOptions = {},
+  ) => {
+    const parsed = parseVexaniumSigningRequest(uri, options);
+    const selector = parsed.data.chainId;
+    if (selector.type !== "chain_id" || selector.value.toLowerCase() !== vexNative.chainId) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.UNSUPPORTED_CHAIN,
+        "VSR must target the configured Vexanium chain",
+      );
+    }
+    return parsed;
+  };
+
+  const createClientSigningRequest = async (
+    args: VexSigningRequestCreateInput,
+    options: VexSigningRequestCreateOptions = {},
+  ) => {
+    if (args.chainAlias !== undefined || args.allowedChains !== undefined) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+        "Vexanium client VSR uses the configured Vexanium chain and does not accept chain aliases",
+      );
+    }
+    const chainId = args.chainId ?? vexNative.chainId;
+    if (!isVexaniumFullChainId(chainId) || chainId.toLowerCase() !== vexNative.chainId) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.UNSUPPORTED_CHAIN,
+        "VSR must target the configured Vexanium chain",
+      );
+    }
+    return createVexaniumSigningRequest(
+      { ...args, chainId: vexNative.chainId },
+      {
+        ...options,
+        abiProvider: options.abiProvider ?? signingRequestAbiProvider,
+      },
+    );
+  };
+
   const signSigningRequest = async (
     params: VexSigningRequestParams,
   ): Promise<VexSigningRequestResult> => {
     await negotiate([VEXANIUM_CAPABILITIES.SIGNING_REQUEST]);
     try {
-      parseSigningRequest(params.request);
+      parseClientSigningRequest(params.request);
     } catch (error) {
+      if (error instanceof VexaniumProviderError) throw error;
       throw new VexaniumProviderError(
         VEXANIUM_ERROR_CODES.INVALID_PARAMS,
         "Invalid Vexanium Signing Request payload",
@@ -946,13 +994,15 @@ export async function createVexaniumClient(
     },
 
     transact,
+    createSigningRequest: createClientSigningRequest,
+    parseSigningRequest: parseClientSigningRequest,
     signSigningRequest,
 
     async signMessage(message: string | Uint8Array, account?: string) {
       if (account && !isAntelopeName(account)) {
         throw new VexaniumProviderError(
           VEXANIUM_ERROR_CODES.INVALID_PARAMS,
-          "Invalid Antelope account name",
+          "Invalid Vexanium account name",
         );
       }
       await negotiate([VEXANIUM_CAPABILITIES.MESSAGE_SIGNING]);
@@ -975,7 +1025,7 @@ export async function createVexaniumClient(
       if (account && !isAntelopeName(account)) {
         throw new VexaniumProviderError(
           VEXANIUM_ERROR_CODES.INVALID_PARAMS,
-          "Invalid Antelope account name",
+          "Invalid Vexanium account name",
         );
       }
       await negotiate([VEXANIUM_CAPABILITIES.DIGEST_SIGNING]);
