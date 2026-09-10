@@ -206,6 +206,15 @@ const clientAbiFetches = new Map();
 const clientFetch = async (input, init) => {
   const url = String(input);
   const body = JSON.parse(String(init?.body ?? "{}"));
+  if (url.endsWith("/get_info")) {
+    return Response.json({
+      chain_id: VEXANIUM_MAINNET_CHAIN_ID,
+      head_block_num: 100,
+      last_irreversible_block_num: 99,
+      head_block_id: `00000064${"00".repeat(28)}`,
+      head_block_time: "2026-09-10T12:00:00.000",
+    });
+  }
   if (url.endsWith("/get_abi")) {
     const account = String(body.account_name);
     assert.ok(account === "vex.token" || account === "token.wind");
