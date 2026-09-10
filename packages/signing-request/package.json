@@ -1,7 +1,7 @@
 {
   "name": "@windstack/signing-request",
   "version": "2.0.0",
-  "description": "Portable Antelope signing requests with action, transaction, identity, callback, and protocol interoperability support.",
+  "description": "Vexanium Signing Request primitives for actions, multi-action transactions, identity, callbacks, resolution, and verification.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -35,9 +35,9 @@
   "sideEffects": false,
   "keywords": [
     "windstack",
+    "vexanium",
     "antelope",
     "vsr",
-    "esr",
     "signing-request",
     "wallet",
     "transaction",
