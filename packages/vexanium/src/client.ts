@@ -222,6 +222,12 @@ function normalizeSignTransactionParams(
       "Invalid Vexanium chain ID",
     );
   }
+  if (params.chainId.toLowerCase() !== vexNative.chainId) {
+    throw new VexaniumProviderError(
+      VEXANIUM_ERROR_CODES.UNSUPPORTED_CHAIN,
+      "Exact transaction signing only supports the configured Vexanium chain",
+    );
+  }
   if (!isHexBytes(params.serializedTransaction)) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_PARAMS,
@@ -436,49 +442,49 @@ export async function createVexaniumClient(
     if (negotiation && hasRequiredCapabilities(negotiation)) return negotiation;
 
     if (negotiationInFlight) {
-      const current = await negotiationInFlight;
-      if (hasRequiredCapabilities(current)) return current;
+      await negotiationInFlight;
+      return negotiate(requiredCapabilities);
     }
 
     const requestedCapabilities = [
       ...new Set([...(negotiation?.capabilities ?? []), ...requiredCapabilities]),
     ];
-    negotiationInFlight = request<VexaniumCapabilitiesResponse>({
+    const negotiationRequest = request<VexaniumCapabilitiesResponse>({
       method: VEXANIUM_METHODS.GET_CAPABILITIES,
       params: {
         standard: VEXANIUM_PROVIDER_STANDARD,
         version: VEXANIUM_PROVIDER_VERSION,
         requiredCapabilities: requestedCapabilities,
       },
-    })
-      .then((response) => {
-        assertVexaniumCapabilitiesResponse(response, requestedCapabilities);
-        assertCapabilityMethods(response);
-        const info = requireProvider().providerInfo;
-        for (const capability of response.capabilities) {
-          if (!info.capabilities.includes(capability)) {
-            throw new VexaniumProviderError(
-              VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-              `Provider negotiated undeclared capability: ${capability}`,
-            );
-          }
+    }).then((response) => {
+      assertVexaniumCapabilitiesResponse(response, requestedCapabilities);
+      assertCapabilityMethods(response);
+      const info = requireProvider().providerInfo;
+      for (const capability of response.capabilities) {
+        if (!info.capabilities.includes(capability)) {
+          throw new VexaniumProviderError(
+            VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+            `Provider negotiated undeclared capability: ${capability}`,
+          );
         }
-        for (const chainId of response.chains) {
-          if (!info.chains.some((declaredChainId) => sameVexaniumChain(chainId, declaredChainId))) {
-            throw new VexaniumProviderError(
-              VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-              `Provider negotiated undeclared chain: ${chainId}`,
-            );
-          }
+      }
+      for (const chainId of response.chains) {
+        if (!info.chains.some((declaredChainId) => sameVexaniumChain(chainId, declaredChainId))) {
+          throw new VexaniumProviderError(
+            VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+            `Provider negotiated undeclared chain: ${chainId}`,
+          );
         }
-        negotiation = response;
-        return response;
-      })
-      .finally(() => {
-        negotiationInFlight = null;
-      });
-
-    return negotiationInFlight;
+      }
+      negotiation = response;
+      return response;
+    });
+    negotiationInFlight = negotiationRequest;
+    try {
+      return await negotiationRequest;
+    } finally {
+      if (negotiationInFlight === negotiationRequest) negotiationInFlight = null;
+    }
   };
 
   const emitSessionChanged = (reason: VexaniumClientSessionChangeReason): void => {
@@ -535,6 +541,12 @@ export async function createVexaniumClient(
         "Malformed vex_getChain response",
       );
     }
+    if (!sameVexaniumChain(chainId, vexNative.chainId)) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.CHAIN_DISCONNECTED,
+        "Wallet provider is connected to a different chain",
+      );
+    }
     return chainId;
   };
 
@@ -569,6 +581,12 @@ export async function createVexaniumClient(
       throw new VexaniumProviderError(
         VEXANIUM_ERROR_CODES.INVALID_PARAMS,
         "Invalid Vexanium chain ID",
+      );
+    }
+    if (!sameVexaniumChain(requestedChainId, vexNative.chainId)) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.UNSUPPORTED_CHAIN,
+        "Vexanium client only connects to the configured Vexanium chain",
       );
     }
     await negotiate(requiredCapabilities);
@@ -628,6 +646,7 @@ export async function createVexaniumClient(
   const handleConnect = (payload: VexaniumProviderEventMap["connect"]): void => {
     try {
       assertVexaniumConnectResponse(payload);
+      if (!sameVexaniumChain(payload.chainId, vexNative.chainId)) return;
       const accounts = normalizeVexaniumAccounts(payload.accounts, payload.chainId);
       updateSession({
         accounts,
@@ -644,6 +663,7 @@ export async function createVexaniumClient(
   const handleAccountsChanged = (payload: VexaniumProviderEventMap["accountsChanged"]): void => {
     try {
       assertAccountsResponse(payload);
+      if (!sameVexaniumChain(payload.chainId, vexNative.chainId)) return;
       const accounts = normalizeVexaniumAccounts(payload.accounts, payload.chainId);
       updateSession({
         accounts,
@@ -659,6 +679,11 @@ export async function createVexaniumClient(
 
   const handleChainChanged = (chainId: VexaniumProviderEventMap["chainChanged"]): void => {
     if (!isVexaniumChainId(chainId)) return;
+    if (!sameVexaniumChain(chainId, vexNative.chainId)) {
+      clearSession("chainChanged");
+      emitClientEvent(listeners, "chainChanged", chainId);
+      return;
+    }
     if (session) {
       session = {
         ...session,
@@ -989,6 +1014,7 @@ export async function createVexaniumClient(
     },
 
     action(input: VexaniumActionInput, signal?: AbortSignal) {
+      if (input.authorization) return buildAction(input, [], signal);
       const signer = requireSigner();
       return buildAction(input, [signer.permissionLevel], signal);
     },
@@ -1033,7 +1059,7 @@ export async function createVexaniumClient(
         digest,
         account,
         sessionId: session?.walletSessionId,
-        dapp: session ? undefined : dapp,
+        dapp: session ? undefined : dapp),
       });
       return request({ method: VEXANIUM_METHODS.SIGN_DIGEST, params });
     },
