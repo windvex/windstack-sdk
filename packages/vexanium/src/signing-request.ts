@@ -57,16 +57,34 @@ function compressionProvider(zlib?: VexSigningRequestZlibProvider): CompressionP
   };
 }
 
+function assertVexaniumSigningRequest(request: SigningRequest): SigningRequest {
+  const selector = request.data.chainId;
+  if (selector.type !== "chain_id" || selector.value.toLowerCase() !== vexNative.chainId) {
+    throw new TypeError("VSR must target Vexanium Mainnet");
+  }
+  return request;
+}
+
 /** Create a canonical Vexanium Signing Request URI. */
 export async function createSigningRequest(
   args: VexSigningRequestCreateInput,
   options: VexSigningRequestCreateOptions = {},
 ): Promise<CanonicalSigningRequestUri> {
-  const request = await SigningRequest.create(args, {
-    abiProvider: options.abiProvider ?? defaultAbiProvider,
-    maxDecodedBytes: options.maxDecodedBytes,
-    signal: options.signal,
-  });
+  if (args.chainAlias !== undefined || args.allowedChains !== undefined) {
+    throw new TypeError("VSR does not accept chain aliases or multi-chain selectors");
+  }
+  const chainId = args.chainId ?? vexNative.chainId;
+  if (typeof chainId !== "string" || chainId.toLowerCase() !== vexNative.chainId) {
+    throw new TypeError("VSR must target Vexanium Mainnet");
+  }
+  const request = await SigningRequest.create(
+    { ...args, chainId: vexNative.chainId },
+    {
+      abiProvider: options.abiProvider ?? defaultAbiProvider,
+      maxDecodedBytes: options.maxDecodedBytes,
+      signal: options.signal,
+    },
+  );
   return encodeSigningRequest(request, options);
 }
 
@@ -75,6 +93,7 @@ export function encodeSigningRequest(
   request: SigningRequest,
   options: Pick<VexSigningRequestCreateOptions, "compress" | "slashes" | "zlib"> = {},
 ): CanonicalSigningRequestUri {
+  assertVexaniumSigningRequest(request);
   return request.encode(
     options.compress ?? false,
     options.slashes ?? true,
@@ -99,8 +118,10 @@ export function parseSigningRequest(
   uri: VexSigningRequestUri,
   options: VexSigningRequestParseOptions = {},
 ): SigningRequest {
-  return SigningRequest.from(assertSigningRequestUri(uri), {
-    maxDecodedBytes: options.maxDecodedBytes,
-    compressionProvider: compressionProvider(options.zlib),
-  });
+  return assertVexaniumSigningRequest(
+    SigningRequest.from(assertSigningRequestUri(uri), {
+      maxDecodedBytes: options.maxDecodedBytes,
+      compressionProvider: compressionProvider(options.zlib),
+    }),
+  );
 }
