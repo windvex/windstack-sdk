@@ -2,83 +2,138 @@
 
 [![Build](https://github.com/windvex/windstack-sdk/actions/workflows/validate.yml/badge.svg)](https://github.com/windvex/windstack-sdk/actions/workflows/validate.yml)
 
-WindStack is a general-purpose, ESM-first TypeScript SDK for Antelope chains, Vexanium, EVM providers, Solana providers, signing requests, exact asset arithmetic, and reusable protocol math.
+WindStack is a modern TypeScript SDK that makes Vexanium application development direct and predictable.
+
+The intended developer flow is:
+
+```text
+install WindStack → configure Vexanium → connect wallet → interact with blockchain
+```
+
+Not:
+
+```text
+install SDK → build compatibility layer → build ABI helper → build transaction helper → build provider adapter → interact with blockchain
+```
+
+WindStack keeps the protocol machinery inside the SDK: RPC access, ABI loading and caching, contract actions, account operations, TAPOS, canonical transaction serialization, wallet capability negotiation, exact signing, multi-action review data, Vexanium Signing Requests, and broadcasting.
 
 Created by **Gilang Ramadan**. Copyright © 2026 PT WIND KRIPTOGRAFI TEKNOLOGI.
 
-## Overview
+## Install
 
-Packages are independently installable and tree-shakeable. Generic primitives do not depend on a particular wallet, explorer, bot, DEX, token registry, or application state.
-
-| Package | Purpose |
-| --- | --- |
-| `@windstack/core` | Provider errors/events, exact decimals, basis points, constant-product quotes, routes, and liquidity math |
-| `@windstack/crypto` | K1/R1 keys and canonical signatures, WIF, recovery, and `VEX`/`EOS`/`PUB_K1` compatibility |
-| `@windstack/abi` | Antelope ABI/binary codec, names, exact assets, extended assets, token identity, and precision conversion |
-| `@windstack/rpc` | Typed Antelope RPC, verified endpoint failover, Spring finality, and Hyperion history |
-| `@windstack/contract` | ABI caching, contract actions, and table queries |
-| `@windstack/account` | Generic Antelope token, resource, governance, account, and permission actions |
-| `@windstack/antelope` | TAPOS, transaction serialization/digest/id, signers, required keys, broadcast, and keosd |
-| `@windstack/signing-request` | Portable ESR/VSR actions, transactions, identity requests, callbacks, compression, and resolution |
-| `@windstack/session` | Runtime-neutral Antelope signer/session and wallet-plugin orchestration |
-| `@windstack/evm` | Addresses, chain IDs, verified JSON-RPC, EIP-1193 clients, and EIP-6963 discovery |
-| `@windstack/solana` | Solana provider discovery and account/client utilities |
-| `@windstack/vexanium` | Vexanium presets, VEX EVM bridge and contract-action decoding, provider protocol, and explorer routes |
-| `@windstack/wallet-plugin-wisp` | Optional Wisp Wallet adapter for the generic session API |
-
-## Installation
-
-Install only the packages needed by an application:
+For normal Vexanium applications:
 
 ```bash
-npm install @windstack/antelope @windstack/rpc
-npm install @windstack/core @windstack/evm
 npm install @windstack/vexanium
 ```
 
-## Usage
+Additional packages expose lower-level protocol primitives for applications that need them, but they are not required to build a normal wallet-connected Vexanium application.
 
-Exact values and protocol math never require floating point:
+## Quick start
 
 ```ts
-import {
-  parseDecimal,
-  quoteConstantProduct,
-  quoteConstantProductMinimum,
-} from "@windstack/core";
+import { createVexaniumClient } from "@windstack/vexanium";
 
-const amountIn = parseDecimal("10.0000", 4);
-const quote = quoteConstantProduct({
-  reserveIn: 1_000_000n,
-  reserveOut: 2_000_000n,
-  amountIn,
-  feeBps: 30,
+const vex = await createVexaniumClient({
+  dapp: {
+    name: "My App",
+    url: "https://app.example",
+    icon: "https://app.example/icon.png",
+  },
 });
-const minimum = quoteConstantProductMinimum(quote, 50);
+
+const account = await vex.connectOne();
+
+await vex.transact({
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      data: {
+        from: account.actor,
+        to: "receiver",
+        quantity: "1.0000 VEX",
+        memo: "WindStack",
+      },
+    },
+  ],
+});
 ```
 
-Build and sign an Antelope transaction with a network-specific client:
+WindStack automatically loads the contract ABI, encodes structured action data, applies the connected wallet permission, prepares TAPOS, serializes the canonical transaction, sends the structured transaction and exact bytes to the wallet, validates the signing boundary, and broadcasts the result.
+
+## Multi-action transactions
+
+Multi-action is a first-class transaction shape. No extra compatibility or transaction helper is required.
 
 ```ts
-import { PrivateKey } from "@windstack/antelope";
-import {
-  createVexaniumAntelopeClient,
-  createVexaniumPrivateKeySigner,
-} from "@windstack/vexanium/antelope";
-
-const client = createVexaniumAntelopeClient();
-const signer = createVexaniumPrivateKeySigner([
-  PrivateKey.fromString("PVT_K1_..."),
-]);
-
-const transfer = await client
-  .account("alice")
-  .transfer("bob", "1.0000 VEX", "example");
-
-await client.transact({ actions: [transfer], signer });
+await vex.transact({
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      data: {
+        from: account.actor,
+        to: "swapv2.wind",
+        quantity: "2.0000 VEX",
+        memo: "liquidity",
+      },
+    },
+    {
+      account: "token.wind",
+      name: "transfer",
+      data: {
+        from: account.actor,
+        to: "swapv2.wind",
+        quantity: "3.00000000 WIND",
+        memo: "liquidity",
+      },
+    },
+  ],
+});
 ```
 
-The Vexanium signer announces legacy K1 keys with the native `VEX` prefix. The parser and required-key flow treat equivalent `VEX…`, `EOS…`, and `PUB_K1_…` strings as the same key.
+The structured transaction is preserved through the signing boundary so a wallet can inspect every action without reconstructing the request from opaque packed bytes.
+
+## Vexanium Signing Request
+
+Portable signing flows use VSR and the `vsr:` URI scheme.
+
+```ts
+const uri = await vex.createSigningRequest({
+  broadcast: true,
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      authorization: [{ actor: account.actor, permission: account.permission }],
+      data: {
+        from: account.actor,
+        to: "receiver",
+        quantity: "1.0000 VEX",
+        memo: "VSR",
+      },
+    },
+  ],
+});
+
+const request = vex.parseSigningRequest(uri);
+```
+
+Client-bound VSR creation uses the same configured Vexanium RPC and ABI cache as normal contract interaction. Vexanium-facing signing requests are restricted to the configured Vexanium chain.
+
+## Configure RPC
+
+WindStack ships with the Vexanium Mainnet defaults. An application may provide another trusted Vexanium RPC endpoint while keeping the same client API:
+
+```ts
+const vex = await createVexaniumClient({
+  rpcUrl: "https://my-vexanium-rpc.example",
+});
+```
+
+The RPC configuration is shared across account access, contracts, ABI loading, transaction preparation, VSR creation, and broadcasting.
 
 ## Vexanium Mainnet
 
@@ -91,15 +146,36 @@ The Vexanium signer announces legacy K1 keys with the native `VEX` prefix. The p
 | Native symbol and precision | `VEX`, `4` |
 | VEX EVM chain ID | `6736` (`0x1a50`) |
 
-Vexanium-specific presets and the reserved `0xbbbb…` native bridge address format live in `@windstack/vexanium`; generic EVM behavior remains in `@windstack/evm`.
+## Package architecture
+
+WindStack is modular internally so applications can use lower-level primitives when required without duplicating implementation outside the SDK.
+
+| Package | Purpose |
+| --- | --- |
+| `@windstack/vexanium` | Primary Vexanium application client, chain presets, provider protocol, VSR, explorer and VEX EVM integration |
+| `@windstack/wallet-plugin-wisp` | Wisp Wallet integration for the generic session layer |
+| `@windstack/session` | Runtime-neutral wallet/session orchestration |
+| `@windstack/antelope` | Transaction, TAPOS, signing and Vexanium-compatible chain primitives |
+| `@windstack/contract` | ABI-aware contract actions and shared ABI caching |
+| `@windstack/account` | Token, resource, governance, account and permission operations |
+| `@windstack/abi` | Binary ABI codec, names, exact assets and action serialization |
+| `@windstack/rpc` | Typed chain RPC, endpoint verification, failover, finality and history APIs |
+| `@windstack/crypto` | K1/R1 keys, signatures, recovery and cryptographic primitives |
+| `@windstack/core` | Shared provider, numeric and protocol utilities |
+| `@windstack/signing-request` | Native VSR encoding, parsing, resolution, inspection and callbacks |
+| `@windstack/evm` | Generic EVM primitives used by VEX EVM integration |
+
+The package boundaries are implementation choices, not steps that normal application developers must manually assemble.
+
+## Reliability and security
+
+WindStack validates chain identity, canonical transaction encoding, packed transaction bounds, wallet capabilities, signatures, ABI payloads, large integer representations, checksums, bridge calldata, and finality states at the relevant boundaries.
+
+Read failover verifies endpoints against the configured chain. Broadcast calls are not automatically retried. Multi-action order and authorization data are preserved. Context-free data remains part of the exact signing boundary.
 
 ## Runtime
 
-Node.js 20.19, 22, and 24 are covered by CI. Browser-safe entrypoints use Web APIs and do not import Node built-ins. Unix-socket keosd support is isolated behind `@windstack/antelope/node`.
-
-## Reliability
-
-Read failover verifies every endpoint against the configured chain ID before use. Broadcast calls never retry automatically. RPC payloads, required keys, signatures, large integers, checksums, bridge calldata, and finality states are validated before acceptance. All public packages ship ESM, source maps, and declaration files.
+WindStack is ESM-first and targets current maintained JavaScript runtimes. Browser-facing packages use Web APIs. Node-specific keosd transport remains isolated from browser entrypoints.
 
 ## Documentation
 
