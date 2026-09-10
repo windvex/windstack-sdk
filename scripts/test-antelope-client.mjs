@@ -103,7 +103,10 @@ assert.equal(result.transaction.ref_block_prefix, 123456789);
 assert.deepEqual(result.serializedContextFreeData, serializeContextFreeData(contextFreeData));
 assert.deepEqual(result.serializedTransaction, serializeTransaction(result.transaction));
 assert.deepEqual(deserializeTransaction(result.serializedTransaction), result.transaction);
-assert.deepEqual(deserializeTransaction(Buffer.from(result.serializedTransaction).toString("hex")), result.transaction);
+assert.deepEqual(
+  deserializeTransaction(Buffer.from(result.serializedTransaction).toString("hex")),
+  result.transaction,
+);
 assert.deepEqual(lastSignRequest.transaction, result.transaction);
 
 const multiTransaction = {
