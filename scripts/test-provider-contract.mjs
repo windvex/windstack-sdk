@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { bytesToHex } from "../packages/abi/dist/index.js";
+import { serializeTransaction } from "../packages/antelope/dist/index.js";
 import { PrivateKey, sha256Digest } from "../packages/crypto/dist/index.js";
 import { createSigningRequest as createPortableSigningRequest } from "../packages/signing-request/dist/index.js";
 import {
@@ -18,20 +20,22 @@ const capabilities = Object.values(VEXANIUM_CAPABILITIES);
 const methods = Object.values(VEXANIUM_METHODS);
 const privateKey = PrivateKey.generate("K1");
 const signature = privateKey.signDigest(sha256Digest(Uint8Array.of(0))).toString();
+const exactTransaction = {
+  expiration: "2026-07-14T12:00:00",
+  ref_block_num: 1,
+  ref_block_prefix: 2,
+  max_net_usage_words: 0,
+  max_cpu_usage_ms: 0,
+  delay_sec: 0,
+  context_free_actions: [],
+  actions: [],
+  transaction_extensions: [],
+};
+const exactSerializedTransaction = bytesToHex(serializeTransaction(exactTransaction));
 const portableRequest = (
   await createPortableSigningRequest({
     chainId: VEXANIUM_MAINNET_CHAIN_ID,
-    transaction: {
-      expiration: "2026-07-14T12:00:00",
-      ref_block_num: 1,
-      ref_block_prefix: 2,
-      max_net_usage_words: 0,
-      max_cpu_usage_ms: 0,
-      delay_sec: 0,
-      context_free_actions: [],
-      actions: [],
-      transaction_extensions: [],
-    },
+    transaction: exactTransaction,
   })
 ).encode(false, true, "esr");
 const account = {
@@ -128,14 +132,27 @@ assert.equal(connectCall.params.version, VEXANIUM_PROVIDER_VERSION);
 assert.ok(connectCall.params.requiredCapabilities.includes(VEXANIUM_CAPABILITIES.ACCOUNTS));
 
 await client.signTransaction({
-  serializedTransaction: "000102ff",
+  serializedTransaction: exactSerializedTransaction,
+  transaction: exactTransaction,
   chainId: VEXANIUM_MAINNET_CHAIN_ID,
   account: "windstack",
   permission: "active",
 });
 const signCall = calls.find((call) => call.method === VEXANIUM_METHODS.SIGN_TRANSACTION);
 assert.equal(signCall.params.sessionId, "wallet-session-v1");
-assert.equal(signCall.params.serializedTransaction, "000102ff");
+assert.equal(signCall.params.serializedTransaction, exactSerializedTransaction);
+assert.deepEqual(signCall.params.transaction, exactTransaction);
+await assert.rejects(
+  () =>
+    client.signTransaction({
+      serializedTransaction: "000102ff",
+      chainId: VEXANIUM_MAINNET_CHAIN_ID,
+      account: "windstack",
+      permission: "active",
+    }),
+  (error) =>
+    error instanceof VexaniumProviderError && error.code === VEXANIUM_ERROR_CODES.INVALID_PARAMS,
+);
 
 // ESR interoperability input is validated and forwarded without rewriting it.
 await client.signSigningRequest({ request: portableRequest, broadcast: false });
