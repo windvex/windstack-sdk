@@ -1,7 +1,12 @@
 import { bytesToHex } from "@windstack/abi";
-import { deserializeTransaction, serializeTransaction, type Transaction } from "@windstack/antelope";
+import {
+  deserializeTransaction,
+  serializeTransaction,
+  type Transaction,
+} from "@windstack/antelope";
 import { getRuntimeWindow, resolveDappMetadata, resolveDappRequestContext } from "@windstack/core";
 import type { DappMetadata, RequestArguments } from "@windstack/core";
+import { Signature } from "@windstack/crypto";
 import {
   VEXANIUM_CAPABILITIES,
   VEXANIUM_METHODS,
@@ -46,7 +51,6 @@ import type {
   VexSigningRequestParams,
   VexSigningRequestResult,
 } from "./types.js";
-import { Signature } from "@windstack/crypto";
 import {
   isAntelopeName,
   isChecksum256,
