@@ -8,7 +8,7 @@ import type { Abi } from "@windstack/abi";
 import type { Signature } from "@windstack/crypto";
 import type { CompressionProvider } from "./compression.js";
 
-export type SigningRequestScheme = "vsr" | "esr";
+export type SigningRequestScheme = "vsr";
 export type SigningRequestPermissionLevel = { actor: string; permission: string };
 
 export type SigningRequestAction = {
