@@ -47,27 +47,31 @@ export type DeserializeTransactionOptions = {
   maxExtensions?: number;
   requireCanonical?: boolean;
 };
-export type SignRequest = {
+export type PrepareTransactionArgs = {
+  actions: Action[];
+  contextFreeActions?: Action[];
+  contextFreeData?: Uint8Array[];
+  transactionExtensions?: TransactionExtension[];
+  expireSeconds?: number;
+  signal?: AbortSignal;
+};
+export type PreparedTransaction = {
   chainId: string;
   transaction: Transaction;
   serializedTransaction: Uint8Array;
   serializedContextFreeData: Uint8Array;
   digest: Uint8Array;
+};
+export type SignRequest = PreparedTransaction & {
   requiredKeys: readonly string[];
 };
 export interface Signer {
   getAvailableKeys(signal?: AbortSignal): Promise<readonly string[]>;
   sign(request: SignRequest, signal?: AbortSignal): Promise<readonly (string | Signature)[]>;
 }
-export type TransactArgs = {
-  actions: Action[];
+export type TransactArgs = PrepareTransactionArgs & {
   signer: Signer;
-  contextFreeActions?: Action[];
-  contextFreeData?: Uint8Array[];
-  transactionExtensions?: TransactionExtension[];
   broadcast?: boolean;
-  expireSeconds?: number;
-  signal?: AbortSignal;
 };
 export type TransactResult<T = Record<string, unknown>> = {
   transaction: Transaction;
@@ -429,7 +433,7 @@ export class AntelopeClient {
     return new AccountClient(name, this.rpc, this.abiCache, options);
   }
 
-  async transact<T = Record<string, unknown>>(args: TransactArgs): Promise<TransactResult<T>> {
+  async prepareTransaction(args: PrepareTransactionArgs): Promise<PreparedTransaction> {
     const contextFreeActions = args.contextFreeActions ?? [];
     if (!args.actions.length && !contextFreeActions.length) {
       throw new TypeError("Transaction must include at least one action");
@@ -475,6 +479,25 @@ export class AntelopeClient {
       : new Uint8Array(32);
     const digest = transactionDigest(actualChainId, serializedTransaction, contextFreeDataHash);
 
+    return {
+      chainId: actualChainId,
+      transaction,
+      serializedTransaction,
+      serializedContextFreeData,
+      digest,
+    };
+  }
+
+  async transact<T = Record<string, unknown>>(args: TransactArgs): Promise<TransactResult<T>> {
+    const prepared = await this.prepareTransaction(args);
+    const {
+      chainId: actualChainId,
+      transaction,
+      serializedTransaction,
+      serializedContextFreeData,
+      digest,
+    } = prepared;
+
     const availableKeys = [...new Set(await args.signer.getAvailableKeys(args.signal))];
     if (!availableKeys.length) throw new Error("Signer returned no available keys");
     for (const key of availableKeys) PublicKey.fromString(key);
@@ -492,11 +515,7 @@ export class AntelopeClient {
 
     const signed = await args.signer.sign(
       {
-        chainId: actualChainId,
-        transaction,
-        serializedTransaction,
-        serializedContextFreeData,
-        digest,
+        ...prepared,
         requiredKeys,
       },
       args.signal,
@@ -504,8 +523,9 @@ export class AntelopeClient {
     if (!Array.isArray(signed)) throw new TypeError("Signer returned an invalid signature list");
     const parsedSignatures = signed.map((value) => {
       if (typeof value === "string") return Signature.fromString(value);
-      if (!(value instanceof Signature))
+      if (!(value instanceof Signature)) {
         throw new TypeError("Signer returned an invalid signature value");
+      }
       return value;
     });
     if (parsedSignatures.length !== requiredKeys.length) {
