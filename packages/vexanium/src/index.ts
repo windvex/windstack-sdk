@@ -62,6 +62,7 @@ export type {
   VexSigningRequestZlibProvider,
   VexaniumAccount,
   VexaniumAccountsResponse,
+  VexaniumActionInput,
   VexaniumCapabilitiesRequest,
   VexaniumCapabilitiesResponse,
   VexaniumCapability,
@@ -83,6 +84,7 @@ export type {
   VexaniumProviderEventMap,
   VexaniumProviderInfo,
   VexaniumSessionSyncOptions,
+  VexaniumTransactArgs,
 } from "./types.js";
 export {
   createSigningRequest,
