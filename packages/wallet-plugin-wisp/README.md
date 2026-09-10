@@ -2,9 +2,9 @@
 
 ## Overview
 
-`@windstack/wallet-plugin-wisp` connects `@windstack/session` applications to Wisp Wallet on Vexanium Mainnet. It handles wallet discovery, account authorization, exact transaction signing, chain validation, and signer integration.
+`@windstack/wallet-plugin-wisp` connects `@windstack/session` applications to Wisp Wallet on Vexanium Mainnet. It supports wallet discovery, account authorization, chain validation, transaction signing, and session integration.
 
-The plugin is restricted to Vexanium Mainnet and selects the Wisp provider identified by `com.wisp.wallet` unless a provider or client is supplied explicitly.
+The plugin selects the Wisp provider identified by `com.wisp.wallet` unless a provider or client is supplied explicitly.
 
 ## Installation
 
@@ -20,12 +20,14 @@ import { vexNative } from "@windstack/vexanium";
 import { WispWalletPlugin } from "@windstack/wallet-plugin-wisp";
 
 const sessionManager = new SessionManager({
-  appName: "My Vexanium App",
-  chains: [{
-    id: vexNative.chainId,
-    url: vexNative.rpcUrl,
-    contracts: vexNative.contracts,
-  }],
+  appName: "Example App",
+  chains: [
+    {
+      id: vexNative.chainId,
+      url: vexNative.rpcUrl,
+      contracts: vexNative.contracts,
+    },
+  ],
   walletPlugins: [new WispWalletPlugin()],
 });
 
@@ -33,22 +35,22 @@ const session = await sessionManager.login();
 
 const action = await session
   .account()
-  .transfer("receiver", "1.0000 VEX", "WindStack");
+  .transfer("bob", "1.0000 VEX", "Example transfer");
 
 await session.transact({
   actions: [action],
 });
 ```
 
-The session resolves the Vexanium transaction before signing. The plugin forwards the exact serialized transaction bytes to Wisp through the Vexanium provider and returns the resulting signatures to the session.
+The plugin signs the canonical transaction resolved by the session and returns the wallet signatures to `@windstack/session`. Structured transaction data is retained for wallet review while the canonical serialized bytes remain the authoritative signing payload.
 
-A different chain ID is rejected during both login and signing. Portable Vexanium Signing Requests are handled separately by `@windstack/vexanium`.
+A chain other than Vexanium Mainnet is rejected during login and signing. Portable Vexanium Signing Requests are available through `@windstack/vexanium`.
 
 ## Runtime
 
-The package targets browser applications with Wisp Wallet available through the Vexanium provider interface. It does not store private keys and does not rebuild transactions after the session has resolved them.
+The package targets browser applications with Wisp Wallet available through the Vexanium provider interface. It does not store private keys.
 
-Applications should provide accurate dApp metadata and must treat wallet authorization as origin-bound permission state.
+Applications should provide accurate dApp metadata. Wallet authorization is bound to the wallet/provider session rather than application-supplied display metadata.
 
 ## License
 

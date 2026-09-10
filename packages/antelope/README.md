@@ -2,9 +2,9 @@
 
 ## Overview
 
-`@windstack/antelope` is a chain-neutral Antelope transaction toolkit. It combines verified RPC access, ABI serialization, contract and account helpers, TAPOS, transaction serialization/digest/id, required-key resolution, pluggable signers, keosd, and transaction broadcast.
+`@windstack/antelope` provides chain-neutral Antelope transaction primitives, including verified RPC access, ABI-aware contract and account clients, TAPOS preparation, canonical transaction serialization, transaction digests and IDs, required-key resolution, pluggable signers, keosd support, and broadcasting.
 
-A client can be bound to an expected chain ID. When configured, signing stops if the RPC endpoint reports a different chain, preventing a transaction from being signed against an unintended network.
+A client can be bound to an expected chain ID. When configured, signing is rejected if the RPC endpoint reports a different chain.
 
 ## Installation
 
@@ -26,15 +26,19 @@ import {
 const client = new AntelopeClient({
   endpoints: ["https://node.example"],
   chainId: "00".repeat(32),
-  contracts: { system: "eosio", token: "eosio.token" },
+  contracts: {
+    system: "system.cntr",
+    token: "token.cntr",
+  },
 });
+
 const signer = new PrivateKeySigner([
   PrivateKey.fromString("PVT_K1_..."),
 ]);
 
 const transfer = await client
   .account("alice")
-  .transfer("bob", "1.0000 SYS", "example");
+  .transfer("bob", "1.0000 TKN", "Example transfer");
 
 const result = await client.transact({
   actions: [transfer],
@@ -46,9 +50,9 @@ console.log(result.response);
 
 ### Custom signer
 
-`PrivateKeySigner` is suitable only when application-managed keys are appropriate. Wallets, hardware signers, secure-storage integrations, and remote signers can implement the exported `Signer` interface.
+Wallets, hardware signers, secure-storage integrations, and remote signers can implement the exported `Signer` interface.
 
-A signer receives the chain ID, resolved transaction, serialized transaction bytes, signing digest, and required public keys in a single request.
+A signer receives the chain ID, structured transaction, serialized transaction bytes, signing digest, and required public keys.
 
 ```ts
 import type { Signer } from "@windstack/antelope";
@@ -63,9 +67,11 @@ const signer: Signer = {
 };
 ```
 
-`PrivateKeySigner` defaults to legacy `EOS` display strings and accepts a custom legacy prefix. Required keys returned in a configured legacy form or as `PUB_K1` are normalized before matching.
+`PrivateKeySigner` is intended for environments where application-managed private keys are appropriate. For portable chain-neutral key representation, prefer modern `PUB_K1_...` public-key strings; legacy display prefixes can be configured when required by a chain or integration.
 
-HTTP keosd is browser-safe and loopback-only by default. Unix sockets are isolated from the browser entrypoint:
+### keosd
+
+HTTP and Unix-socket keosd transports are available for Node.js environments. Unix-socket support is exported separately from the browser entrypoint:
 
 ```ts
 import { KeosdSigner } from "@windstack/antelope";
@@ -79,13 +85,15 @@ const signer = new KeosdSigner({
 
 ## Security
 
-The configured chain ID is checked before signing. Signer output is parsed, counted, recovered, and matched to the keys requested by the node before broadcast. Use `broadcast: false` when an application needs signed bytes without submission.
+When a chain ID is configured, it is checked before signing. Signatures returned by a signer are parsed, recovered, and matched against the keys requested by the node before broadcast.
+
+Use `broadcast: false` when signed transaction data is required without submitting it to the network.
 
 ## Runtime
 
-The package is ESM-first and requires Node.js 20.19 or newer when used directly in Node.js. It uses Web-standard byte and networking APIs and does not require Node.js `Buffer` for transaction construction or signing.
+The package is ESM-first and requires Node.js 20.19 or newer when used directly in Node.js. Transaction construction uses Web-standard byte APIs and does not require Node.js `Buffer`.
 
-The client accepts one or more RPC endpoints for read operations and required-key resolution. Transaction broadcast is not retried automatically when the outcome of a submitted transaction is uncertain.
+Read operations can use multiple RPC endpoints. Transaction broadcast is not automatically retried when submission status is uncertain.
 
 ## License
 

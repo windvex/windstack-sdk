@@ -130,14 +130,6 @@ async function resolveNpmToken() {
   return token;
 }
 
-async function resolvePublishingCredential() {
-  const token = await resolveNpmToken();
-  console.log(
-    "npm publishing credential is configured; identity preflight is intentionally skipped for publish-only granular tokens.",
-  );
-  return token;
-}
-
 async function publishedVersion(name, version) {
   let response;
   try {
@@ -156,28 +148,6 @@ async function publishedVersion(name, version) {
   return Object.hasOwn(packument.versions ?? {}, version);
 }
 
-async function versionLifecycleStatus(name, version, token) {
-  let response;
-  try {
-    response = await fetch(
-      `${registry}-/package/${encodeURIComponent(name)}/version/${encodeURIComponent(version)}/status`,
-      { headers: { authorization: `Bearer ${token}`, accept: "application/json" } },
-    );
-  } catch (error) {
-    throw new Error(
-      `Unable to query npm lifecycle status for ${name}@${version}: ${error.message}`,
-    );
-  }
-  if (response.status === 403 || response.status === 404) return null;
-  if (response.status !== 200) {
-    throw new Error(
-      `Unable to query npm lifecycle status for ${name}@${version}: HTTP ${response.status}`,
-    );
-  }
-  const payload = await response.json();
-  return typeof payload.status === "string" ? payload.status : "submitted";
-}
-
 async function waitForPublishedVersions(entries) {
   let pending = entries;
   for (let attempt = 1; attempt <= visibilityAttempts; attempt += 1) {
@@ -191,7 +161,7 @@ async function waitForPublishedVersions(entries) {
     if (!pending.length) return;
     if (attempt === 1 || attempt % 12 === 0) {
       console.log(
-        `Waiting for npm package scanning and visibility (${pending.length} remaining): ${pending
+        `Waiting for npm package visibility (${pending.length} remaining): ${pending
           .map(({ manifest }) => `${manifest.name}@${manifest.version}`)
           .join(", ")}`,
       );
@@ -211,7 +181,8 @@ console.log(
   `WindStack publish order:\n${releaseEntries.map(({ manifest }) => `- ${manifest.name}@${manifest.version}`).join("\n")}`,
 );
 
-const npmToken = await resolvePublishingCredential();
+await resolveNpmToken();
+console.log("npm publishing credential is configured.");
 run("npm", ["run", "release:dry-run"]);
 
 const conflicts = [];
@@ -219,14 +190,10 @@ for (const { manifest } of releaseEntries) {
   const { name, version } = manifest;
   if (await publishedVersion(name, version)) {
     conflicts.push(`${name}@${version} is already public`);
-    continue;
   }
-  const lifecycleStatus = await versionLifecycleStatus(name, version, npmToken);
-  if (lifecycleStatus)
-    conflicts.push(`${name}@${version} is already submitted (${lifecycleStatus})`);
 }
 if (conflicts.length) {
-  throw new Error(`Refusing a partial or silently skipped release:\n${conflicts.join("\n")}`);
+  throw new Error(`Refusing to overwrite an existing release:\n${conflicts.join("\n")}`);
 }
 
 for (const { manifest } of releaseEntries) {

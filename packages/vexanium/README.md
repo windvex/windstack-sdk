@@ -2,15 +2,7 @@
 
 ## Overview
 
-`@windstack/vexanium` is the high-level Vexanium SDK surface for applications that need chain access, wallet connection, contract interaction, transaction signing, Vexanium Signing Requests, account data, explorer routes, and VEX EVM utilities.
-
-The primary developer flow is intentionally small:
-
-```text
-install WindStack → configure Vexanium → connect wallet → interact with blockchain
-```
-
-Applications should not need to create their own ABI helpers, transaction serializers, provider adapters, signing-request compatibility layers, or multi-action decoders for normal Vexanium development.
+`@windstack/vexanium` is the high-level WindStack package for Vexanium applications. It provides wallet connection, account and contract access, ABI-aware transactions, Vexanium Signing Requests (VSR), explorer routes, chain metadata, and VEX EVM utilities.
 
 VEX Native defaults:
 
@@ -21,7 +13,7 @@ VEX Native defaults:
 - Native symbol: `VEX`
 - Precision: `4`
 
-VEX EVM metadata is also included for chain ID `6736` (`0x1a50`).
+VEX EVM metadata is included for chain ID `6736` (`0x1a50`).
 
 ## Installation
 
@@ -29,16 +21,14 @@ VEX EVM metadata is also included for chain ID `6736` (`0x1a50`).
 npm install @windstack/vexanium
 ```
 
-## Usage
-
-### Configure and connect
+## Configure and connect
 
 ```ts
 import { createVexaniumClient } from "@windstack/vexanium";
 
 const vex = await createVexaniumClient({
   dapp: {
-    name: "My App",
+    name: "Example App",
     url: "https://app.example",
     icon: "https://app.example/icon.png",
   },
@@ -48,7 +38,7 @@ const account = await vex.connectOne();
 console.log(account.permissionLevel);
 ```
 
-The default RPC is the WindStack Vexanium endpoint. Applications can provide an alternate Vexanium RPC endpoint without changing the rest of the API:
+A trusted alternate Vexanium RPC endpoint can be supplied when needed:
 
 ```ts
 const vex = await createVexaniumClient({
@@ -56,11 +46,11 @@ const vex = await createVexaniumClient({
 });
 ```
 
-The configured RPC is shared by contract ABI loading, account access, transaction preparation, VSR creation, and broadcasting.
+The configured RPC is shared by account access, contract ABI loading, transaction preparation, VSR creation, and broadcasting.
 
-### Interact with contracts
+## Transactions
 
-Structured action data is ABI-encoded automatically. When `authorization` is omitted, normal transaction actions use the connected wallet permission.
+Structured action data is ABI-encoded automatically. When `authorization` is omitted, transaction actions use the connected wallet permission.
 
 ```ts
 const result = await vex.transact({
@@ -70,9 +60,9 @@ const result = await vex.transact({
       name: "transfer",
       data: {
         from: account.actor,
-        to: "receiver",
+        to: "bob",
         quantity: "1.0000 VEX",
-        memo: "WindStack",
+        memo: "Example transfer",
       },
     },
   ],
@@ -81,11 +71,11 @@ const result = await vex.transact({
 console.log(result.response);
 ```
 
-`transact()` handles the complete normal transaction pipeline: ABI loading and caching, action encoding, authorization, TAPOS, canonical transaction serialization, wallet signing, and broadcasting.
+`transact()` handles ABI loading, action encoding, authorization, TAPOS, canonical transaction serialization, wallet signing, and optional broadcast.
 
-#### Multi-action transactions
+### Multi-action transactions
 
-Multiple contracts use exactly the same API. There is no separate multi-action transaction helper.
+Pass multiple actions in the same transaction:
 
 ```ts
 await vex.transact({
@@ -95,30 +85,28 @@ await vex.transact({
       name: "transfer",
       data: {
         from: account.actor,
-        to: "swapv2.wind",
-        quantity: "2.0000 VEX",
-        memo: "liquidity",
+        to: "bob",
+        quantity: "1.0000 VEX",
+        memo: "First action",
       },
     },
     {
-      account: "token.wind",
+      account: "vex.token",
       name: "transfer",
       data: {
         from: account.actor,
-        to: "swapv2.wind",
-        quantity: "3.00000000 WIND",
-        memo: "liquidity",
+        to: "bob",
+        quantity: "0.5000 VEX",
+        memo: "Second action",
       },
     },
   ],
 });
 ```
 
-The structured transaction remains available through the complete signing boundary so wallets can review every action without reconstructing the transaction from opaque bytes.
+The canonical serialized transaction and its matching structured representation are preserved through wallet signing so each action can be reviewed before approval.
 
-### Contract and account access
-
-The same configured client exposes lower-level contract and account objects when an application needs direct reads or reusable action construction:
+## Contract and account access
 
 ```ts
 const token = vex.contract("vex.token");
@@ -128,11 +116,11 @@ const currentAccount = vex.account();
 const balance = await currentAccount.getTokenBalance();
 ```
 
-These APIs share the same RPC and ABI cache used by `transact()`.
+Contract and account APIs use the same RPC and ABI cache as `transact()`.
 
-### Vexanium Signing Request (VSR)
+## Vexanium Signing Request (VSR)
 
-Portable wallet requests use the canonical `vsr:` scheme.
+Portable wallet requests use the `vsr:` scheme.
 
 ```ts
 const uri = await vex.createSigningRequest({
@@ -144,32 +132,20 @@ const uri = await vex.createSigningRequest({
       authorization: [{ actor: account.actor, permission: account.permission }],
       data: {
         from: account.actor,
-        to: "receiver",
+        to: "bob",
         quantity: "1.0000 VEX",
-        memo: "VSR",
-      },
-    },
-    {
-      account: "token.wind",
-      name: "transfer",
-      authorization: [{ actor: account.actor, permission: account.permission }],
-      data: {
-        from: account.actor,
-        to: "receiver",
-        quantity: "1.00000000 WIND",
-        memo: "VSR",
+        memo: "VSR example",
       },
     },
   ],
 });
 
 const request = vex.parseSigningRequest(uri);
-console.log(request.data.request.type); // action[]
 ```
 
-`createSigningRequest()` uses the client's configured Vexanium chain, RPC, and ABI cache. `parseSigningRequest()` only accepts VSRs targeting Vexanium Mainnet. Single actions, multi-actions, and full transactions are represented by the native WindStack signing-request implementation.
+Client-bound VSR uses the configured Vexanium chain, RPC, and ABI cache. Vexanium-facing VSR operations are restricted to the configured Vexanium chain.
 
-A VSR can be handed to the connected wallet directly:
+A VSR can also be sent to the connected wallet:
 
 ```ts
 const signed = await vex.signSigningRequest({
@@ -180,9 +156,7 @@ const signed = await vex.signSigningRequest({
 console.log(signed.signatures);
 ```
 
-### Existing wallet session
-
-Applications can read or observe the current session without rebuilding wallet state themselves:
+## Session access
 
 ```ts
 const accounts = await vex.getAccounts();
@@ -194,11 +168,11 @@ const unsubscribe = vex.subscribeSession(({ session, reason }) => {
 unsubscribe();
 ```
 
-### Advanced exact signing
+## Exact transaction signing
 
-`signTransaction()` is an advanced escape hatch for applications that already have a canonical packed Vexanium transaction. Normal applications should prefer `transact()`.
+`signTransaction()` is available for applications that already have a canonical packed Vexanium transaction. For ordinary structured transactions, prefer `transact()`.
 
-WindStack validates the packed transaction, decodes it canonically, preserves its structured form for wallet review, and rejects a supplied structured transaction when it does not serialize back to the exact same bytes.
+When both packed bytes and a structured transaction are supplied, WindStack verifies that the structured form serializes to exactly the same bytes before signing.
 
 ## Network metadata
 
@@ -217,11 +191,11 @@ console.log(vexEvm.chainId); // 6736
 ```ts
 import { buildExplorerAccountUrl, buildExplorerTxUrl } from "@windstack/vexanium";
 
-const accountUrl = buildExplorerAccountUrl("gvexa");
+const accountUrl = buildExplorerAccountUrl("alice");
 const transactionUrl = buildExplorerTxUrl("transaction-id");
 ```
 
-## VEX EVM bridge primitives
+## VEX EVM bridge utilities
 
 ```ts
 import {
@@ -235,7 +209,7 @@ const nativeAccount = reservedEvmAddressToNativeAccount(address);
 const transfer = decodeVexEvmBridgeTransferCalldata(calldata);
 ```
 
-Reserved bridge addresses are accepted only when their payload decodes to a canonical Vexanium account. Malformed offsets, invalid address payloads, truncated UTF-8, and oversized memos are rejected.
+Reserved bridge addresses are accepted only when their payload decodes to a canonical Vexanium account.
 
 ## VEX EVM contract actions
 
@@ -248,17 +222,17 @@ if (action.name === "evmtx") {
 }
 ```
 
-Both `evmtx_v1` and `evmtx_v3` variants are supported. RLP bytes, event fields, account names, and uint64 values are validated before being returned.
+Both `evmtx_v1` and `evmtx_v3` variants are supported.
 
 ## Runtime
 
-The provider client targets browser applications with a compatible Vexanium wallet provider. RPC, metadata, VSR, decoding, and other utility surfaces can also be used where their runtime dependencies are available.
+Wallet connection targets browser environments with a compatible Vexanium provider. RPC, metadata, VSR, decoding, and other utility APIs can be used wherever their runtime requirements are available.
 
 ## Security
 
-Wallet permissions are bound to the trusted provider/runtime session. Application display metadata is not used as an authorization boundary.
+Wallet permissions are bound to the provider session. Application metadata is display information and is not an authorization boundary.
 
-Packed transactions and VSR payloads are treated as untrusted input. WindStack applies canonical decoding, size limits, chain validation, ABI-aware action handling, and explicit wallet capability negotiation before signing.
+Packed transactions and VSR payloads are treated as untrusted input and validated for chain identity, encoding, size, ABI data, and wallet capabilities before signing.
 
 ## License
 

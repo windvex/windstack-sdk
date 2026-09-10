@@ -1,5 +1,9 @@
 # VexaniumProvider v1
 
+## Audience
+
+This document is the interoperability specification for wallet and provider implementers. Application developers normally use `@windstack/vexanium` and do not need to implement this protocol directly.
+
 ## Overview
 
 `VexaniumProvider` defines the browser-facing contract between a Vexanium application and a compatible wallet. It standardizes provider identity, capability negotiation, account access, exact transaction signing, Vexanium Signing Requests, events, errors, discovery, and the security boundary used for wallet permissions.
@@ -151,7 +155,7 @@ Response:
 }
 ```
 
-`serializedTransaction` is the authoritative byte representation and contains non-empty, even-length hexadecimal bytes. `transaction` is the canonical structured representation of those exact bytes and is intended for wallet review, policy checks, and action inspection. WindStack preserves this structure through the provider boundary so wallets do not need to reconstruct multi-action transactions from opaque bytes.
+`serializedTransaction` is the authoritative byte representation and contains non-empty, even-length hexadecimal bytes. `transaction` is the canonical structured representation of those exact bytes and is intended for wallet review, policy checks, and action inspection.
 
 `serializedContextFreeData` is the canonical packed context-free-data byte representation. An empty or omitted value means no context-free data. Wallets that compute or verify the transaction signing digest must include this value according to the Vexanium transaction digest rules.
 
@@ -176,14 +180,14 @@ When `signer` or `signerPermission` is returned, it must match the requested wal
 The Vexanium URI scheme is exclusively:
 
 ```text
-vsr://...
+vsr:...
 ```
 
 A `VexaniumProvider` v1 implementation must treat other signing-request URI schemes as invalid input. Newly created and accepted provider-level signing requests target the configured Vexanium chain.
 
 A successful response contains `signatures: string[]` and `broadcast: boolean`. Empty or malformed signature lists are rejected.
 
-Wallets can use WindStack's signing-request inspection API to enumerate and ABI-decode single actions, action arrays, and full transactions through one code path. Multi-action order and authorization data must be preserved.
+Wallets can use WindStack's signing-request inspection API to enumerate and ABI-decode single actions, action arrays, and full transactions. Multi-action order and authorization data must be preserved.
 
 ## Errors
 
@@ -236,13 +240,13 @@ A discovered provider must expose valid mandatory `providerInfo` before it is ac
 
 `DappMetadata` is display metadata only. Wallet permission state must bind to an authoritative runtime or transport origin, such as the browser extension sender origin. A wallet must not use an origin supplied by application content as the permission boundary.
 
-Exact transaction signing must preserve the canonical bytes approved by the application and must not substitute a rebuilt transaction after user approval. Structured transaction review data must be verified against the authoritative serialized bytes before it is trusted for display or policy decisions.
+Exact transaction signing must preserve the canonical bytes approved by the application. Structured transaction review data must be verified against the authoritative serialized bytes before it is trusted for display or policy decisions.
 
 VSR input and packed transactions are untrusted input. Implementations must enforce supported chain, payload bounds, canonical transaction encoding, provider capability checks, and explicit user approval policies before signing.
 
 ## Runtime
 
-The specification is transport-oriented and does not require a specific UI framework, storage implementation, or signing backend. Implementations may use browser extensions, mobile wallet bridges, embedded providers, or other trusted transports as long as the observable provider contract remains compatible.
+The specification does not require a specific UI framework, storage implementation, or signing backend. Implementations may use browser extensions, mobile wallet bridges, embedded providers, or other trusted transports as long as the observable provider contract remains compatible.
 
 ## License
 
