@@ -268,7 +268,9 @@ assert.equal(highLevelResult.transaction.actions[0].account, "vex.token");
 assert.equal(highLevelResult.transaction.actions[1].account, "token.wind");
 assert.equal(highLevelResult.transaction.actions[0].authorization[0].actor, "windstack");
 assert.equal(rpcPushes, 0);
-const highLevelSignCall = calls.filter((call) => call.method === VEXANIUM_METHODS.SIGN_TRANSACTION).at(-1);
+const highLevelSignCall = calls
+  .filter((call) => call.method === VEXANIUM_METHODS.SIGN_TRANSACTION)
+  .at(-1);
 assert.equal(highLevelSignCall.params.transaction.actions.length, 2);
 assert.equal(highLevelSignCall.params.serializedContextFreeData, "");
 
