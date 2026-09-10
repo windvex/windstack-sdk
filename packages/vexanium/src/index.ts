@@ -20,7 +20,6 @@ export {
   VEXANIUM_REQUEST_PROVIDER_EVENT,
   VEX_EVM_ANTELOPE_CONTRACT,
   VSR_SCHEME,
-  ESR_SCHEME,
 } from "./constants.js";
 export {
   VEXANIUM_ERROR_CODES,
