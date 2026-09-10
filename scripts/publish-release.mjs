@@ -130,22 +130,11 @@ async function resolveNpmToken() {
   return token;
 }
 
-async function verifyRegistryAuthentication() {
+async function resolvePublishingCredential() {
   const token = await resolveNpmToken();
-  let response;
-  try {
-    response = await fetch(new URL("-/whoami", registry), {
-      headers: { authorization: `Bearer ${token}` },
-      redirect: "error",
-    });
-  } catch (error) {
-    throw new Error(`Unable to reach npm registry authentication endpoint: ${error.message}`);
-  }
-
-  if (response.status !== 200) {
-    throw new Error(`npm registry authentication failed with HTTP ${response.status}`);
-  }
-  console.log("npm registry authentication accepted.");
+  console.log(
+    "npm publishing credential is configured; identity preflight is intentionally skipped for publish-only granular tokens.",
+  );
   return token;
 }
 
@@ -222,7 +211,7 @@ console.log(
   `WindStack publish order:\n${releaseEntries.map(({ manifest }) => `- ${manifest.name}@${manifest.version}`).join("\n")}`,
 );
 
-const npmToken = await verifyRegistryAuthentication();
+const npmToken = await resolvePublishingCredential();
 run("npm", ["run", "release:dry-run"]);
 
 const conflicts = [];
