@@ -140,6 +140,7 @@ Response:
 ```ts
 {
   serializedTransaction: string;
+  transaction?: Transaction;
   chainId: string;
   account: string;
   permission: string;
@@ -147,9 +148,11 @@ Response:
 }
 ```
 
-A wallet must not silently rebuild or alter the transaction before signing.
+`serializedTransaction` is the authoritative byte representation and contains non-empty, even-length hexadecimal bytes. `transaction` is the canonical structured representation of those same bytes and is intended for wallet review, policy checks, and action inspection. WindStack session signers preserve this structure through the provider boundary instead of forcing wallets to reconstruct multi-action transactions from opaque bytes.
 
-`serializedTransaction` contains non-empty, even-length hexadecimal bytes. `account` and `permission` must be valid Antelope names. A successful response contains at least one valid signature:
+If `transaction` is present, a wallet must verify that serializing it produces exactly `serializedTransaction` before approval or signing. Wallets may also decode the packed bytes with `deserializeTransaction` and compare the result. A wallet must never display one structure to the user and sign different bytes.
+
+`account` and `permission` must be valid Antelope names. A successful response contains at least one valid signature:
 
 ```ts
 {
@@ -172,6 +175,8 @@ vsr://...
 The payload follows the compatible Antelope signing-request format used by existing ecosystem tooling. Compatible input using the established alternate URI scheme may be accepted for interoperability, while newly created Vexanium requests use `vsr:`.
 
 A successful signing-request response contains `signatures: string[]` and `broadcast: boolean`. Empty or malformed signature lists are rejected.
+
+Wallets can use the WindStack signing-request inspection API to enumerate and ABI-decode single actions, action arrays, and full-transaction requests through one code path.
 
 ## Errors
 
@@ -224,7 +229,7 @@ A discovered provider must expose valid mandatory `providerInfo` before it is ac
 
 `DappMetadata` is display metadata only. Wallet permission state must bind to an authoritative runtime or transport origin, such as the browser extension sender origin. A wallet must not use an origin supplied by application content as the permission boundary.
 
-Exact transaction signing must preserve the bytes approved by the application and must not substitute a rebuilt transaction after user approval.
+Exact transaction signing must preserve the bytes approved by the application and must not substitute a rebuilt transaction after user approval. Structured transaction review data must be verified against the authoritative serialized bytes before it is trusted for display or policy decisions.
 
 ## Runtime
 
