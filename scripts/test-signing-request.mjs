@@ -8,6 +8,8 @@ import {
   SIGNING_REQUEST_PROTOCOL_VERSION,
   SigningRequest,
   createSigningRequestCallback,
+  decodeSigningRequestActions,
+  getSigningRequestActions,
   pakoCompressionProvider,
   resolveSigningRequest,
   verifyResolvedSigningRequestSignature,
@@ -109,6 +111,80 @@ const resolvedTransfer = new AbiSerializer(transferAbi).decodeAction(
 assert.equal(resolvedTransfer.from, "windstack");
 assert.equal(resolvedTransfer.to, "receiver");
 assert.equal(resolvedTransfer.quantity, "1.0000 VEX");
+
+const multiAbiCalls = new Map();
+const multiAbiProvider = {
+  async getAbi(account) {
+    multiAbiCalls.set(account, (multiAbiCalls.get(account) ?? 0) + 1);
+    if (account === "vex.token" || account === "token.wind") return transferAbi;
+    throw new Error(`Unexpected ABI account: ${account}`);
+  },
+};
+const multiRequest = await SigningRequest.create(
+  {
+    chainId: VEX_CHAIN_ID,
+    actions: [
+      {
+        account: "vex.token",
+        name: "transfer",
+        authorization: [
+          {
+            actor: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
+            permission: SIGNING_REQUEST_PLACEHOLDER_PERMISSION,
+          },
+        ],
+        data: {
+          from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
+          to: "receiver",
+          quantity: "2.0000 VEX",
+          memo: "first",
+        },
+      },
+      {
+        account: "token.wind",
+        name: "transfer",
+        authorization: [
+          {
+            actor: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
+            permission: SIGNING_REQUEST_PLACEHOLDER_PERMISSION,
+          },
+        ],
+        data: {
+          from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
+          to: "receiver",
+          quantity: "3.00000000 WIND",
+          memo: "second",
+        },
+      },
+    ],
+    broadcast: true,
+  },
+  { abiProvider: multiAbiProvider },
+);
+const multiParsed = SigningRequest.from(multiRequest.encode(true, false, "esr"));
+assert.equal(multiParsed.data.request.type, "action[]");
+assert.equal(getSigningRequestActions(multiParsed).length, 2);
+const inspectedActions = await decodeSigningRequestActions(multiParsed, multiAbiProvider);
+assert.equal(inspectedActions.length, 2);
+assert.equal(inspectedActions[0].account, "vex.token");
+assert.equal(inspectedActions[0].data.quantity, "2.0000 VEX");
+assert.equal(inspectedActions[1].account, "token.wind");
+assert.equal(inspectedActions[1].data.quantity, "3.00000000 WIND");
+assert.equal(multiAbiCalls.get("vex.token"), 2);
+assert.equal(multiAbiCalls.get("token.wind"), 2);
+const multiResolved = await resolveSigningRequest(multiParsed, {
+  actor: "windstack",
+  permission: "active",
+  abiProvider: multiAbiProvider,
+  tapos: {
+    expiration: "2026-09-07T04:00:00",
+    refBlockNum: 5,
+    refBlockPrefix: 123,
+  },
+});
+assert.equal(multiResolved.transaction.actions.length, 2);
+assert.equal(multiResolved.transaction.actions[0].authorization[0].actor, "windstack");
+assert.equal(multiResolved.transaction.actions[1].authorization[0].actor, "windstack");
 
 const scalarOne = Uint8Array.from({ length: 32 }, (_, index) => (index === 31 ? 1 : 0));
 const privateKey = PrivateKey.fromBytes("K1", scalarOne);
