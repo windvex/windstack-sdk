@@ -1059,7 +1059,7 @@ export async function createVexaniumClient(
         digest,
         account,
         sessionId: session?.walletSessionId,
-        dapp: session ? undefined : dapp),
+        dapp: session ? undefined : dapp,
       });
       return request({ method: VEXANIUM_METHODS.SIGN_DIGEST, params });
     },
