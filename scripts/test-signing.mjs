@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { bytesToHex } from "../packages/abi/dist/index.js";
+import { serializeTransaction } from "../packages/antelope/dist/index.js";
 import { PrivateKey, sha256Digest } from "../packages/crypto/dist/index.js";
 import { SigningRequest } from "../packages/signing-request/dist/index.js";
 import { deflateRaw, inflateRaw } from "pako";
@@ -221,13 +222,34 @@ const pluginClient = {
   async disconnect() {},
 };
 const plugin = new WispWalletPlugin({ client: pluginClient });
-const exactBytes = new Uint8Array([0, 1, 2, 255]);
+const exactTransaction = {
+  ...portableTransaction,
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      authorization: [{ actor: "windstack", permission: "active" }],
+      data: "00",
+    },
+    {
+      account: "token.wind",
+      name: "transfer",
+      authorization: [{ actor: "windstack", permission: "active" }],
+      data: "01",
+    },
+  ],
+};
+const exactBytes = serializeTransaction(exactTransaction);
 const login = await plugin.login({
   chain: { id: VEXANIUM_MAINNET_CHAIN_ID, url: "https://api.windcrypto.com" },
 });
 const signed = await login.signer.sign({
   chainId: VEXANIUM_MAINNET_CHAIN_ID,
+  transaction: exactTransaction,
   serializedTransaction: exactBytes,
+  serializedContextFreeData: new Uint8Array(),
+  digest: sha256Digest(Uint8Array.of(1)),
+  requiredKeys: [privateKey.toPublicKey().toString()],
 });
 assert.equal(signed.length, 1);
 
@@ -238,6 +260,8 @@ assert.equal(
   false,
 );
 assert.equal(exactCalls[0].params.serializedTransaction, bytesToHex(exactBytes));
+assert.deepEqual(exactCalls[0].params.transaction, exactTransaction);
+assert.equal(exactCalls[0].params.transaction.actions.length, 2);
 assert.equal(exactCalls[0].params.chainId, VEXANIUM_MAINNET_CHAIN_ID);
 assert.equal(exactCalls[0].params.account, "windstack");
 assert.equal(exactCalls[0].params.permission, "active");
