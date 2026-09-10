@@ -39,17 +39,6 @@ const abiProvider = {
   },
 };
 
-// Public Revision 2 interoperability vector published with the Signing Request specification.
-const publicCompressedVector =
-  "esr:gmNcs7jsE9uOP6rL3rrcvpMWUmN27LCdleD836_eTzFz-vCSjZGRYcm-EsZXBqEMILDA6C5QBAKYoLQQTAAIFNycd-1iZGAUyigpKSi20tdPyc9NzMzTS87PZQAA";
-const legacy = SigningRequest.from(publicCompressedVector);
-assert.equal(legacy.version, 2);
-assert.equal(legacy.data.request.type, "action[]");
-assert.equal(legacy.data.request.value[0].account, "eosio.forum");
-assert.equal(legacy.data.request.value[0].name, "vote");
-assert.equal(legacy.isBroadcast, true);
-assert.equal(legacy.data.callback, "https://domain.com");
-
 const request = await SigningRequest.create(
   {
     chainId: VEX_CHAIN_ID,
@@ -75,7 +64,7 @@ const request = await SigningRequest.create(
   },
   { abiProvider },
 );
-assert.equal(request.version, SIGNING_REQUEST_PROTOCOL_VERSION);
+assert.equal(request.version, 2);
 assert.equal(request.getInfoText("note"), "WindStack VSR");
 
 const vsr = request.encode(true, true, "vsr");
@@ -156,22 +145,42 @@ const multiRequest = await SigningRequest.create(
           memo: "second",
         },
       },
+      {
+        account: "vex.token",
+        name: "transfer",
+        authorization: [
+          {
+            actor: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
+            permission: SIGNING_REQUEST_PLACEHOLDER_PERMISSION,
+          },
+        ],
+        data: {
+          from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
+          to: "reserve.wind",
+          quantity: "4.0000 VEX",
+          memo: "third",
+        },
+      },
     ],
     broadcast: true,
   },
   { abiProvider: multiAbiProvider },
 );
-const multiParsed = SigningRequest.from(multiRequest.encode(true, false, "esr"));
+assert.equal(multiRequest.version, 2);
+const multiParsed = SigningRequest.from(multiRequest.encode(true, false, "vsr"));
 assert.equal(multiParsed.data.request.type, "action[]");
-assert.equal(getSigningRequestActions(multiParsed).length, 2);
+assert.equal(getSigningRequestActions(multiParsed).length, 3);
+const callsBeforeInspection = new Map(multiAbiCalls);
 const inspectedActions = await decodeSigningRequestActions(multiParsed, multiAbiProvider);
-assert.equal(inspectedActions.length, 2);
+assert.equal(inspectedActions.length, 3);
 assert.equal(inspectedActions[0].account, "vex.token");
 assert.equal(inspectedActions[0].data.quantity, "2.0000 VEX");
 assert.equal(inspectedActions[1].account, "token.wind");
 assert.equal(inspectedActions[1].data.quantity, "3.00000000 WIND");
-assert.equal(multiAbiCalls.get("vex.token"), 2);
-assert.equal(multiAbiCalls.get("token.wind"), 2);
+assert.equal(inspectedActions[2].account, "vex.token");
+assert.equal(inspectedActions[2].data.quantity, "4.0000 VEX");
+assert.equal(multiAbiCalls.get("vex.token") - (callsBeforeInspection.get("vex.token") ?? 0), 1);
+assert.equal(multiAbiCalls.get("token.wind") - (callsBeforeInspection.get("token.wind") ?? 0), 1);
 const multiResolved = await resolveSigningRequest(multiParsed, {
   actor: "windstack",
   permission: "active",
@@ -182,9 +191,10 @@ const multiResolved = await resolveSigningRequest(multiParsed, {
     refBlockPrefix: 123,
   },
 });
-assert.equal(multiResolved.transaction.actions.length, 2);
+assert.equal(multiResolved.transaction.actions.length, 3);
 assert.equal(multiResolved.transaction.actions[0].authorization[0].actor, "windstack");
 assert.equal(multiResolved.transaction.actions[1].authorization[0].actor, "windstack");
+assert.equal(multiResolved.transaction.actions[2].authorization[0].actor, "windstack");
 
 const scalarOne = Uint8Array.from({ length: 32 }, (_, index) => (index === 31 ? 1 : 0));
 const privateKey = PrivateKey.fromBytes("K1", scalarOne);
@@ -214,10 +224,11 @@ const identity = await SigningRequest.create({
   identity: { scope: "windstack" },
   callback: "https://app.example/login?actor={{sa}}",
 });
+assert.equal(identity.version, SIGNING_REQUEST_PROTOCOL_VERSION);
 assert.equal(identity.isIdentity, true);
 assert.throws(
   () => SigningRequest.from(identity.encode(false, false, "vsr").replace(/^vsr:/, "http:")),
-  /vsr: or esr:/,
+  /vsr:/,
 );
 const identityResolved = await resolveSigningRequest(identity, {
   actor: "windstack",
@@ -247,11 +258,37 @@ const identityData = new AbiSerializer(SIGNING_REQUEST_ABI).decode(
 assert.equal(identityData.scope, "windstack");
 assert.deepEqual(identityData.permission, { actor: "windstack", permission: "active" });
 
+const revision2Identity = await SigningRequest.create({
+  chainId: VEX_CHAIN_ID,
+  identity: {},
+  callback: "https://app.example/login",
+});
+assert.equal(revision2Identity.version, 2);
+const revision2Uri = revision2Identity.encode(false, true, "vsr");
+const revision2RoundTrip = SigningRequest.from(revision2Uri);
+assert.equal(revision2RoundTrip.version, 2);
+assert.equal(revision2RoundTrip.isIdentity, true);
+assert.equal(revision2RoundTrip.data.request.type, "identity");
+assert.equal(revision2RoundTrip.data.request.value.scope, undefined);
+assert.equal(revision2RoundTrip.encode(false, true, "vsr"), revision2Uri);
+const revision2Resolved = await resolveSigningRequest(revision2RoundTrip, {
+  actor: "windstack",
+  permission: "active",
+  abiProvider,
+});
+assert.equal(revision2Resolved.transaction.expiration, "1970-01-01T00:00:00");
+assert.equal(revision2Resolved.transaction.ref_block_num, 0);
+assert.equal(revision2Resolved.transaction.ref_block_prefix, 0);
+assert.deepEqual(revision2Resolved.transaction.actions[0].authorization, [
+  { actor: "windstack", permission: "active" },
+]);
+
 const multiChain = await SigningRequest.create({
   chainAlias: 0,
   identity: { scope: "windstack" },
   callback: "https://app.example/login",
 });
+assert.equal(multiChain.version, SIGNING_REQUEST_PROTOCOL_VERSION);
 const selected = await resolveSigningRequest(multiChain, {
   actor: "windstack",
   permission: "active",
@@ -263,42 +300,13 @@ assert.equal(selected.chainId, VEX_CHAIN_ID);
 
 const compressedBytes = pakoCompressionProvider.deflate(new Uint8Array(16_384));
 assert.throws(() => pakoCompressionProvider.inflate(compressedBytes, 1024), /size limit/);
-assert.throws(() => SigningRequest.from("vsr:not+base64"), /valid vsr: or esr:/);
+assert.throws(() => SigningRequest.from("vsr:not+base64"), /valid vsr:/);
 assert.throws(
   () => SigningRequest.from(`vsr:${Buffer.from(Uint8Array.of(4, 0)).toString("base64url")}`),
   /Unsupported signing-request protocol version/,
 );
 
-const revision2IdentityUri = "esr://AgABAwACJWh0dHBzOi8vY2guYW5jaG9yLmxpbmsvMTIzNC00NTY3LTg5MDAA";
-const revision2Identity = SigningRequest.from(revision2IdentityUri);
-assert.equal(revision2Identity.version, 2);
-assert.equal(revision2Identity.isIdentity, true);
-assert.equal(revision2Identity.data.request.type, "identity");
-assert.equal(revision2Identity.data.request.value.scope, undefined);
-assert.equal(revision2Identity.encode(false, true, "esr"), revision2IdentityUri);
-const revision2Resolved = await resolveSigningRequest(revision2Identity, {
-  actor: "windstack",
-  permission: "active",
-  abiProvider,
-});
-assert.equal(revision2Resolved.transaction.expiration, "1970-01-01T00:00:00");
-assert.equal(revision2Resolved.transaction.ref_block_num, 0);
-assert.equal(revision2Resolved.transaction.ref_block_prefix, 0);
-assert.deepEqual(revision2Resolved.transaction.actions[0].authorization, [
-  { actor: "windstack", permission: "active" },
-]);
-const revision2IdentityData = new AbiSerializer(SIGNING_REQUEST_ABI).decode(
-  "permission_level",
-  Uint8Array.from(
-    revision2Resolved.transaction.actions[0].data
-      .slice(2)
-      .match(/.{2}/g)
-      .map((value) => Number.parseInt(value, 16)),
-  ),
-);
-assert.deepEqual(revision2IdentityData, { actor: "windstack", permission: "active" });
-
-const legacyPermissionRequest = await SigningRequest.create(
+const placeholderCompatibilityRequest = await SigningRequest.create(
   {
     chainId: VEX_CHAIN_ID,
     action: {
@@ -314,23 +322,26 @@ const legacyPermissionRequest = await SigningRequest.create(
         from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
         to: "receiver",
         quantity: "1.0000 VEX",
-        memo: "legacy placeholder",
+        memo: "placeholder compatibility",
       },
     },
   },
   { abiProvider },
 );
-const legacyPermissionResolved = await resolveSigningRequest(legacyPermissionRequest, {
-  actor: "windstack",
-  permission: "active",
-  abiProvider,
-  tapos: {
-    expiration: "2026-09-07T04:00:00",
-    refBlockNum: 1,
-    refBlockPrefix: 2,
+const placeholderCompatibilityResolved = await resolveSigningRequest(
+  placeholderCompatibilityRequest,
+  {
+    actor: "windstack",
+    permission: "active",
+    abiProvider,
+    tapos: {
+      expiration: "2026-09-07T04:00:00",
+      refBlockNum: 1,
+      refBlockPrefix: 2,
+    },
   },
-});
-assert.deepEqual(legacyPermissionResolved.transaction.actions[0].authorization, [
+);
+assert.deepEqual(placeholderCompatibilityResolved.transaction.actions[0].authorization, [
   { actor: "windstack", permission: "active" },
 ]);
 
