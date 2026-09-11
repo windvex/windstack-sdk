@@ -17,10 +17,7 @@ const TAPOS = {
 };
 
 const swapAbi = JSON.parse(
-  readFileSync(
-    new URL("../test/fixtures/vexanium/swapv2.wind.abi.json", import.meta.url),
-    "utf8",
-  ),
+  readFileSync(new URL("../test/fixtures/vexanium/swapv2.wind.abi.json", import.meta.url), "utf8"),
 );
 
 const tokenAbi = {
