@@ -4,6 +4,12 @@
 
 Release history for the WindStack package set.
 
+### 2.1.1 — 2026-09-11
+
+- Made signing-request action resolution deterministic in wire order so failures identify the exact contract action and position.
+- Added WindSwap liquidity regression coverage for one VSR containing `swapv2.wind::opendepo`, VEX transfer, and WIND transfer actions.
+- Added single-action `swapv2.wind::withdraw` regression coverage and deterministic ABI-resolution failure assertions.
+
 ### 2.1.0 — 2026-09-10
 
 - Added canonical transaction deserialization with size and count limits plus canonical round-trip verification.

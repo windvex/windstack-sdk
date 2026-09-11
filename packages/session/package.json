@@ -1,6 +1,6 @@
 {
   "name": "@windstack/session",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Runtime-neutral Antelope signer session and wallet-plugin orchestration.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/antelope": "2.1.0"
+    "@windstack/antelope": "2.1.1"
   },
   "sideEffects": false,
   "keywords": [

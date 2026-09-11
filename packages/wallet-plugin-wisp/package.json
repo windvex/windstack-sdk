@@ -1,6 +1,6 @@
 {
   "name": "@windstack/wallet-plugin-wisp",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "WindStack session plugin for Vexanium transaction signing with Wisp Wallet.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,10 +23,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/antelope": "2.1.0",
-    "@windstack/core": "2.1.0",
-    "@windstack/session": "2.1.0",
-    "@windstack/vexanium": "2.1.0"
+    "@windstack/antelope": "2.1.1",
+    "@windstack/core": "2.1.1",
+    "@windstack/session": "2.1.1",
+    "@windstack/vexanium": "2.1.1"
   },
   "sideEffects": false,
   "keywords": [
