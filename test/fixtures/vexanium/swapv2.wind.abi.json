@@ -1,0 +1,31 @@
+{
+  "version": "eosio::abi/1.2",
+  "types": [],
+  "structs": [
+    {
+      "name": "opendepo",
+      "base": "",
+      "fields": [
+        { "name": "owner", "type": "name" },
+        { "name": "pair_id", "type": "uint64" }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "base": "",
+      "fields": [
+        { "name": "owner", "type": "name" },
+        { "name": "pair_id", "type": "uint64" },
+        { "name": "amount", "type": "uint64" }
+      ]
+    }
+  ],
+  "actions": [
+    { "name": "opendepo", "type": "opendepo", "ricardian_contract": "" },
+    { "name": "withdraw", "type": "withdraw", "ricardian_contract": "" }
+  ],
+  "tables": [],
+  "ricardian_clauses": [],
+  "variants": [],
+  "action_results": []
+}
