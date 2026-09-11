@@ -47,6 +47,11 @@ export {
   requestVexaniumProviders,
 } from "./discovery.js";
 export type { GetVexaniumProviderOptions } from "./discovery.js";
+export { restoreVexaniumSession } from "./session.js";
+export type {
+  VexaniumRestoreSessionParams,
+  VexaniumRestoreSessionRequest,
+} from "./session.js";
 export type {
   CanonicalSigningRequestUri,
   VexSignMessageParams,

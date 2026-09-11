@@ -6,12 +6,20 @@
  */
 import { bytesToHex, type SignRequest, type Signer } from "@windstack/antelope";
 import type { DappMetadataInput } from "@windstack/core";
-import type { WalletLoginContext, WalletLoginResult, WalletPlugin } from "@windstack/session";
+import type {
+  WalletLoginContext,
+  WalletLoginResult,
+  WalletPlugin,
+  WalletSessionContext,
+} from "@windstack/session";
 import {
   VEXANIUM_ERROR_CODES,
   VEXANIUM_MAINNET_CHAIN_ID,
+  VEXANIUM_METHODS,
   VexaniumProviderError,
   createVexaniumClient,
+  isVexaniumProviderError,
+  restoreVexaniumSession,
   type VexaniumAccount,
   type VexaniumClient,
   type VexaniumProvider,
@@ -37,6 +45,7 @@ class WispSigner implements Signer {
   constructor(
     private readonly client: VexaniumClient,
     private readonly account: VexaniumAccount,
+    private readonly walletSessionId?: string,
   ) {}
 
   async getAvailableKeys(): Promise<readonly string[]> {
@@ -63,6 +72,7 @@ class WispSigner implements Signer {
       chainId: request.chainId,
       account: this.account.actor,
       permission: this.account.permission,
+      sessionId: this.walletSessionId,
     });
     return result.signatures;
   }
@@ -114,14 +124,19 @@ export class WispWalletPlugin implements WalletPlugin {
     }
   }
 
-  private loginResult(client: VexaniumClient, account: VexaniumAccount): WalletLoginResult {
+  private loginResult(
+    client: VexaniumClient,
+    account: VexaniumAccount,
+    walletSessionId?: string,
+  ): WalletLoginResult {
     return {
       identity: {
         actor: account.actor,
         permission: account.permission,
         publicKey: account.publicKey,
       },
-      signer: new WispSigner(client, account),
+      walletSessionId,
+      signer: new WispSigner(client, account, walletSessionId),
     };
   }
 
@@ -129,30 +144,85 @@ export class WispWalletPlugin implements WalletPlugin {
     this.assertChain(context);
     const client = await this.getClient();
     const account = await client.connectOne({ chainId: context.chain.id });
-    return this.loginResult(client, account);
+    const walletSessionId = client.getSession()?.walletSessionId;
+    return this.loginResult(client, account, walletSessionId);
   }
 
-  async restore(
-    context: WalletLoginContext & {
-      identity: { actor: string; permission: string; publicKey?: string };
-    },
-  ): Promise<WalletLoginResult | null> {
+  async restore(context: WalletSessionContext): Promise<WalletLoginResult | null> {
     this.assertChain(context);
     const client = await this.getClient();
-    const session = client.getSession();
-    if (!session) return null;
-    const account = session.accounts.find(
+    const currentSession = client.getSession();
+    if (currentSession) {
+      if (
+        context.walletSessionId !== undefined &&
+        currentSession.walletSessionId !== context.walletSessionId
+      ) {
+        return null;
+      }
+      const account = currentSession.accounts.find(
+        (item) =>
+          item.actor === context.identity.actor && item.permission === context.identity.permission,
+      );
+      if (!account) return null;
+      return this.loginResult(
+        client,
+        {
+          ...account,
+          publicKey: account.publicKey ?? context.identity.publicKey,
+        },
+        currentSession.walletSessionId,
+      );
+    }
+
+    if (!context.walletSessionId) return null;
+
+    try {
+      await restoreVexaniumSession(client, {
+        sessionId: context.walletSessionId,
+        chainId: context.chain.id,
+      });
+    } catch (error) {
+      if (
+        isVexaniumProviderError(error) &&
+        (error.code === VEXANIUM_ERROR_CODES.UNAUTHORIZED ||
+          error.code === VEXANIUM_ERROR_CODES.DISCONNECTED ||
+          error.code === VEXANIUM_ERROR_CODES.CHAIN_DISCONNECTED ||
+          error.code === VEXANIUM_ERROR_CODES.UNSUPPORTED_METHOD ||
+          error.code === VEXANIUM_ERROR_CODES.UNSUPPORTED_CAPABILITY)
+      ) {
+        return null;
+      }
+      throw error;
+    }
+
+    const restoredSession = client.getSession();
+    if (!restoredSession || restoredSession.walletSessionId !== context.walletSessionId) return null;
+    const account = restoredSession.accounts.find(
       (item) =>
         item.actor === context.identity.actor && item.permission === context.identity.permission,
     );
     if (!account) return null;
-    return this.loginResult(client, {
-      ...account,
-      publicKey: account.publicKey ?? context.identity.publicKey,
-    });
+
+    return this.loginResult(
+      client,
+      {
+        ...account,
+        publicKey: account.publicKey ?? context.identity.publicKey,
+      },
+      restoredSession.walletSessionId,
+    );
   }
 
-  async logout(): Promise<void> {
-    await (await this.getClient()).disconnect();
+  async logout(context: WalletSessionContext): Promise<void> {
+    const client = await this.getClient();
+    if (client.getSession()) {
+      await client.disconnect();
+      return;
+    }
+    if (!context.walletSessionId) return;
+    await client.request({
+      method: VEXANIUM_METHODS.DISCONNECT,
+      params: { sessionId: context.walletSessionId },
+    });
   }
 }

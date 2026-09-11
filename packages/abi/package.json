@@ -1,6 +1,6 @@
 {
   "name": "@windstack/abi",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Pure TypeScript Antelope ABI, binary, exact asset, extended asset, and name codec.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/crypto": "2.1.1"
+    "@windstack/crypto": "2.2.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -37,12 +37,12 @@
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/abi#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/windvex/windstack-sdk.git",
     "directory": "packages/abi"
   },
-  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/abi#readme",
   "bugs": {
     "url": "https://github.com/windvex/windstack-sdk/issues"
   },

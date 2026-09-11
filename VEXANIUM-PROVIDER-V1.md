@@ -6,11 +6,11 @@ This document is the interoperability specification for wallet and provider impl
 
 ## Overview
 
-`VexaniumProvider` defines the browser-facing contract between a Vexanium application and a compatible wallet. It standardizes provider identity, capability negotiation, account access, exact transaction signing, Vexanium Signing Requests, events, errors, discovery, and the security boundary used for wallet permissions.
+`VexaniumProvider` defines the browser-facing contract between a Vexanium application and a compatible wallet. It standardizes provider identity, capability negotiation, account access, wallet-authoritative session restore, exact transaction signing, Vexanium Signing Requests, events, errors, discovery, and the security boundary used for wallet permissions.
 
 Protocol identifier: `VexaniumProvider`
 
-Protocol version: `1.0.0`
+Protocol version: `1.1.0`
 
 Created by **Gilang Ramadan**.
 
@@ -51,6 +51,8 @@ The client and wallet negotiate semantic protocol versions through `vex_getCapab
 
 Implementations of protocol v1 must share major version `1`. A provider using another major version is not considered compatible unless a future specification explicitly defines that compatibility.
 
+Protocol `1.1.0` adds explicit non-interactive `vex_restoreSession`. A v1 client may remain compatible with a `1.0.x` provider, but cold session restore is unavailable unless the provider advertises `vex_restoreSession` in its negotiated methods.
+
 ## Capabilities
 
 Protocol v1 defines these capability identifiers:
@@ -78,7 +80,7 @@ provider.request({
   method: "vex_getCapabilities",
   params: {
     standard: "VexaniumProvider",
-    version: "1.0.0",
+    version: "1.1.0",
     requiredCapabilities: ["vex.accounts", "vex.sessions"],
   },
 });
@@ -89,25 +91,25 @@ Response:
 ```ts
 {
   standard: "VexaniumProvider",
-  version: "1.0.0",
+  version: "1.1.0",
   capabilities: VexaniumCapability[],
   chains: string[],
   methods: string[],
 }
 ```
 
-The client rejects an incompatible major version, undeclared chain/capability, or missing required capability before the affected operation continues.
+The client rejects an incompatible major version, undeclared chain/capability, or missing required capability before the affected operation continues. A feature introduced in a compatible minor version must also verify that its required method appears in `methods`.
 
 ## Account access
 
-`vex_requestAccounts` is the interactive authorization request.
+`vex_requestAccounts` is the interactive authorization request. It is the only account method that may create a new wallet authorization session.
 
 Request:
 
 ```ts
 {
   standard: "VexaniumProvider",
-  version: "1.0.0",
+  version: "1.1.0",
   dapp: DappMetadata,
   chainId?: string,
   requiredCapabilities?: VexaniumCapability[],
@@ -119,7 +121,7 @@ Response:
 ```ts
 {
   standard: "VexaniumProvider",
-  version: "1.0.0",
+  version: "1.1.0",
   sessionId: string,
   chainId: string,
   accounts: VexaniumAccount[],
@@ -127,9 +129,9 @@ Response:
 }
 ```
 
-`sessionId` is required. `chainId` in a response is the complete 64-character Vexanium chain ID. A request may use either the complete chain ID or the Vexanium CAIP-2 scope. Clients compare supported forms against the configured Vexanium chain.
+`sessionId` is required and is an opaque identifier issued by the wallet. It is not a signing secret. `chainId` in a response is the complete 64-character Vexanium chain ID. A request may use either the complete chain ID or the Vexanium CAIP-2 scope. Clients compare supported forms against the configured Vexanium chain.
 
-`vex_getAccounts` is the non-interactive restore/read path and returns:
+`vex_getAccounts` is a non-interactive read/synchronization path for the provider's current runtime session and returns:
 
 ```ts
 {
@@ -138,6 +140,43 @@ Response:
   accounts: VexaniumAccount[],
 }
 ```
+
+A fresh application runtime must not infer that an old session is valid merely because a local `sessionId` exists. Cold restore uses `vex_restoreSession`.
+
+## Session restore
+
+`vex_restoreSession` restores a wallet-authoritative session without interactive approval.
+
+Request:
+
+```ts
+{
+  standard: "VexaniumProvider",
+  version: "1.1.0",
+  sessionId: string,
+  chainId: string,
+  dapp: DappMetadata,
+}
+```
+
+A successful response uses the same canonical connection response shape as `vex_requestAccounts` and must return the same `sessionId` and chain:
+
+```ts
+{
+  standard: "VexaniumProvider",
+  version: "1.1.0",
+  sessionId: string,
+  chainId: string,
+  accounts: VexaniumAccount[],
+  capabilities: VexaniumCapability[],
+}
+```
+
+The provider must bind restore to wallet-owned authorization state and an authoritative runtime or transport origin. `DappMetadata` is display metadata and cannot establish authorization.
+
+Restore is strictly non-interactive. A provider must never create a new session, change the authorized account, permission, or chain, or fall back to `vex_requestAccounts` when restore fails. Unknown, expired, revoked, origin-mismatched, or otherwise invalid sessions fail with `UNAUTHORIZED`, `DISCONNECTED`, or another applicable provider error.
+
+Disconnect or wallet-side revocation invalidates the session for future restore. A client that receives a revoked/unknown-session failure must clear its local opaque session reference.
 
 ## Exact transaction signing
 
@@ -172,6 +211,8 @@ If `transaction` is present, the wallet must verify that serializing it produces
 ```
 
 When `signer` or `signerPermission` is returned, it must match the requested wallet permission.
+
+A restored connection does not grant silent signing. Transaction review, vault unlock, risk policy, and signing approval remain wallet responsibilities and are separate from connection restore.
 
 ## Vexanium Signing Requests
 
@@ -238,7 +279,11 @@ A discovered provider must expose valid mandatory `providerInfo` before it is ac
 
 ## Security
 
-`DappMetadata` is display metadata only. Wallet permission state must bind to an authoritative runtime or transport origin, such as the browser extension sender origin. A wallet must not use an origin supplied by application content as the permission boundary.
+`DappMetadata` is display metadata only. Wallet permission state must bind to an authoritative runtime or transport origin, such as the browser extension sender origin or an authenticated wallet bridge. A wallet must not use an origin supplied by application content as the permission boundary.
+
+A dApp may persist the opaque wallet `sessionId` needed for restore, but it must never receive or persist a wallet password, PIN, decrypted private key, or signing secret. Wallet-side session records remain authoritative and revocable.
+
+Persistent connection, trusted-dApp policy, vault unlock state, and transaction signing approval are separate states. Restoring a connection must not silently unlock the wallet or authorize arbitrary transaction signing.
 
 Exact transaction signing must preserve the canonical bytes approved by the application. Structured transaction review data must be verified against the authoritative serialized bytes before it is trusted for display or policy decisions.
 
@@ -246,7 +291,9 @@ VSR input and packed transactions are untrusted input. Implementations must enfo
 
 ## Runtime
 
-The specification does not require a specific UI framework, storage implementation, or signing backend. Implementations may use browser extensions, mobile wallet bridges, embedded providers, or other trusted transports as long as the observable provider contract remains compatible.
+The specification does not require a specific UI framework, storage implementation, or signing backend. Implementations may use browser extensions, mobile wallet bridges, Telegram Mini Apps, embedded providers, or other trusted transports as long as the observable provider contract remains compatible.
+
+Transport return/deep-link behavior is not authorization. A Telegram or browser return URL only routes the user back to the dApp and must not be treated as proof that a wallet session is valid.
 
 ## License
 

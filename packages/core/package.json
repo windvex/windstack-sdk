@@ -1,6 +1,6 @@
 {
   "name": "@windstack/core",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Runtime-neutral provider, error, exact decimal, basis-point, and constant-product math primitives.",
   "type": "module",
   "main": "./dist/index.js",

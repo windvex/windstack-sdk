@@ -1,6 +1,6 @@
 {
   "name": "@windstack/solana",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Generic Solana provider discovery, account normalization, and client utilities.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "2.1.1"
+    "@windstack/core": "2.2.0"
   },
   "sideEffects": false,
   "keywords": [

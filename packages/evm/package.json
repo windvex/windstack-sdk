@@ -1,6 +1,6 @@
 {
   "name": "@windstack/evm",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Generic EVM address, JSON-RPC, EIP-1193, and EIP-6963 provider utilities.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "2.1.1"
+    "@windstack/core": "2.2.0"
   },
   "sideEffects": false,
   "keywords": [

@@ -1,6 +1,6 @@
 {
   "name": "@windstack/signing-request",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Vexanium Signing Request primitives for actions, multi-action transactions, identity, callbacks, resolution, and verification.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,10 +23,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/abi": "2.1.1",
-    "@windstack/antelope": "2.1.1",
-    "@windstack/crypto": "2.1.1",
-    "@windstack/rpc": "2.1.1",
+    "@windstack/abi": "2.2.0",
+    "@windstack/antelope": "2.2.0",
+    "@windstack/crypto": "2.2.0",
+    "@windstack/rpc": "2.2.0",
     "pako": "^2.2.0"
   },
   "devDependencies": {
@@ -45,12 +45,12 @@
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/signing-request#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/windvex/windstack-sdk.git",
     "directory": "packages/signing-request"
   },
-  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/signing-request#readme",
   "bugs": {
     "url": "https://github.com/windvex/windstack-sdk/issues"
   },

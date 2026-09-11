@@ -1,6 +1,6 @@
 {
   "name": "@windstack/crypto",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Portable Antelope K1/R1 keys, canonical signatures, recovery, WIF, and legacy key compatibility.",
   "type": "module",
   "main": "./dist/index.js",
@@ -39,12 +39,12 @@
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/crypto#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/windvex/windstack-sdk.git",
     "directory": "packages/crypto"
   },
-  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/crypto#readme",
   "bugs": {
     "url": "https://github.com/windvex/windstack-sdk/issues"
   },

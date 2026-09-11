@@ -3,7 +3,7 @@ export const VEXANIUM_REQUEST_PROVIDER_EVENT = "vexanium:requestProvider" as con
 export const VEXANIUM_ANNOUNCE_PROVIDER_EVENT = "vexanium:announceProvider" as const;
 
 export const VEXANIUM_PROVIDER_STANDARD = "VexaniumProvider" as const;
-export const VEXANIUM_PROVIDER_VERSION = "1.0.0" as const;
+export const VEXANIUM_PROVIDER_VERSION = "1.1.0" as const;
 export const VEXANIUM_PROVIDER_MAJOR_VERSION = 1 as const;
 
 export const VEXANIUM_CAPABILITIES = {
@@ -19,6 +19,7 @@ export const VEXANIUM_CAPABILITIES = {
 export const VEXANIUM_METHODS = {
   GET_CAPABILITIES: "vex_getCapabilities",
   REQUEST_ACCOUNTS: "vex_requestAccounts",
+  RESTORE_SESSION: "vex_restoreSession",
   GET_ACCOUNTS: "vex_getAccounts",
   GET_CHAIN: "vex_getChain",
   SIGNING_REQUEST: "vex_signingRequest",

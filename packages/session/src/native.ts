@@ -21,14 +21,21 @@ export type SessionChain = {
 };
 export type SessionIdentity = { actor: string; permission: string; publicKey?: string };
 export type WalletLoginContext = { chain: SessionChain; appName?: string };
-export type WalletLoginResult = { identity: SessionIdentity; signer: Signer };
+export type WalletLoginResult = {
+  identity: SessionIdentity;
+  signer: Signer;
+  /** Opaque wallet-issued session id. Never contains private key material. */
+  walletSessionId?: string;
+};
+export type WalletSessionContext = WalletLoginContext & {
+  identity: SessionIdentity;
+  walletSessionId?: string;
+};
 export interface WalletPlugin {
   readonly id: string;
   login(context: WalletLoginContext): Promise<WalletLoginResult>;
-  restore?(
-    context: WalletLoginContext & { identity: SessionIdentity },
-  ): Promise<WalletLoginResult | null>;
-  logout?(context: WalletLoginContext & { identity: SessionIdentity }): Promise<void>;
+  restore?(context: WalletSessionContext): Promise<WalletLoginResult | null>;
+  logout?(context: WalletSessionContext): Promise<void>;
 }
 export interface SessionStorage {
   get(key: string): Promise<string | null>;
@@ -67,6 +74,20 @@ function validateIdentity(identity: SessionIdentity): SessionIdentity {
   }
   if (identity.publicKey !== undefined) PublicKey.fromString(identity.publicKey);
   return Object.freeze({ ...identity, actor, permission });
+}
+
+function validateWalletSessionId(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 512 ||
+    value !== value.trim() ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  ) {
+    throw new TypeError("Wallet session id must be a non-empty opaque string");
+  }
+  return value;
 }
 
 function validateSigner(signer: Signer): Signer {
@@ -135,6 +156,7 @@ export class Session {
   readonly chain: SessionChain;
   readonly identity: SessionIdentity;
   readonly walletPlugin: WalletPlugin;
+  readonly walletSessionId?: string;
   readonly client: AntelopeClient;
   readonly signer: Signer;
 
@@ -142,11 +164,13 @@ export class Session {
     chain: SessionChain;
     identity: SessionIdentity;
     walletPlugin: WalletPlugin;
+    walletSessionId?: string;
     signer: Signer;
   }) {
     this.chain = validateChain(args.chain);
     this.identity = validateIdentity(args.identity);
     this.walletPlugin = validatePlugin(args.walletPlugin);
+    this.walletSessionId = validateWalletSessionId(args.walletSessionId);
     this.signer = validateSigner(args.signer);
     this.client = new AntelopeClient({
       endpoints: this.chain.url,
@@ -197,6 +221,7 @@ type StoredSession = {
   chainId: string;
   walletPluginId: string;
   identity: SessionIdentity;
+  walletSessionId?: string;
 };
 
 export class SessionManager {
@@ -254,10 +279,12 @@ export class SessionManager {
     try {
       const result = await plugin.login({ chain, appName: this.appName });
       const identity = validateIdentity(result.identity);
+      const walletSessionId = validateWalletSessionId(result.walletSessionId);
       const session = new Session({
         chain,
         identity,
         walletPlugin: plugin,
+        walletSessionId,
         signer: validateSigner(result.signer),
       });
       try {
@@ -267,12 +294,18 @@ export class SessionManager {
             chainId: chain.id,
             walletPluginId: plugin.id,
             identity: session.identity,
+            walletSessionId: session.walletSessionId,
           }),
         );
       } catch (error) {
         if (plugin.logout) {
           await plugin
-            .logout({ chain, appName: this.appName, identity: session.identity })
+            .logout({
+              chain,
+              appName: this.appName,
+              identity: session.identity,
+              walletSessionId: session.walletSessionId,
+            })
             .catch(() => undefined);
         }
         throw error;
@@ -303,16 +336,30 @@ export class SessionManager {
         chain,
         appName: this.appName,
         identity: stored.identity,
+        walletSessionId: stored.walletSessionId,
       });
-      if (!result) return null;
+      if (!result) {
+        await this.storage.remove(this.storageKey);
+        return null;
+      }
       const restoredIdentity = validateIdentity(result.identity);
       if (!identitiesMatch(stored.identity, restoredIdentity)) {
+        await this.storage.remove(this.storageKey).catch(() => undefined);
         throw new Error("Wallet restored an identity that does not match the stored session");
+      }
+      const restoredWalletSessionId = validateWalletSessionId(result.walletSessionId);
+      if (
+        stored.walletSessionId !== undefined &&
+        restoredWalletSessionId !== stored.walletSessionId
+      ) {
+        await this.storage.remove(this.storageKey).catch(() => undefined);
+        throw new Error("Wallet restored a session id that does not match the stored session");
       }
       const session = new Session({
         chain,
         identity: restoredIdentity,
         walletPlugin: plugin,
+        walletSessionId: restoredWalletSessionId ?? stored.walletSessionId,
         signer: validateSigner(result.signer),
       });
       try {
@@ -322,12 +369,18 @@ export class SessionManager {
             chainId: chain.id,
             walletPluginId: plugin.id,
             identity: session.identity,
+            walletSessionId: session.walletSessionId,
           }),
         );
       } catch (error) {
         if (plugin.logout) {
           await plugin
-            .logout({ chain, appName: this.appName, identity: session.identity })
+            .logout({
+              chain,
+              appName: this.appName,
+              identity: session.identity,
+              walletSessionId: session.walletSessionId,
+            })
             .catch(() => undefined);
         }
         throw error;
@@ -351,6 +404,7 @@ export class SessionManager {
           chain: session.chain,
           appName: this.appName,
           identity: session.identity,
+          walletSessionId: session.walletSessionId,
         });
       }
     } catch (error) {
@@ -395,6 +449,7 @@ export class SessionManager {
         chainId: value.chainId.toLowerCase(),
         walletPluginId: value.walletPluginId,
         identity: validateIdentity(value.identity),
+        walletSessionId: validateWalletSessionId(value.walletSessionId),
       };
     } catch {
       await this.storage.remove(this.storageKey).catch(() => undefined);

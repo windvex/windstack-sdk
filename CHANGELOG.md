@@ -4,6 +4,14 @@
 
 Release history for the WindStack package set.
 
+### 2.2.0 — 2026-09-12
+
+- Added wallet-authoritative cold session restore through VexaniumProvider `1.1.0` and the explicit non-interactive `vex_restoreSession` method.
+- Persisted opaque wallet session identifiers through `@windstack/session` login, restore, logout, stale-session cleanup, and identity/session mismatch guards.
+- Updated `@windstack/wallet-plugin-wisp` so restored signing and disconnect use the authoritative wallet session identifier instead of depending on a previous JavaScript runtime.
+- Added regression coverage proving a recreated Wisp client restores without reopening interactive account authorization and clears revoked sessions without connect fallback.
+- Added the Wisp persistent-session SSOT checkpoint covering the official TON Connect, Telegram Mini Apps, and OKX-derived architectural constraints and the 0–100% rollout.
+
 ### 2.1.1 — 2026-09-11
 
 - Made signing-request action resolution deterministic in wire order so failures identify the exact contract action and position.

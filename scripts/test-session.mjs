@@ -25,18 +25,23 @@ const identity = {
   permission: "active",
   publicKey: privateKey.toPublicKey().toString(),
 };
+const walletSessionId = "wallet-session-1";
 
 const storage = new MemorySessionStorage();
 let logoutCalls = 0;
+let lastRestoreContext;
+let lastLogoutContext;
 const plugin = {
   id: "test-wallet",
   async login() {
-    return { identity, signer };
+    return { identity, signer, walletSessionId };
   },
-  async restore() {
-    return { identity, signer };
+  async restore(context) {
+    lastRestoreContext = context;
+    return { identity, signer, walletSessionId };
   },
-  async logout() {
+  async logout(context) {
+    lastLogoutContext = context;
     logoutCalls += 1;
   },
 };
@@ -44,6 +49,7 @@ const kit = new SessionManager({ chains: [chain], walletPlugins: [plugin], stora
 const session = await kit.login();
 assert.equal(session.actor, "alice");
 assert.equal(session.permission, "active");
+assert.equal(session.walletSessionId, walletSessionId);
 assert.equal(Object.isFrozen(session.chain), true);
 assert.equal(Object.isFrozen(session.chain.url), true);
 assert.equal(Object.isFrozen(session.chain.contracts), true);
@@ -54,29 +60,33 @@ assert.equal(
   false,
   "stored sessions must never contain private keys",
 );
+assert.equal(JSON.parse(stored).walletSessionId, walletSessionId);
 await assert.rejects(() => kit.login(), /already active/);
 await kit.logout();
 assert.equal(kit.getSession(), null);
 assert.equal(await storage.get("windstack:session"), null);
 assert.equal(logoutCalls, 1);
+assert.equal(lastLogoutContext.walletSessionId, walletSessionId);
 
 await storage.set(
   "windstack:session",
-  JSON.stringify({ chainId, walletPluginId: plugin.id, identity }),
+  JSON.stringify({ chainId, walletPluginId: plugin.id, identity, walletSessionId }),
 );
 assert.equal((await kit.restore())?.actor, "alice");
+assert.equal(lastRestoreContext.walletSessionId, walletSessionId);
+assert.equal(kit.getSession()?.walletSessionId, walletSessionId);
 await kit.logout();
 
 await storage.set(
   "windstack:session",
-  JSON.stringify({ chainId, walletPluginId: "missing-wallet", identity }),
+  JSON.stringify({ chainId, walletPluginId: "missing-wallet", identity, walletSessionId }),
 );
 assert.equal(await kit.restore(), null);
 assert.equal(await storage.get("windstack:session"), null);
 
 await storage.set(
   "windstack:session",
-  JSON.stringify({ chainId, walletPluginId: plugin.id, identity }),
+  JSON.stringify({ chainId, walletPluginId: plugin.id, identity, walletSessionId }),
 );
 const mismatchedRestoreKit = new SessionManager({
   chains: [chain],
@@ -84,7 +94,7 @@ const mismatchedRestoreKit = new SessionManager({
     {
       ...plugin,
       async restore() {
-        return { identity: { ...identity, actor: "bob" }, signer };
+        return { identity: { ...identity, actor: "bob" }, signer, walletSessionId };
       },
     },
   ],
@@ -92,13 +102,58 @@ const mismatchedRestoreKit = new SessionManager({
 });
 await assert.rejects(() => mismatchedRestoreKit.restore(), /does not match/);
 assert.equal(mismatchedRestoreKit.getSession(), null);
-await storage.remove("windstack:session");
+assert.equal(await storage.get("windstack:session"), null);
+
+await storage.set(
+  "windstack:session",
+  JSON.stringify({ chainId, walletPluginId: plugin.id, identity, walletSessionId }),
+);
+const mismatchedWalletSessionKit = new SessionManager({
+  chains: [chain],
+  walletPlugins: [
+    {
+      ...plugin,
+      async restore() {
+        return { identity, signer, walletSessionId: "wallet-session-other" };
+      },
+    },
+  ],
+  storage,
+});
+await assert.rejects(() => mismatchedWalletSessionKit.restore(), /session id.*does not match/i);
+assert.equal(mismatchedWalletSessionKit.getSession(), null);
+assert.equal(await storage.get("windstack:session"), null);
+
+await storage.set(
+  "windstack:session",
+  JSON.stringify({ chainId, walletPluginId: plugin.id, identity, walletSessionId }),
+);
+const revokedRestoreKit = new SessionManager({
+  chains: [chain],
+  walletPlugins: [{ ...plugin, async restore() { return null; } }],
+  storage,
+});
+assert.equal(await revokedRestoreKit.restore(), null);
+assert.equal(await storage.get("windstack:session"), null);
 
 await storage.set("windstack:session", "{malformed");
 assert.equal(await kit.getStoredSession(), null);
 assert.equal(await storage.get("windstack:session"), null);
 
+await storage.set(
+  "windstack:session",
+  JSON.stringify({
+    chainId,
+    walletPluginId: plugin.id,
+    identity,
+    walletSessionId: " bad-session ",
+  }),
+);
+assert.equal(await kit.getStoredSession(), null);
+assert.equal(await storage.get("windstack:session"), null);
+
 let rollbackCalls = 0;
+let rollbackContext;
 const failingStorage = {
   async get() {
     return null;
@@ -111,7 +166,8 @@ const failingStorage = {
 const rollbackPlugin = {
   ...plugin,
   id: "rollback-wallet",
-  async logout() {
+  async logout(context) {
+    rollbackContext = context;
     rollbackCalls += 1;
   },
 };
@@ -122,6 +178,7 @@ const rollbackKit = new SessionManager({
 });
 await assert.rejects(() => rollbackKit.login(), /storage full/);
 assert.equal(rollbackCalls, 1);
+assert.equal(rollbackContext.walletSessionId, walletSessionId);
 assert.equal(rollbackKit.getSession(), null);
 
 const cleanupStorage = new MemorySessionStorage();

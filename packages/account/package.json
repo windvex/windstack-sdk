@@ -1,6 +1,6 @@
 {
   "name": "@windstack/account",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Common Antelope account, balance, permission, and system-action helpers.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,9 +23,9 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/contract": "2.1.1",
-    "@windstack/crypto": "2.1.1",
-    "@windstack/rpc": "2.1.1"
+    "@windstack/contract": "2.2.0",
+    "@windstack/crypto": "2.2.0",
+    "@windstack/rpc": "2.2.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -41,12 +41,12 @@
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/account#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/windvex/windstack-sdk.git",
     "directory": "packages/account"
   },
-  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/account#readme",
   "bugs": {
     "url": "https://github.com/windvex/windstack-sdk/issues"
   },

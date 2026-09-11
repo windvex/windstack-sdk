@@ -1,6 +1,6 @@
 {
   "name": "@windstack/rpc",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Typed Antelope RPC, verified endpoint failover, Spring finality, and Hyperion history client.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "2.1.1"
+    "@windstack/core": "2.2.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -37,12 +37,12 @@
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/rpc#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/windvex/windstack-sdk.git",
     "directory": "packages/rpc"
   },
-  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/rpc#readme",
   "bugs": {
     "url": "https://github.com/windvex/windstack-sdk/issues"
   },

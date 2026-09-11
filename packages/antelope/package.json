@@ -1,6 +1,6 @@
 {
   "name": "@windstack/antelope",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Antelope transaction, TAPOS, signing, keosd, contract, account, and verified RPC toolkit.",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,12 +27,12 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/account": "2.1.1",
-    "@windstack/abi": "2.1.1",
-    "@windstack/contract": "2.1.1",
-    "@windstack/core": "2.1.1",
-    "@windstack/crypto": "2.1.1",
-    "@windstack/rpc": "2.1.1"
+    "@windstack/account": "2.2.0",
+    "@windstack/abi": "2.2.0",
+    "@windstack/contract": "2.2.0",
+    "@windstack/core": "2.2.0",
+    "@windstack/crypto": "2.2.0",
+    "@windstack/rpc": "2.2.0"
   },
   "sideEffects": false,
   "keywords": [
@@ -47,12 +47,12 @@
   ],
   "license": "MIT",
   "author": "Gilang Ramadan",
+  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/antelope#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/windvex/windstack-sdk.git",
     "directory": "packages/antelope"
   },
-  "homepage": "https://github.com/windvex/windstack-sdk/tree/main/packages/antelope#readme",
   "bugs": {
     "url": "https://github.com/windvex/windstack-sdk/issues"
   },
