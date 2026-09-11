@@ -234,6 +234,38 @@ async function resolveAction(
   };
 }
 
+function actionResolutionError(
+  action: SigningRequestAction,
+  index: number,
+  total: number,
+  scope: string,
+  cause: unknown,
+): Error {
+  const reason = cause instanceof Error ? cause.message : String(cause || "Unknown action resolution error");
+  return new Error(
+    `Unable to resolve ${action.account}::${action.name} in ${scope}: action ${index + 1}/${total}; ${reason}`,
+    { cause },
+  );
+}
+
+async function resolveActionsInOrder(
+  actions: readonly SigningRequestAction[],
+  signer: SigningRequestPermissionLevel,
+  abiProvider: SigningRequestAbiProvider,
+  signal: AbortSignal | undefined,
+  scope: string,
+): Promise<SigningRequestAction[]> {
+  const resolved: SigningRequestAction[] = [];
+  for (const [index, action] of actions.entries()) {
+    try {
+      resolved.push(await resolveAction(action, signer, abiProvider, signal));
+    } catch (error) {
+      throw actionResolutionError(action, index, actions.length, scope, error);
+    }
+  }
+  return resolved;
+}
+
 function hasNullHeader(transaction: SigningRequestTransaction): boolean {
   const expiration = Date.parse(
     /(?:Z|[+-]\d{2}:\d{2})$/.test(transaction.expiration)
@@ -338,8 +370,12 @@ export async function resolveSigningRequest(
       max_cpu_usage_ms: 0,
       delay_sec: 0,
       context_free_actions: [],
-      actions: await Promise.all(
-        actions.map((action) => resolveAction(action, signer, abiProvider, options.signal)),
+      actions: await resolveActionsInOrder(
+        actions,
+        signer,
+        abiProvider,
+        options.signal,
+        "signing-request actions",
       ),
       transaction_extensions: [],
     };
@@ -347,13 +383,19 @@ export async function resolveSigningRequest(
     const source = payload.value;
     transaction = {
       ...source,
-      context_free_actions: await Promise.all(
-        source.context_free_actions.map((action) =>
-          resolveAction(action, signer, abiProvider, options.signal),
-        ),
+      context_free_actions: await resolveActionsInOrder(
+        source.context_free_actions,
+        signer,
+        abiProvider,
+        options.signal,
+        "transaction context-free actions",
       ),
-      actions: await Promise.all(
-        source.actions.map((action) => resolveAction(action, signer, abiProvider, options.signal)),
+      actions: await resolveActionsInOrder(
+        source.actions,
+        signer,
+        abiProvider,
+        options.signal,
+        "transaction actions",
       ),
       transaction_extensions: source.transaction_extensions.map((extension) => ({ ...extension })),
     };
