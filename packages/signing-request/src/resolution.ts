@@ -241,7 +241,8 @@ function actionResolutionError(
   scope: string,
   cause: unknown,
 ): Error {
-  const reason = cause instanceof Error ? cause.message : String(cause || "Unknown action resolution error");
+  const reason =
+    cause instanceof Error ? cause.message : String(cause || "Unknown action resolution error");
   return new Error(
     `Unable to resolve ${action.account}::${action.name} in ${scope}: action ${index + 1}/${total}; ${reason}`,
     { cause },
