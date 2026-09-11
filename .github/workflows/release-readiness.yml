@@ -31,5 +31,3 @@ jobs:
         run: npm ci
       - name: Run complete release dry run
         run: npm run release:dry-run
-        env:
-          RELEASE_BASE_REF: ${{ github.event.before }}

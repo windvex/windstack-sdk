@@ -37,7 +37,7 @@ jobs:
       - name: Check release metadata
         run: npm run check:release
         env:
-          RELEASE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          RELEASE_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
       - name: Build native Antelope packages
         run: npm run build:native
       - name: Test native Antelope packages
