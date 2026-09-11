@@ -196,7 +196,8 @@ export class WispWalletPlugin implements WalletPlugin {
     }
 
     const restoredSession = client.getSession();
-    if (!restoredSession || restoredSession.walletSessionId !== context.walletSessionId) return null;
+    if (!restoredSession || restoredSession.walletSessionId !== context.walletSessionId)
+      return null;
     const account = restoredSession.accounts.find(
       (item) =>
         item.actor === context.identity.actor && item.permission === context.identity.permission,

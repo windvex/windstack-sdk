@@ -130,7 +130,14 @@ await storage.set(
 );
 const revokedRestoreKit = new SessionManager({
   chains: [chain],
-  walletPlugins: [{ ...plugin, async restore() { return null; } }],
+  walletPlugins: [
+    {
+      ...plugin,
+      async restore() {
+        return null;
+      },
+    },
+  ],
   storage,
 });
 assert.equal(await revokedRestoreKit.restore(), null);

@@ -19,11 +19,7 @@ import {
   vexaniumUnsupportedChain,
 } from "./errors.js";
 import { assertVexaniumConnectResponse } from "./standard.js";
-import type {
-  VexaniumChainId,
-  VexaniumClient,
-  VexaniumConnectResponse,
-} from "./types.js";
+import type { VexaniumChainId, VexaniumClient, VexaniumConnectResponse } from "./types.js";
 import { isVexaniumChainId, sameVexaniumChain } from "./validation.js";
 
 export type VexaniumRestoreSessionParams = {
