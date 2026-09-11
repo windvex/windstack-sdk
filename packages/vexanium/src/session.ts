@@ -39,13 +39,21 @@ export type VexaniumRestoreSessionRequest = {
   dapp: DappMetadata;
 };
 
+function hasAsciiControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
 function assertOpaqueSessionId(value: unknown): asserts value is string {
   if (
     typeof value !== "string" ||
     value.length === 0 ||
     value.length > 512 ||
     value !== value.trim() ||
-    /[\u0000-\u001f\u007f]/.test(value)
+    hasAsciiControlCharacter(value)
   ) {
     throw vexaniumInvalidParams("sessionId must be a non-empty opaque wallet session id");
   }
