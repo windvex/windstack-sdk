@@ -307,7 +307,7 @@ assert.equal(
 assert.equal(secondHarness.opened.length, 1, "signing must open Wisp exactly once");
 assert.equal(
   secondHarness.opened[0],
-  "https://t.me/wispwalletbot?startapp=&mode=compact",
+  "https://t.me/wispwalletbot?startapp&mode=compact",
   "active-session signing must launch Wisp without a handoff token",
 );
 assert.equal(secondHarness.opened[0].includes("dapp_"), false);
