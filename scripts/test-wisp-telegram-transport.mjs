@@ -44,7 +44,11 @@ function resultFor(body, extra = {}) {
   };
 }
 
-function createHarness({ immediateRestore = false, immediateDisconnect = false } = {}) {
+function createHarness({
+  immediateRestore = false,
+  immediateDisconnect = false,
+  streamErrorBeforeResult = false,
+} = {}) {
   const prepared = new Map();
   const prepareBodies = [];
   const opened = [];
@@ -58,6 +62,7 @@ function createHarness({ immediateRestore = false, immediateDisconnect = false }
     if (body.kind === "sign") {
       return {
         id,
+        eventId: 3,
         status: "approved",
         expiresAt: Date.now() + 60_000,
         result: resultFor(body, { transactionId: TX_ID }),
@@ -65,6 +70,7 @@ function createHarness({ immediateRestore = false, immediateDisconnect = false }
     }
     return {
       id,
+      eventId: 3,
       status: "approved",
       expiresAt: Date.now() + 60_000,
       result: resultFor(body),
@@ -82,6 +88,7 @@ function createHarness({ immediateRestore = false, immediateDisconnect = false }
       if (body.kind === "restore" && immediateRestore) {
         return response(200, {
           id,
+          eventId: 3,
           status: "approved",
           expiresAt: Date.now() + 60_000,
           launchUrl: "",
@@ -91,6 +98,7 @@ function createHarness({ immediateRestore = false, immediateDisconnect = false }
       if (body.kind === "disconnect" && immediateDisconnect) {
         return response(200, {
           id,
+          eventId: 3,
           status: "approved",
           expiresAt: Date.now() + 60_000,
           launchUrl: "",
@@ -100,15 +108,21 @@ function createHarness({ immediateRestore = false, immediateDisconnect = false }
 
       return response(200, {
         id,
+        eventId: 1,
         status: "pending",
         expiresAt: Date.now() + 60_000,
-        launchUrl: `https://t.me/wispwalletbot?startapp=dapp_${id}`,
+        launchUrl:
+          body.kind === "connect"
+            ? `https://t.me/wispwalletbot?startapp=dapp_${id}`
+            : "https://t.me/wispwalletbot?startapp&mode=compact",
       });
     }
 
     if (url.pathname === `${API_PREFIX}/telegram/dapp/status`) {
       statusPolls += 1;
-      return response(200, handoffStatus(url.searchParams.get("id")));
+      return response(500, {
+        error: { message: "legacy status polling must never be used" },
+      });
     }
 
     return response(404, { error: { message: `unexpected ${url.pathname}` } });
@@ -128,7 +142,11 @@ function createHarness({ immediateRestore = false, immediateDisconnect = false }
       },
     };
     queueMicrotask(() => {
-      if (!closed) source.onmessage?.({ data: JSON.stringify(handoffStatus(id)) });
+      if (closed) return;
+      if (streamErrorBeforeResult) source.onerror?.(new Error("temporary SSE disconnect"));
+      queueMicrotask(() => {
+        if (!closed) source.onmessage?.({ data: JSON.stringify(handoffStatus(id)) });
+      });
     });
     return source;
   }
@@ -178,9 +196,10 @@ assert.equal(first.getChain(), CHAIN_ID);
 assert.equal(firstHarness.prepareBodies.length, 1);
 assert.equal(firstHarness.prepareBodies[0].kind, "connect");
 assert.equal(firstHarness.opened.length, 1);
+assert.match(firstHarness.opened[0], /startapp=dapp_handoff-1/u);
 assert.match(firstHarness.opened[0], /[?&]mode=compact(?:&|$)/u);
 assert.equal(firstHarness.eventStreams.length, 1);
-assert.equal(firstHarness.statusPolls(), 0, "SSE must be primary when available");
+assert.equal(firstHarness.statusPolls(), 0, "connect must never use legacy status polling");
 await assert.rejects(
   () => first.connect(),
   /already connected/iu,
@@ -286,8 +305,15 @@ assert.equal(
   "multi-action transaction must open exactly one Telegram signing handoff",
 );
 assert.equal(secondHarness.opened.length, 1, "signing must open Wisp exactly once");
+assert.equal(
+  secondHarness.opened[0],
+  "https://t.me/wispwalletbot?startapp=&mode=compact",
+  "active-session signing must launch Wisp without a handoff token",
+);
+assert.equal(secondHarness.opened[0].includes("dapp_"), false);
+assert.equal(secondHarness.opened[0].includes("vsr:"), false);
 assert.equal(secondHarness.eventStreams.length, 1, "signing must resolve over one event stream");
-assert.equal(secondHarness.statusPolls(), 0, "signing must not poll while SSE is healthy");
+assert.equal(secondHarness.statusPolls(), 0, "signing must never use legacy status polling");
 
 await second.disconnect();
 const disconnectBody = secondHarness.prepareBodies.find((body) => body.kind === "disconnect");
@@ -308,28 +334,47 @@ await assert.rejects(
   "disconnect must report a real not-connected state instead of silently succeeding",
 );
 
-const fallbackStorage = createStorage();
-const fallbackHarness = createHarness();
-const fallback = createWispTelegramTransport({
+const reconnectStorage = createStorage();
+const reconnectHarness = createHarness({ streamErrorBeforeResult: true });
+const reconnecting = createWispTelegramTransport({
   ...options,
-  storage: fallbackStorage,
-  fetch: fallbackHarness.fetch,
-  eventSource: null,
+  storage: reconnectStorage,
+  fetch: reconnectHarness.fetch,
+  eventSource: reconnectHarness.eventSource,
   openUrl(url) {
-    fallbackHarness.opened.push(url);
+    reconnectHarness.opened.push(url);
   },
-  pollIntervalMs: 250,
 });
-await fallback.connect();
+await reconnecting.connect();
+assert.equal(reconnectHarness.eventStreams.length, 1);
 assert.equal(
-  fallbackHarness.statusPolls(),
-  1,
-  "status polling must remain as a compatibility fallback",
+  reconnectHarness.statusPolls(),
+  0,
+  "transient SSE errors must stay on the event transport instead of falling back to polling",
 );
 
+const noStreamStorage = createStorage();
+const noStreamHarness = createHarness();
+const noStream = createWispTelegramTransport({
+  ...options,
+  storage: noStreamStorage,
+  fetch: noStreamHarness.fetch,
+  eventSource: null,
+  openUrl(url) {
+    noStreamHarness.opened.push(url);
+  },
+});
+await assert.rejects(
+  () => noStream.connect(),
+  /requires EventSource|polling fallback was removed/iu,
+  "non-browser consumers must provide EventSource instead of silently polling",
+);
+assert.equal(noStreamHarness.statusPolls(), 0);
+
 console.log("PASS: Wisp Telegram API base paths preserve /wisp/v1");
-console.log("PASS: Wisp Telegram uses SSE first with status polling as compatibility fallback");
-console.log("PASS: Telegram launches request compact Mini App presentation");
+console.log("PASS: Wisp Telegram uses resumable SSE without a legacy status-poll fallback");
+console.log("PASS: connect uses only a short Telegram pairing token");
+console.log("PASS: active-session signing opens Wisp without a handoff token or VSR in startapp");
 console.log("PASS: Wisp Telegram persisted pointer is not treated as a live connection");
 console.log("PASS: cold restore revalidates immediately without reopening Wisp");
 console.log("PASS: connect/sign/transact enforce the restored active-session lifecycle");
