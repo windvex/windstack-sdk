@@ -38,6 +38,8 @@ jobs:
         run: npm run check:release
         env:
           RELEASE_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+      - name: Check public content
+        run: npm run check:public-content
       - name: Build native Antelope packages
         run: npm run build:native
       - name: Test native Antelope packages
