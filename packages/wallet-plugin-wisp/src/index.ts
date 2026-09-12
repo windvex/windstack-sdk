@@ -8,6 +8,8 @@ export {
 } from "./WispTelegramTransport.js";
 export type {
   WispTelegramDappMetadata,
+  WispTelegramEventSource,
+  WispTelegramEventSourceFactory,
   WispTelegramSession,
   WispTelegramSessionStorage,
   WispTelegramTransactArgs,

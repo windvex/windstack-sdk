@@ -6,6 +6,7 @@ const CHAIN_ID = "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce
 const TX_ID = "a".repeat(64);
 const SESSION_ID = "wisp_session_123";
 const SESSION_EXPIRES_AT = Date.now() + 7 * 24 * 60 * 60_000;
+const API_PREFIX = "/wisp/v1";
 
 function createStorage() {
   const values = new Map();
@@ -47,11 +48,32 @@ function createHarness({ immediateRestore = false, immediateDisconnect = false }
   const prepared = new Map();
   const prepareBodies = [];
   const opened = [];
+  const eventStreams = [];
+  let statusPolls = 0;
   let sequence = 0;
+
+  function handoffStatus(id) {
+    const body = prepared.get(id);
+    assert.ok(body, `unknown handoff ${id}`);
+    if (body.kind === "sign") {
+      return {
+        id,
+        status: "approved",
+        expiresAt: Date.now() + 60_000,
+        result: resultFor(body, { transactionId: TX_ID }),
+      };
+    }
+    return {
+      id,
+      status: "approved",
+      expiresAt: Date.now() + 60_000,
+      result: resultFor(body),
+    };
+  }
 
   const fetch = async (input, init = {}) => {
     const url = new URL(String(input));
-    if (url.pathname === "/telegram/dapp/prepare") {
+    if (url.pathname === `${API_PREFIX}/telegram/dapp/prepare`) {
       const body = JSON.parse(String(init.body || "{}"));
       const id = `handoff-${++sequence}`;
       prepareBodies.push(body);
@@ -84,44 +106,47 @@ function createHarness({ immediateRestore = false, immediateDisconnect = false }
       });
     }
 
-    if (url.pathname === "/telegram/dapp/status") {
-      const id = url.searchParams.get("id");
-      const body = prepared.get(id);
-      assert.ok(body, `unknown handoff ${id}`);
-      if (body.kind === "connect") {
-        return response(200, {
-          id,
-          status: "approved",
-          expiresAt: Date.now() + 60_000,
-          result: resultFor(body),
-        });
-      }
-      if (body.kind === "sign") {
-        return response(200, {
-          id,
-          status: "approved",
-          expiresAt: Date.now() + 60_000,
-          result: resultFor(body, { transactionId: TX_ID }),
-        });
-      }
-      return response(200, {
-        id,
-        status: "approved",
-        expiresAt: Date.now() + 60_000,
-        result: resultFor(body),
-      });
+    if (url.pathname === `${API_PREFIX}/telegram/dapp/status`) {
+      statusPolls += 1;
+      return response(200, handoffStatus(url.searchParams.get("id")));
     }
 
     return response(404, { error: { message: `unexpected ${url.pathname}` } });
   };
 
-  return { fetch, prepareBodies, opened };
+  function eventSource(input) {
+    const url = new URL(String(input));
+    assert.equal(url.pathname, `${API_PREFIX}/telegram/dapp/events`);
+    const id = url.searchParams.get("id");
+    eventStreams.push(url.toString());
+    let closed = false;
+    const source = {
+      onmessage: null,
+      onerror: null,
+      close() {
+        closed = true;
+      },
+    };
+    queueMicrotask(() => {
+      if (!closed) source.onmessage?.({ data: JSON.stringify(handoffStatus(id)) });
+    });
+    return source;
+  }
+
+  return {
+    fetch,
+    eventSource,
+    prepareBodies,
+    opened,
+    eventStreams,
+    statusPolls: () => statusPolls,
+  };
 }
 
 const storage = createStorage();
 const firstHarness = createHarness();
 const options = {
-  apiUrl: "https://api.windcrypto.com",
+  apiUrl: "https://api.windcrypto.com/wisp/v1",
   dapp: {
     name: "WindSwap",
     description: "Swap and provide liquidity on WindSwap V2.",
@@ -135,7 +160,10 @@ const options = {
   },
 };
 
-const first = createWispTelegramTransport(options);
+const first = createWispTelegramTransport({
+  ...options,
+  eventSource: firstHarness.eventSource,
+});
 assert.equal(first.connected(), false);
 assert.equal(await first.getSessionId(), null);
 const connected = await first.connect();
@@ -150,6 +178,9 @@ assert.equal(first.getChain(), CHAIN_ID);
 assert.equal(firstHarness.prepareBodies.length, 1);
 assert.equal(firstHarness.prepareBodies[0].kind, "connect");
 assert.equal(firstHarness.opened.length, 1);
+assert.match(firstHarness.opened[0], /[?&]mode=compact(?:&|$)/u);
+assert.equal(firstHarness.eventStreams.length, 1);
+assert.equal(firstHarness.statusPolls(), 0, "SSE must be primary when available");
 await assert.rejects(
   () => first.connect(),
   /already connected/iu,
@@ -160,6 +191,7 @@ const secondHarness = createHarness({ immediateRestore: true, immediateDisconnec
 const second = createWispTelegramTransport({
   ...options,
   fetch: secondHarness.fetch,
+  eventSource: secondHarness.eventSource,
   openUrl(url) {
     secondHarness.opened.push(url);
   },
@@ -254,6 +286,8 @@ assert.equal(
   "multi-action transaction must open exactly one Telegram signing handoff",
 );
 assert.equal(secondHarness.opened.length, 1, "signing must open Wisp exactly once");
+assert.equal(secondHarness.eventStreams.length, 1, "signing must resolve over one event stream");
+assert.equal(secondHarness.statusPolls(), 0, "signing must not poll while SSE is healthy");
 
 await second.disconnect();
 const disconnectBody = secondHarness.prepareBodies.find((body) => body.kind === "disconnect");
@@ -274,6 +308,24 @@ await assert.rejects(
   "disconnect must report a real not-connected state instead of silently succeeding",
 );
 
+const fallbackStorage = createStorage();
+const fallbackHarness = createHarness();
+const fallback = createWispTelegramTransport({
+  ...options,
+  storage: fallbackStorage,
+  fetch: fallbackHarness.fetch,
+  eventSource: null,
+  openUrl(url) {
+    fallbackHarness.opened.push(url);
+  },
+  pollIntervalMs: 250,
+});
+await fallback.connect();
+assert.equal(fallbackHarness.statusPolls(), 1, "status polling must remain as a compatibility fallback");
+
+console.log("PASS: Wisp Telegram API base paths preserve /wisp/v1");
+console.log("PASS: Wisp Telegram uses SSE first with status polling as compatibility fallback");
+console.log("PASS: Telegram launches request compact Mini App presentation");
 console.log("PASS: Wisp Telegram persisted pointer is not treated as a live connection");
 console.log("PASS: cold restore revalidates immediately without reopening Wisp");
 console.log("PASS: connect/sign/transact enforce the restored active-session lifecycle");

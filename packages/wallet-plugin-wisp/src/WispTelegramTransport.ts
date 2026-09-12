@@ -30,6 +30,14 @@ type TelegramWebAppLike = {
   openTelegramLink?: (url: string) => void;
 };
 
+export type WispTelegramEventSource = {
+  onmessage: ((event: { data: string }) => void) | null;
+  onerror: ((event: unknown) => void) | null;
+  close(): void;
+};
+
+export type WispTelegramEventSourceFactory = (url: string) => WispTelegramEventSource;
+
 export type WispTelegramSessionStorage = {
   getItem(key: string): MaybePromise<string | null>;
   setItem(key: string, value: string): MaybePromise<void>;
@@ -45,7 +53,7 @@ export type WispTelegramDappMetadata = {
 };
 
 export type WispTelegramTransportOptions = {
-  /** Public Wisp API base URL, for example https://api.windcrypto.com. */
+  /** Public Wisp API base URL, for example https://api.windcrypto.com/wisp/v1. */
   apiUrl: string;
   dapp: WispTelegramDappMetadata;
   /**
@@ -56,8 +64,11 @@ export type WispTelegramTransportOptions = {
   storage?: WispTelegramSessionStorage;
   storageKey?: string;
   fetch?: typeof globalThis.fetch;
+  /** Optional EventSource factory. Pass null to force status-poll compatibility mode. */
+  eventSource?: WispTelegramEventSourceFactory | null;
   /** Optional custom launcher. Telegram Mini Apps are detected automatically when omitted. */
   openUrl?: (url: string) => MaybePromise<void>;
+  /** Compatibility polling interval used only when the event stream is unavailable. */
   pollIntervalMs?: number;
 };
 
@@ -204,6 +215,17 @@ function normalizeTelegramReturnUrl(value: unknown) {
   }
 }
 
+function telegramCompactUrl(value: string) {
+  if (!/^https:\/\/t\.me\//iu.test(value)) return value;
+  try {
+    const parsed = new URL(value);
+    if (!parsed.searchParams.has("mode")) parsed.searchParams.set("mode", "compact");
+    return parsed.toString();
+  } catch {
+    return value;
+  }
+}
+
 function runtimeLocation() {
   return typeof globalThis.location === "object" ? globalThis.location : null;
 }
@@ -297,6 +319,7 @@ function terminalResult(status: HandoffStatus): HandoffResult | null {
 
 export function createWispTelegramTransport(options: WispTelegramTransportOptions) {
   const apiUrl = credentialFreeHttpsUrl(options.apiUrl, "Wisp Telegram apiUrl");
+  const baseApiUrl = apiUrl.toString().replace(/\/+$/u, "");
   const runtime = runtimeLocation();
   const requestedOrigin = String(options.dapp.origin || runtime?.origin || "").trim();
   const origin = credentialFreeHttpsUrl(requestedOrigin, "Wisp Telegram DApp origin").origin;
@@ -323,6 +346,13 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   if (typeof fetchImplementation !== "function") {
     throw new TypeError("Wisp Telegram transport requires fetch");
   }
+  const eventSourceFactory: WispTelegramEventSourceFactory | null =
+    options.eventSource === null
+      ? null
+      : options.eventSource ??
+        (typeof globalThis.EventSource === "function"
+          ? (url) => new globalThis.EventSource(url) as unknown as WispTelegramEventSource
+          : null);
   const storage = options.storage ?? runtimeStorage() ?? memoryStorage();
   const storageKey = String(options.storageKey || DEFAULT_STORAGE_KEY).trim();
   if (!storageKey) throw new TypeError("Wisp Telegram storageKey must be non-empty");
@@ -332,8 +362,12 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   );
   let currentSession: WispTelegramSession | null = null;
 
+  function apiEndpoint(path: string) {
+    return `${baseApiUrl}/${String(path || "").replace(/^\/+/, "")}`;
+  }
+
   async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetchImplementation(new URL(path, apiUrl).toString(), {
+    const response = await fetchImplementation(apiEndpoint(path), {
       ...init,
       headers: {
         "content-type": "application/json",
@@ -351,8 +385,9 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   }
 
   async function openTelegram(url: string) {
+    const target = telegramCompactUrl(url);
     if (options.openUrl) {
-      await options.openUrl(url);
+      await options.openUrl(target);
       return;
     }
     if (typeof globalThis.window !== "object") {
@@ -364,25 +399,25 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
         Telegram?: { WebApp?: TelegramWebAppLike };
       }
     ).Telegram?.WebApp;
-    if (/^https:\/\/t\.me\//iu.test(url) && telegram?.openTelegramLink) {
-      telegram.openTelegramLink(url);
+    if (/^https:\/\/t\.me\//iu.test(target) && telegram?.openTelegramLink) {
+      telegram.openTelegramLink(target);
       return;
     }
 
-    const opened = globalThis.window.open(url, "wisp-wallet");
+    const opened = globalThis.window.open(target, "wisp-wallet");
     if (opened) {
       opened.opener = null;
       opened.focus();
       return;
     }
-    globalThis.window.location.assign(url);
+    globalThis.window.location.assign(target);
   }
 
   async function prepare(
     body: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<PreparedHandoff> {
-    const prepared = await requestJson<PreparedHandoff>("/telegram/dapp/prepare", {
+    const prepared = await requestJson<PreparedHandoff>("telegram/dapp/prepare", {
       method: "POST",
       signal,
       body: JSON.stringify({
@@ -409,6 +444,67 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     return prepared;
   }
 
+  async function waitForEventResult(
+    prepared: PreparedHandoff,
+    signal?: AbortSignal,
+  ): Promise<HandoffResult | null> {
+    if (!eventSourceFactory) return null;
+    if (signal?.aborted) throw new DOMException("Wallet request cancelled", "AbortError");
+
+    return new Promise<HandoffResult | null>((resolve, reject) => {
+      let source: WispTelegramEventSource | null = null;
+      let settled = false;
+      const timeoutMs = Math.max(0, prepared.expiresAt - Date.now());
+      const timer = globalThis.setTimeout(() => {
+        finishReject(new WispTelegramResultError("Wisp Telegram request expired", "expired"));
+      }, timeoutMs);
+
+      const cleanup = () => {
+        globalThis.clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        source?.close();
+        source = null;
+      };
+      const finishResolve = (value: HandoffResult | null) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+      const finishReject = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      const onAbort = () => {
+        finishReject(new DOMException("Wallet request cancelled", "AbortError"));
+      };
+
+      signal?.addEventListener("abort", onAbort, { once: true });
+
+      try {
+        source = eventSourceFactory(
+          apiEndpoint(`telegram/dapp/events?id=${encodeURIComponent(prepared.id)}`),
+        );
+        source.onmessage = (event) => {
+          try {
+            const status = JSON.parse(String(event.data || "")) as HandoffStatus;
+            if (!status || status.id !== prepared.id) return;
+            const result = terminalResult(status);
+            if (result) finishResolve(result);
+          } catch (error) {
+            if (error instanceof WispTelegramResultError) finishReject(error);
+            else finishResolve(null);
+          }
+        };
+        source.onerror = () => finishResolve(null);
+      } catch {
+        finishResolve(null);
+      }
+    });
+  }
+
   async function waitForResult(
     prepared: PreparedHandoff,
     signal?: AbortSignal,
@@ -416,11 +512,14 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     const immediate = terminalResult(prepared);
     if (immediate) return immediate;
 
+    const streamed = await waitForEventResult(prepared, signal);
+    if (streamed) return streamed;
+
     while (Date.now() < prepared.expiresAt) {
       if (signal?.aborted) throw new DOMException("Wallet request cancelled", "AbortError");
       try {
         const status = await requestJson<HandoffStatus>(
-          `/telegram/dapp/status?id=${encodeURIComponent(prepared.id)}`,
+          `telegram/dapp/status?id=${encodeURIComponent(prepared.id)}`,
           { signal },
         );
         const result = terminalResult(status);
