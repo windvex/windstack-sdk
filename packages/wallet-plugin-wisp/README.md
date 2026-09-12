@@ -69,7 +69,7 @@ The plugin signs the canonical transaction resolved by the session and returns t
 
 ### Telegram transport
 
-Use the WindStack-owned Telegram transport instead of implementing connect, polling, session persistence, VSR construction, restore, or disconnect logic inside the DApp.
+Use the WindStack-owned Telegram transport instead of implementing connect, polling, session persistence, VSR construction, restore, disconnect, or Telegram return navigation inside the DApp.
 
 ```ts
 import { createVexaniumClient } from "@windstack/vexanium";
@@ -84,6 +84,9 @@ const vex = await createVexaniumClient({
 
 const wisp = createWispTelegramTransport({
   apiUrl: "https://api.windcrypto.com",
+  // For a Telegram Mini App, provide its own Telegram return link.
+  // Omit this for ordinary browser use.
+  telegramReturnUrl: "https://t.me/example_bot/example_app",
   dapp: {
     name: "Example App",
     origin: window.location.origin,
@@ -141,11 +144,13 @@ async function disconnectWisp() {
 
 `disconnect()` transitions the DApp to disconnected local state immediately using the captured opaque session pointer, then requests authoritative wallet-side revocation. A known already-invalid/revoked session is treated as disconnected. Other transport failures are surfaced to the application; the local runtime nevertheless remains disconnected and must not silently reuse the old pointer. `clearSession()` is deliberately lower level and only resets the local cache; applications should normally use `disconnect()`.
 
+`telegramReturnUrl` is an optional transport-only return policy for Telegram Mini Apps. It must be a credential-free `https://t.me/` link to the originating Mini App or bot. Wisp carries it with each handoff and uses it only after terminal approval/rejection; it is never part of DApp identity, trust, account binding, session authorization, or signing scope. If it is omitted, Wisp falls back to Telegram host close/return behavior. This mirrors the purpose of TON Connect's TMA return URL and OKX's Telegram redirect without claiming wire compatibility with either protocol.
+
 `getChain()` and `getCapabilities()` describe the transport's supported Vexanium scope. Telegram Mini Apps use Telegram's native link-opening API when available; non-Telegram browsers use the browser fallback.
 
 `transact()` accepts one or more structured Vexanium actions, resolves them through the configured `VexaniumClient`, creates one canonical VSR, opens one Wisp signing handoff, and returns the wallet-broadcast transaction id. Multi-action transactions are never split into independent signatures.
 
-For an existing VSR, use `signSigningRequest(vsr)` directly after a successful `connect()` or `restore()`. The Telegram transport binds every signing handoff to that session id, origin, chain, account, and permission.
+For an existing VSR, use `signSigningRequest(vsr)` directly after a successful `connect()` or `restore()`. The Telegram transport binds every signing handoff to that session id, origin, chain, account, and permission. Sessionless Telegram signing is not supported.
 
 ### DApp identity manifest
 
@@ -169,7 +174,7 @@ Minimum manifest:
 
 Optional fields are `description`, `termsOfUseUrl`, and `privacyPolicyUrl`. All URLs must use credential-free HTTPS, and the manifest `url` origin must exactly match the origin requesting the Wisp connection.
 
-The manifest must be available through an unauthenticated public `GET` request and must be reachable by the Wisp wallet web runtime. Configure CORS so the wallet can fetch the JSON; do not require cookies, bearer tokens, Telegram `initData`, or other DApp-session credentials to read the manifest.
+The manifest must be available through an unauthenticated public `GET` request and must be reachable by the Wisp wallet web runtime. Configure CORS so the wallet can fetch the JSON; do not require cookies, bearer tokens, Telegram `initData`, or other DApp-session credentials to read the manifest. Wisp does not follow manifest redirects: the requesting HTTPS origin must serve its identity document directly.
 
 DApps that are already marked verified in Wisp's bundled registry use that wallet-owned registry entry as the identity anchor. A manifest can never mark itself verified or trusted. Trusted-session privileges remain wallet-owned policy.
 
