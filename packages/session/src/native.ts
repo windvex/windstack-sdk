@@ -350,25 +350,50 @@ export class SessionManager {
         await this.storage.remove(this.storageKey);
         return null;
       }
+
       const restoredIdentity = validateIdentity(result.identity);
+      const restoredWalletSessionId = validateWalletSessionId(result.walletSessionId);
+      const rollbackRestoredState = async () => {
+        if (!plugin.logout) return;
+        await plugin
+          .logout({
+            chain,
+            appName: this.appName,
+            identity: restoredIdentity,
+            walletSessionId: restoredWalletSessionId,
+          })
+          .catch(() => undefined);
+      };
+
       if (!identitiesMatch(stored.identity, restoredIdentity)) {
+        await rollbackRestoredState();
         await this.storage.remove(this.storageKey).catch(() => undefined);
         throw new Error("Wallet restored an identity that does not match the stored session");
       }
-      const restoredWalletSessionId = validateWalletSessionId(result.walletSessionId);
       if (
         stored.walletSessionId !== undefined &&
         restoredWalletSessionId !== stored.walletSessionId
       ) {
+        await rollbackRestoredState();
         await this.storage.remove(this.storageKey).catch(() => undefined);
         throw new Error("Wallet restored a session id that does not match the stored session");
       }
+
+      let restoredSigner: Signer;
+      try {
+        restoredSigner = validateSigner(result.signer);
+      } catch (error) {
+        await rollbackRestoredState();
+        await this.storage.remove(this.storageKey).catch(() => undefined);
+        throw error;
+      }
+
       const session = new Session({
         chain,
         identity: restoredIdentity,
         walletPlugin: plugin,
         walletSessionId: restoredWalletSessionId ?? stored.walletSessionId,
-        signer: validateSigner(result.signer),
+        signer: restoredSigner,
       });
       try {
         await this.storage.set(
