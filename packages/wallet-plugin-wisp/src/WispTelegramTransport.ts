@@ -48,6 +48,11 @@ export type WispTelegramTransportOptions = {
   /** Public Wisp API base URL, for example https://api.windcrypto.com. */
   apiUrl: string;
   dapp: WispTelegramDappMetadata;
+  /**
+   * Optional Telegram Mini App return target used only for navigation after a
+   * terminal wallet action. It is never part of DApp identity or session auth.
+   */
+  telegramReturnUrl?: string;
   storage?: WispTelegramSessionStorage;
   storageKey?: string;
   fetch?: typeof globalThis.fetch;
@@ -178,6 +183,27 @@ function credentialFreeHttpsUrl(value: string, label: string) {
   }
 }
 
+function normalizeTelegramReturnUrl(value: unknown) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.hostname.toLowerCase() !== "t.me" ||
+      parsed.username ||
+      parsed.password
+    ) {
+      throw new Error();
+    }
+    return parsed.toString();
+  } catch {
+    throw new TypeError(
+      "Wisp Telegram telegramReturnUrl must be a credential-free https://t.me/ link",
+    );
+  }
+}
+
 function runtimeLocation() {
   return typeof globalThis.location === "object" ? globalThis.location : null;
 }
@@ -291,6 +317,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   const description = String(options.dapp.description || "").trim();
   const icon = String(options.dapp.icon || "").trim();
   if (icon) credentialFreeHttpsUrl(icon, "Wisp Telegram DApp icon");
+  const telegramReturnUrl = normalizeTelegramReturnUrl(options.telegramReturnUrl);
 
   const fetchImplementation = options.fetch ?? globalThis.fetch;
   if (typeof fetchImplementation !== "function") {
@@ -366,6 +393,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
         url: pageUrl.toString(),
         chainId: VEXANIUM_MAINNET_CHAIN_ID,
         ...body,
+        ...(telegramReturnUrl ? { telegramReturnUrl } : {}),
       }),
     });
     if (!prepared.id || prepared.expiresAt <= Date.now()) {
