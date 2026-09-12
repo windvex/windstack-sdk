@@ -69,7 +69,7 @@ The plugin signs the canonical transaction resolved by the session and returns t
 
 ### Telegram transport
 
-Use the WindStack-owned Telegram transport for connect, event-stream result delivery with status-poll fallback, session persistence, VSR construction, restore, disconnect, and Telegram return navigation.
+Use the WindStack-owned Telegram transport for connect, resumable server-sent event delivery, session persistence, VSR construction, restore, disconnect, and Telegram return navigation. WindStack 2.2 does not downgrade an active Telegram request to legacy status polling.
 
 ```ts
 import { createVexaniumClient } from "@windstack/vexanium";
@@ -184,7 +184,7 @@ This follows the same security purpose as the TON Connect app manifest: identity
 
 ## Runtime
 
-The package targets browser and Telegram Mini App consumers. Injected Wisp providers use the Vexanium provider bridge. External Wisp Telegram flows use the public Wisp handoff API, a server-sent event stream with status polling as a compatibility fallback, and Telegram-native link opening when the Telegram WebApp runtime is present.
+The package targets browser and Telegram Mini App consumers. Injected Wisp providers use the Vexanium provider bridge. External Wisp Telegram flows use the public Wisp handoff API, a resumable server-sent event stream, and Telegram-native link opening when the Telegram WebApp runtime is present. EventSource reconnect remains part of the primary transport; there is no client-side status-poll fallback in WindStack 2.2.
 
 Persistent restore does not depend on an old JavaScript runtime remaining alive. The consumer keeps an opaque session pointer, while Wisp validates authoritative session state. A valid restore can therefore complete after a hard reload or later runtime without reopening the wallet; an expired, revoked, or mismatched session fails closed.
 
