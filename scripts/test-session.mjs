@@ -72,6 +72,23 @@ await storage.set(
   "windstack:session",
   JSON.stringify({ chainId, walletPluginId: plugin.id, identity, walletSessionId }),
 );
+const coldLogoutKit = new SessionManager({
+  chains: [chain],
+  walletPlugins: [plugin],
+  storage,
+});
+const logoutCallsBeforeColdLogout = logoutCalls;
+await coldLogoutKit.logout();
+assert.equal(coldLogoutKit.getSession(), null);
+assert.equal(await storage.get("windstack:session"), null);
+assert.equal(logoutCalls, logoutCallsBeforeColdLogout + 1);
+assert.equal(lastLogoutContext.walletSessionId, walletSessionId);
+assert.equal(lastLogoutContext.identity.actor, identity.actor);
+
+await storage.set(
+  "windstack:session",
+  JSON.stringify({ chainId, walletPluginId: plugin.id, identity, walletSessionId }),
+);
 assert.equal((await kit.restore())?.actor, "alice");
 assert.equal(lastRestoreContext.walletSessionId, walletSessionId);
 assert.equal(kit.getSession()?.walletSessionId, walletSessionId);
