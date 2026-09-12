@@ -106,6 +106,27 @@ type StoredSession = {
   expiresAt?: number;
 };
 
+export class WispTelegramAlreadyConnectedError extends Error {
+  constructor() {
+    super("Wisp Telegram is already connected; disconnect before starting another session");
+    this.name = "WispTelegramAlreadyConnectedError";
+  }
+}
+
+export class WispTelegramNotConnectedError extends Error {
+  constructor() {
+    super("Wisp Telegram is not connected");
+    this.name = "WispTelegramNotConnectedError";
+  }
+}
+
+export class WispTelegramRestoreRequiredError extends Error {
+  constructor() {
+    super("Restore the persisted Wisp Telegram session before using or replacing it");
+    this.name = "WispTelegramRestoreRequiredError";
+  }
+}
+
 class WispTelegramHttpError extends Error {
   constructor(
     message: string,
@@ -472,11 +493,16 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   }
 
   async function connect(signal?: AbortSignal) {
+    if (currentSession) throw new WispTelegramAlreadyConnectedError();
+    if (await getStoredSession()) throw new WispTelegramRestoreRequiredError();
+
     const prepared = await prepare({ kind: "connect", request: "" }, signal);
     return persistSession(sessionFromResult(await waitForResult(prepared, signal)));
   }
 
   async function restore(signal?: AbortSignal): Promise<WispTelegramSession | null> {
+    if (currentSession) return currentSession;
+
     const stored = await getStoredSession();
     if (!stored) return null;
     try {
@@ -508,16 +534,24 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     }
   }
 
-  async function sessionPointer() {
+  async function sessionForDisconnect() {
     return currentSession ?? (await getStoredSession());
   }
 
+  async function requireActiveSession() {
+    if (currentSession) return currentSession;
+    if (await getStoredSession()) throw new WispTelegramRestoreRequiredError();
+    throw new WispTelegramNotConnectedError();
+  }
+
   async function disconnect(signal?: AbortSignal): Promise<void> {
-    const session = await sessionPointer();
-    if (!session) {
-      await clearSession();
-      return;
-    }
+    const session = await sessionForDisconnect();
+    if (!session) throw new WispTelegramNotConnectedError();
+
+    // Mirror established wallet-connect UX: the DApp becomes disconnected
+    // immediately, while wallet-side revocation is still attempted with the
+    // captured opaque session pointer.
+    await clearSession();
 
     try {
       const prepared = await prepare(
@@ -537,10 +571,8 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
       if (normalizeAccount(result).permissionLevel !== session.account.permissionLevel) {
         throw new Error("Wisp Telegram disconnect identity does not match the active session");
       }
-      await clearSession();
     } catch (error) {
       if (error instanceof WispTelegramResultError && error.status === "failed") {
-        await clearSession();
         return;
       }
       throw error;
@@ -554,8 +586,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     if (typeof request !== "string" || !request.toLowerCase().startsWith("vsr:")) {
       throw new TypeError("Wisp Telegram signing requires a canonical Vexanium VSR");
     }
-    const session = await sessionPointer();
-    if (!session) throw new Error("Connect Wisp Telegram before signing");
+    const session = await requireActiveSession();
 
     const prepared = await prepare(
       {
@@ -607,8 +638,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   ): Promise<VexSigningRequestResult> {
     if (!args.actions.length)
       throw new TypeError("Wisp Telegram transaction requires at least one action");
-    const session = await sessionPointer();
-    if (!session) throw new Error("Connect Wisp Telegram before transacting");
+    const session = await requireActiveSession();
 
     const actions = await Promise.all(
       args.actions.map((action) =>
@@ -637,9 +667,11 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     connect,
     restore,
     disconnect,
+    connected: () => currentSession !== null,
     getSession: () => currentSession,
+    getSessionId: async () => currentSession?.sessionId ?? null,
     getStoredSession,
-    getAccounts: async () => (await sessionPointer())?.accounts ?? [],
+    getAccounts: async () => currentSession?.accounts ?? [],
     getChain: () => VEXANIUM_MAINNET_CHAIN_ID,
     getCapabilities: () => TELEGRAM_CAPABILITIES,
     /** Local cache reset only. Use disconnect() to revoke wallet authorization. */
