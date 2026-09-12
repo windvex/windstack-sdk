@@ -14,7 +14,6 @@ import {
 } from "@windstack/vexanium";
 
 const DEFAULT_STORAGE_KEY = "windstack:wisp-telegram-session:v1";
-const DEFAULT_POLL_INTERVAL_MS = 1_500;
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/u;
 const TRANSACTION_ID_RE = /^[0-9a-f]{64}$/u;
 const MAX_SESSION_ID_LENGTH = 512;
@@ -64,12 +63,10 @@ export type WispTelegramTransportOptions = {
   storage?: WispTelegramSessionStorage;
   storageKey?: string;
   fetch?: typeof globalThis.fetch;
-  /** Optional EventSource factory. Pass null to force status-poll compatibility mode. */
-  eventSource?: WispTelegramEventSourceFactory | null;
+  /** Optional EventSource factory for non-browser runtimes and deterministic tests. */
+  eventSource?: WispTelegramEventSourceFactory;
   /** Optional custom launcher. Telegram Mini Apps are detected automatically when omitted. */
   openUrl?: (url: string) => MaybePromise<void>;
-  /** Compatibility polling interval used only when the event stream is unavailable. */
-  pollIntervalMs?: number;
 };
 
 export type WispTelegramSession = Readonly<{
@@ -96,6 +93,7 @@ type HandoffResult = {
   chainId?: string;
   transactionId?: string;
   sessionExpiresAt?: number;
+  sessionInvalidated?: boolean;
   error?: string;
 };
 
@@ -157,6 +155,7 @@ class WispTelegramResultError extends Error {
   constructor(
     message: string,
     readonly status: "rejected" | "failed" | "expired",
+    readonly sessionInvalidated = false,
   ) {
     super(message);
     this.name = "WispTelegramResultError";
@@ -282,36 +281,20 @@ function resultErrorMessage(value: unknown, fallback: string) {
   return fallback;
 }
 
-function sleep(ms: number, signal?: AbortSignal) {
-  return new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException("Wallet request cancelled", "AbortError"));
-      return;
-    }
-    const timer = globalThis.setTimeout(resolve, ms);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        globalThis.clearTimeout(timer);
-        reject(new DOMException("Wallet request cancelled", "AbortError"));
-      },
-      { once: true },
-    );
-  });
-}
-
 function terminalResult(status: HandoffStatus): HandoffResult | null {
   if (status.status === "approved") return status.result ?? {};
   if (status.status === "rejected") {
     throw new WispTelegramResultError(
       status.result?.error || "Request rejected in Wisp Telegram",
       "rejected",
+      status.result?.sessionInvalidated === true,
     );
   }
   if (status.status === "failed") {
     throw new WispTelegramResultError(
       status.result?.error || "Wisp Telegram could not complete the request",
       "failed",
+      status.result?.sessionInvalidated === true,
     );
   }
   return null;
@@ -347,19 +330,13 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     throw new TypeError("Wisp Telegram transport requires fetch");
   }
   const eventSourceFactory: WispTelegramEventSourceFactory | null =
-    options.eventSource === null
-      ? null
-      : (options.eventSource ??
-        (typeof globalThis.EventSource === "function"
-          ? (url) => new globalThis.EventSource(url) as unknown as WispTelegramEventSource
-          : null));
+    options.eventSource ??
+    (typeof globalThis.EventSource === "function"
+      ? (url) => new globalThis.EventSource(url) as unknown as WispTelegramEventSource
+      : null);
   const storage = options.storage ?? runtimeStorage() ?? memoryStorage();
   const storageKey = String(options.storageKey || DEFAULT_STORAGE_KEY).trim();
   if (!storageKey) throw new TypeError("Wisp Telegram storageKey must be non-empty");
-  const pollIntervalMs = Math.max(
-    250,
-    Math.min(10_000, Number(options.pollIntervalMs) || DEFAULT_POLL_INTERVAL_MS),
-  );
   let currentSession: WispTelegramSession | null = null;
 
   function apiEndpoint(path: string) {
@@ -447,11 +424,15 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   async function waitForEventResult(
     prepared: PreparedHandoff,
     signal?: AbortSignal,
-  ): Promise<HandoffResult | null> {
-    if (!eventSourceFactory) return null;
+  ): Promise<HandoffResult> {
+    if (!eventSourceFactory) {
+      throw new TypeError(
+        "Wisp Telegram transport requires EventSource; polling fallback was removed in WindStack 2.2",
+      );
+    }
     if (signal?.aborted) throw new DOMException("Wallet request cancelled", "AbortError");
 
-    return new Promise<HandoffResult | null>((resolve, reject) => {
+    return new Promise<HandoffResult>((resolve, reject) => {
       let source: WispTelegramEventSource | null = null;
       let settled = false;
       const timeoutMs = Math.max(0, prepared.expiresAt - Date.now());
@@ -465,7 +446,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
         source?.close();
         source = null;
       };
-      const finishResolve = (value: HandoffResult | null) => {
+      const finishResolve = (value: HandoffResult) => {
         if (settled) return;
         settled = true;
         cleanup();
@@ -494,13 +475,14 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
             const result = terminalResult(status);
             if (result) finishResolve(result);
           } catch (error) {
-            if (error instanceof WispTelegramResultError) finishReject(error);
-            else finishResolve(null);
+            finishReject(error);
           }
         };
-        source.onerror = () => finishResolve(null);
-      } catch {
-        finishResolve(null);
+        // Native EventSource reconnects automatically and sends Last-Event-ID.
+        // A transient stream error must not downgrade the request to polling.
+        source.onerror = () => undefined;
+      } catch (error) {
+        finishReject(error);
       }
     });
   }
@@ -511,29 +493,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   ): Promise<HandoffResult> {
     const immediate = terminalResult(prepared);
     if (immediate) return immediate;
-
-    const streamed = await waitForEventResult(prepared, signal);
-    if (streamed) return streamed;
-
-    while (Date.now() < prepared.expiresAt) {
-      if (signal?.aborted) throw new DOMException("Wallet request cancelled", "AbortError");
-      try {
-        const status = await requestJson<HandoffStatus>(
-          `telegram/dapp/status?id=${encodeURIComponent(prepared.id)}`,
-          { signal },
-        );
-        const result = terminalResult(status);
-        if (result) return result;
-      } catch (error) {
-        if (signal?.aborted) throw new DOMException("Wallet request cancelled", "AbortError");
-        if (error instanceof WispTelegramResultError) throw error;
-        if (error instanceof WispTelegramHttpError && error.status < 500 && error.status !== 429) {
-          throw error;
-        }
-      }
-      await sleep(pollIntervalMs, signal);
-    }
-    throw new WispTelegramResultError("Wisp Telegram request expired", "expired");
+    return waitForEventResult(prepared, signal);
   }
 
   function sessionFromResult(result: HandoffResult): WispTelegramSession {
@@ -715,48 +675,55 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     }
     const session = await requireActiveSession();
 
-    const prepared = await prepare(
-      {
-        kind: "sign",
-        request,
-        sessionId: session.sessionId,
-        expectedAccount: session.account.actor,
-        expectedPermission: session.account.permission,
-      },
-      signal,
-    );
-    const result = await waitForResult(prepared, signal);
-    const signer = normalizeAccount(result);
-    if (signer.permissionLevel !== session.account.permissionLevel) {
-      throw new Error("Wisp Telegram signed with a different account than the active session");
-    }
-    if (opaqueSessionId(result.sessionId) !== session.sessionId) {
-      throw new Error("Wisp Telegram signing result does not match the active session");
-    }
-    const transactionId = String(result.transactionId || "")
-      .trim()
-      .toLowerCase();
-    if (!TRANSACTION_ID_RE.test(transactionId)) {
-      throw new Error("Wisp Telegram did not return a broadcast transaction id");
-    }
+    try {
+      const prepared = await prepare(
+        {
+          kind: "sign",
+          request,
+          sessionId: session.sessionId,
+          expectedAccount: session.account.actor,
+          expectedPermission: session.account.permission,
+        },
+        signal,
+      );
+      const result = await waitForResult(prepared, signal);
+      const signer = normalizeAccount(result);
+      if (signer.permissionLevel !== session.account.permissionLevel) {
+        throw new Error("Wisp Telegram signed with a different account than the active session");
+      }
+      if (opaqueSessionId(result.sessionId) !== session.sessionId) {
+        throw new Error("Wisp Telegram signing result does not match the active session");
+      }
+      const transactionId = String(result.transactionId || "")
+        .trim()
+        .toLowerCase();
+      if (!TRANSACTION_ID_RE.test(transactionId)) {
+        throw new Error("Wisp Telegram did not return a broadcast transaction id");
+      }
 
-    const refreshed = sessionFromResult({
-      ...result,
-      actor: signer.actor,
-      permission: signer.permission,
-      sessionId: session.sessionId,
-      chainId: session.chainId,
-      sessionExpiresAt: result.sessionExpiresAt ?? session.expiresAt,
-    });
-    await persistSession(refreshed);
-    return {
-      transactionId,
-      signatures: [],
-      signer: signer.actor,
-      signerPermission: signer.permission,
-      broadcast: true,
-      raw: { transport: "wisp-telegram", handoffId: prepared.id },
-    };
+      const refreshed = sessionFromResult({
+        ...result,
+        actor: signer.actor,
+        permission: signer.permission,
+        sessionId: session.sessionId,
+        chainId: session.chainId,
+        sessionExpiresAt: result.sessionExpiresAt ?? session.expiresAt,
+      });
+      await persistSession(refreshed);
+      return {
+        transactionId,
+        signatures: [],
+        signer: signer.actor,
+        signerPermission: signer.permission,
+        broadcast: true,
+        raw: { transport: "wisp-telegram", handoffId: prepared.id },
+      };
+    } catch (error) {
+      if (error instanceof WispTelegramResultError && error.sessionInvalidated) {
+        await clearSession();
+      }
+      throw error;
+    }
   }
 
   async function transact(
