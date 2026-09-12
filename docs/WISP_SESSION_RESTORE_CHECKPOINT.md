@@ -8,7 +8,7 @@ Baseline before this work: `windvex/windstack-sdk` `main` at `bbd69a8` (`2.1.1`)
 
 Current WindStack SDK implementation phase: **95%**. The generic session/provider/Telegram transport is implemented and covered by regression tests; publication of the coordinated `2.2.0` package set remains outside the source changes.
 
-Current end-to-end rollout: **85%**. Wallet-authoritative session restore, revocation, trusted-session policy, Telegram launch/return handling, biometric pre-unlock, and one-VSR multi-action signing are implemented. The remaining release work is public DApp-manifest parity, final Telegram TMA-to-TMA return verification, WindStack `2.2.0` publication, and WindSwap migration to the released consumer API.
+Current end-to-end rollout: **92%**. Wallet-authoritative restore/revocation, wallet-fetched DApp identity, trusted-session policy, Telegram request/return routing, Telegram-user session binding, biometric pre-unlock, and one-VSR multi-action signing are implemented. Remaining work is real-device TMA-to-TMA verification, WindStack `2.2.0` publication, clean WindSwap migration to the released consumer API, and production E2E.
 
 Created by **Gilang Ramadan**.
 
@@ -17,14 +17,15 @@ Created by **Gilang Ramadan**.
 Persistent connection, DApp identity/trust, wallet vault unlock, and transaction signing approval are separate states.
 
 - WindStack owns the generic connection/session protocol and consumer API.
-- Wisp Wallet owns authoritative authorization, expiry, revocation, vault state, and signing policy.
+- Wisp Wallet owns authoritative authorization, expiry, revocation, vault state, DApp identity policy, and signing policy.
 - A DApp persists only an opaque wallet-issued session identifier plus public connection metadata.
 - A DApp never receives a wallet password, PIN, decrypted private key, or signing key.
 - Restore is non-interactive. It must never silently fall back to a new account authorization for a known expired/revoked/mismatched session.
-- A revoked, expired, origin-mismatched, account-mismatched, permission-mismatched, or chain-mismatched known session fails closed without opening the wallet.
+- A revoked, expired, origin-mismatched, account-mismatched, permission-mismatched, chain-mismatched, or Telegram-owner-mismatched known session fails closed.
 - A pre-registry legacy session may use one migration handoff so the wallet can prove that it still owns the historical session.
 - Restoring a connection does not unlock the wallet and never implies silent transaction signing.
 - Disconnect means authoritative remote revocation, not merely deleting localStorage.
+- Return/deep-link state is routing only and is never authorization proof.
 - Multi-action Vexanium transactions remain one ordered canonical structured transaction, one VSR/review request, one approval/signing flow, and one broadcast.
 - WindSwap and other consumers must not add Wisp-specific compatibility, ABI-rebuild, transaction-rebuild, polling, or session-reconstruction helpers.
 
@@ -33,10 +34,10 @@ Persistent connection, DApp identity/trust, wallet vault unlock, and transaction
 The design follows official platform semantics, not reverse-engineered behavior:
 
 - TON Connect SDK: `restoreConnection()` is intended to run immediately on application load; successful restoration reuses the existing wallet session without a new connect prompt.
-- TON Connect protocol/core concepts: a DApp and wallet retain corresponding session state; unknown/revoked sessions cannot be restored; DApp disconnect sends a wallet-side `disconnect` request in addition to clearing local connection state.
+- TON Connect protocol/core concepts: a DApp and wallet retain corresponding session state; unknown/revoked sessions cannot be restored; DApp disconnect sends a wallet-side disconnect request in addition to clearing local connection state.
 - TON Connect manifest: the wallet fetches public DApp identity metadata before connect so name/icon/policy information does not come only from an arbitrary connect payload.
 - Telegram Mini Apps: server-side trust uses validated `initData`; `initDataUnsafe` is not an authentication boundary. Telegram also defines native Mini App link/open/close behavior including `return_back`.
-- OKX Universal Connect: a successful connection exposes a session identifier plus accounts/chains/method scope, while Telegram return/deep-link configuration is a transport concern such as `tg://resolve` rather than an authorization primitive.
+- OKX Universal Connect: a successful connection exposes a session identifier plus accounts/chains/method scope, while Telegram return/deep-link configuration such as `tg://resolve` is transport rather than authorization.
 
 The Wisp wire format remains a WindStack/Wisp protocol. This file does **not** claim TON Connect, WalletConnect, or OKX wire compatibility. The official systems are architectural references for lifecycle, scope, transport, identity, and revocation semantics.
 
@@ -56,14 +57,15 @@ Wisp Telegram transport
     |
     v
 Wisp authoritative session policy
-    origin + chain + account + permission + expiry + revoke
+    origin + chain + account + permission + expiry + revoke + Telegram owner
 ```
 
 The expected lifecycle is:
 
 ```text
 FIRST CONNECT
-DApp -> connect() -> Wisp approval -> wallet-issued session -> return to DApp
+DApp -> connect() -> wallet resolves trusted registry/public manifest identity
+     -> Wisp approval -> wallet-issued session -> return to DApp
 
 NEXT RUNTIME / NEXT DAY
 DApp -> restore() -> authoritative validation -> connected immediately
@@ -72,6 +74,9 @@ DApp -> restore() -> authoritative validation -> connected immediately
 TRANSACTION
 DApp actions[1..N] -> one structured transaction -> one VSR -> Wisp review
 -> explicit approval -> one signing/broadcast result
+
+DISCONNECT
+DApp -> disconnect() -> authoritative wallet revoke -> local pointer cleanup
 ```
 
 ## 0–100% rollout
@@ -94,7 +99,7 @@ DApp actions[1..N] -> one structured transaction -> one VSR -> Wisp review
 
 - `@windstack/session` persists optional `walletSessionId` and propagates it through login, restore, logout, and runtime `Session`.
 - Identity/session mismatch clears stale state and fails closed.
-- Cold logout now invokes wallet-plugin logout with the stored identity/session ID even if the JavaScript runtime never restored an in-memory `Session` first.
+- Cold logout invokes wallet-plugin logout with the stored identity/session ID even if the JavaScript runtime never restored an in-memory `Session` first.
 - Generic session storage never contains private keys.
 
 ### 30–40% — Injected Wisp provider cold restore — DONE
@@ -108,8 +113,9 @@ DApp actions[1..N] -> one structured transaction -> one VSR -> Wisp review
 
 - Approved Telegram DApp connections receive cryptographically random opaque wallet session IDs.
 - Wallet-side local session records bind immutable origin, chain, actor, permission, expiry, open/revoked state, and counters.
-- The Wisp backend now maintains a versioned durable authoritative Telegram session registry for cross-runtime validation.
+- The Wisp backend maintains a versioned durable authoritative Telegram session registry for cross-runtime validation.
 - Registry entries bind exact origin, VEX Native chain ID, actor, permission, expiry, Telegram wallet user correlation, and revocation state.
+- A registered session-bound Telegram handoff cannot be opened, updated, or revoked by a different authenticated Telegram user.
 - Store writes are serialized and atomic; old checkpoint v1 rows migrate safely to the v2 schema.
 - Known expired/revoked/mismatched sessions return immediate failure without reopening Wisp.
 - Expired/revoked session tombstones are retained for a bounded period so a known invalid session cannot be mistaken for an unregistered legacy session.
@@ -118,7 +124,7 @@ DApp actions[1..N] -> one structured transaction -> one VSR -> Wisp review
 
 ### 60–72% — WindStack Telegram transport — DONE
 
-`createWispTelegramTransport()` now owns the reusable external-Wisp flow:
+`createWispTelegramTransport()` owns the reusable external-Wisp flow:
 
 - `connect()`
 - `restore()`
@@ -139,19 +145,26 @@ Behavior:
 - Telegram environments use Telegram-native link opening when available; ordinary browsers use the browser fallback.
 - Session-bound sign responses must return the same session ID and signer permission.
 
-### 72–80% — Telegram return and request routing — DONE WITH FINAL DEVICE VERIFICATION PENDING
+### 72–82% — Telegram return and request routing — IMPLEMENTED; FINAL DEVICE VERIFICATION PENDING
 
 - Handoff requests/results use bounded opaque correlation IDs and terminal-state protection.
 - Telegram identity-sensitive resolve/complete endpoints require server-validated Telegram `initData` through the existing API authentication boundary.
-- Terminal Wisp handoffs use Telegram close `return_back` where supported; older clients fall back to normal close.
-- External/browser -> Wisp return is implemented without treating the return URL as authorization.
-- The transport never accepts arbitrary return links as a session proof.
-- Final production-device verification is still required for the exact WindSwap-TMA -> Wisp-TMA -> WindSwap-TMA UX. If that topology requires an explicit Telegram Mini App return identity, it must use the DApp's real bot/Mini-App identity; it must not be guessed or hardcoded by the wallet.
+- Session-bound handoffs are additionally checked against the Telegram user recorded on the authoritative session.
+- DApp launches identified by the `dapp_` start parameter use Telegram `WebApp.close({ return_back: true })` where Bot API 7.6+ is available.
+- The return policy is centralized in the Telegram boundary so locked and already-unlocked Wisp flows cannot drift.
+- Older Telegram clients fall back to normal close.
+- Return/start parameters remain routing hints only; they are never accepted as session proof.
+- Final production-device verification is still required for the exact WindSwap-TMA -> Wisp-TMA -> WindSwap-TMA UX. If that topology requires an explicit Telegram Mini App return identity, it must use the real DApp bot/Mini-App identity at the transport layer only.
 
-### 80–90% — Trusted DApp and unlock policy — DONE
+### 82–90% — Wallet-owned DApp identity and trusted policy — DONE
 
 - Trusted status is wallet-derived, not DApp-declared.
-- v1 trust anchors come only from Wisp's bundled verified/active VEX Native registry with exact HTTPS origin match.
+- Verified/active VEX Native DApps in Wisp's bundled registry use that wallet-owned entry as the identity/security anchor.
+- Standard DApps must expose `https://<origin>/wisp-wallet-manifest.json`.
+- Wisp fetches the standard DApp manifest independently before showing connect approval.
+- Manifest `url` must have the exact requesting origin; manifest URLs use credential-free HTTPS.
+- Manifest `name`, `iconUrl`, optional description/terms/privacy are display identity only and cannot self-grant verified/trusted status.
+- Session-bound signing reuses the already approved session identity instead of trusting fresh DApp-supplied name/icon data.
 - Mutable remote registry/cache data may enrich catalog display but cannot grant trusted privileges by itself.
 - Trusted connection lifetime is separate from vault unlock lifetime.
 - Verified DApps can use durable 1-day / 7-day / 30-day connection grants (default 7 days); standard DApps remain 1/6/24 hours.
@@ -166,19 +179,18 @@ Behavior:
 - Completion returns exact session ID, chain, expiry, and transaction ID.
 - Multi-action transport regression proves three actions create exactly one VSR and exactly one Telegram signing handoff.
 - Generic SessionManager regression covers cold restore, mismatch cleanup, revoke cleanup, storage rollback, logout failure cleanup, and cold logout remote revoke.
-- Server regressions cover immediate restore, authoritative disconnect, binding mismatch, malformed session IDs, legacy migration, and expired-session fail-closed tombstones.
+- Server regressions cover immediate restore, authoritative disconnect, binding mismatch, malformed session IDs, legacy migration, expired-session fail-closed tombstones, and rejection when a different Telegram user opens a session-bound signing handoff.
 
-### 95–100% — Identity manifest + release + clean consumer migration — PENDING
+### 95–100% — Release, real-device E2E, and clean consumer migration — PENDING
 
 Remaining work must stay narrow:
 
-1. **DApp manifest parity.** TON Connect uses a public manifest fetched by the wallet before connect. Wisp currently has a stronger privilege boundary for trusted DApps (wallet-owned bundled verified registry), but ordinary display metadata can still originate in the connect request. Add a Wisp public manifest contract/fetch path for DApp identity metadata without allowing that manifest to self-grant `trusted` status.
-2. **Final TMA-to-TMA return verification.** Verify on a real Telegram client whether current native launch + `return_back` returns exactly to the originating WindSwap TMA. If an explicit `tg://resolve`/TMA return target is needed, configure the real WindSwap Mini App identity at the transport layer only.
-3. **Publish WindStack `2.2.0`.** Source/version metadata is prepared, but GitHub tag/release and installable package publication must exist before consumers switch.
-4. **Migrate WindSwap.** Remove copied Telegram handoff/session polling from WindSwap and consume the released WindStack transport directly. Do not add serializer, ABI, transaction, session, or compatibility helpers to WindSwap.
-5. **Production E2E.** Verify connect -> return -> hard close/reopen -> silent restore -> Add Liquidity multi-action -> review all actions -> approve -> one broadcast -> disconnect/revoke -> restore fails cleanly.
+1. **Final TMA-to-TMA return verification.** Verify on a real Telegram client that current native launch + `return_back` returns exactly to the originating WindSwap TMA. If an explicit `tg://resolve`/TMA return target is required, configure the real WindSwap Mini App identity at the transport layer only.
+2. **Publish WindStack `2.2.0`.** Source/version metadata is prepared, but GitHub tag/release and installable package publication must exist before consumers switch.
+3. **Migrate WindSwap.** Remove copied Telegram handoff/session polling from WindSwap and consume the released WindStack transport directly. Do not add serializer, ABI, transaction, session, or compatibility helpers to WindSwap.
+4. **Production E2E.** Verify connect -> return -> hard close/reopen -> silent restore -> Add Liquidity multi-action -> review all actions -> approve -> one broadcast -> disconnect/revoke -> restore fails cleanly.
 
-100% means first connect is explicit, later valid connection restore is seamless, disconnect is authoritative, signing remains wallet-controlled, DApp identity is verifiable, multi-action remains one transaction, and no consumer-side compatibility workaround exists.
+100% means first connect is explicit, later valid connection restore is seamless, disconnect is authoritative, signing remains wallet-controlled, DApp identity is wallet-verified, the Telegram session owner is enforced, multi-action remains one transaction, and no consumer-side compatibility workaround exists.
 
 ## WindStack 2.2.0 release gate
 
