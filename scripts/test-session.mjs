@@ -105,6 +105,7 @@ await storage.set(
   "windstack:session",
   JSON.stringify({ chainId, walletPluginId: plugin.id, identity, walletSessionId }),
 );
+let mismatchedIdentityLogoutContext;
 const mismatchedRestoreKit = new SessionManager({
   chains: [chain],
   walletPlugins: [
@@ -113,6 +114,9 @@ const mismatchedRestoreKit = new SessionManager({
       async restore() {
         return { identity: { ...identity, actor: "bob" }, signer, walletSessionId };
       },
+      async logout(context) {
+        mismatchedIdentityLogoutContext = context;
+      },
     },
   ],
   storage,
@@ -120,11 +124,18 @@ const mismatchedRestoreKit = new SessionManager({
 await assert.rejects(() => mismatchedRestoreKit.restore(), /does not match/);
 assert.equal(mismatchedRestoreKit.getSession(), null);
 assert.equal(await storage.get("windstack:session"), null);
+assert.equal(
+  mismatchedIdentityLogoutContext?.identity.actor,
+  "bob",
+  "identity mismatch rollback must target the identity the wallet actually restored",
+);
+assert.equal(mismatchedIdentityLogoutContext?.walletSessionId, walletSessionId);
 
 await storage.set(
   "windstack:session",
   JSON.stringify({ chainId, walletPluginId: plugin.id, identity, walletSessionId }),
 );
+let mismatchedSessionLogoutContext;
 const mismatchedWalletSessionKit = new SessionManager({
   chains: [chain],
   walletPlugins: [
@@ -133,6 +144,9 @@ const mismatchedWalletSessionKit = new SessionManager({
       async restore() {
         return { identity, signer, walletSessionId: "wallet-session-other" };
       },
+      async logout(context) {
+        mismatchedSessionLogoutContext = context;
+      },
     },
   ],
   storage,
@@ -140,6 +154,38 @@ const mismatchedWalletSessionKit = new SessionManager({
 await assert.rejects(() => mismatchedWalletSessionKit.restore(), /session id.*does not match/i);
 assert.equal(mismatchedWalletSessionKit.getSession(), null);
 assert.equal(await storage.get("windstack:session"), null);
+assert.equal(
+  mismatchedSessionLogoutContext?.walletSessionId,
+  "wallet-session-other",
+  "session mismatch rollback must revoke the wallet session that was actually restored",
+);
+assert.equal(mismatchedSessionLogoutContext?.identity.actor, identity.actor);
+
+await storage.set(
+  "windstack:session",
+  JSON.stringify({ chainId, walletPluginId: plugin.id, identity, walletSessionId }),
+);
+let invalidRestoredSignerLogoutContext;
+const invalidRestoredSignerKit = new SessionManager({
+  chains: [chain],
+  walletPlugins: [
+    {
+      ...plugin,
+      async restore() {
+        return { identity, signer: {}, walletSessionId };
+      },
+      async logout(context) {
+        invalidRestoredSignerLogoutContext = context;
+      },
+    },
+  ],
+  storage,
+});
+await assert.rejects(() => invalidRestoredSignerKit.restore(), /invalid signer/);
+assert.equal(invalidRestoredSignerKit.getSession(), null);
+assert.equal(await storage.get("windstack:session"), null);
+assert.equal(invalidRestoredSignerLogoutContext?.identity.actor, identity.actor);
+assert.equal(invalidRestoredSignerLogoutContext?.walletSessionId, walletSessionId);
 
 await storage.set(
   "windstack:session",
