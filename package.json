@@ -20,7 +20,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "pack:native": "npm run clean && npm run build:native && npm pack --dry-run -w @windstack/core -w @windstack/crypto -w @windstack/abi -w @windstack/rpc -w @windstack/contract -w @windstack/account -w @windstack/antelope -w @windstack/signing-request -w @windstack/session",
     "pack:dry-run": "npm pack --dry-run --workspaces",
-    "test": "node scripts/test-signing.mjs && node scripts/test-provider-contract.mjs && node scripts/test-provider-spec.mjs && node scripts/test-wisp-session-restore.mjs && node scripts/test-wisp-telegram-transport.mjs && node scripts/test-wisp-telegram-tma-return.mjs && node scripts/test-sdk-behavior.mjs && npm run test:native && node scripts/test-general-purpose.mjs",
+    "test": "node scripts/test-signing.mjs && node scripts/test-provider-contract.mjs && node scripts/test-provider-spec.mjs && node scripts/test-wisp-session-restore.mjs && node scripts/test-wisp-telegram-transport.mjs && node scripts/test-wisp-api-namespace.mjs && node scripts/test-wisp-telegram-tma-return.mjs && node scripts/test-sdk-behavior.mjs && npm run test:native && node scripts/test-general-purpose.mjs",
     "test:native": "node scripts/test-crypto.mjs && node scripts/test-abi.mjs && node scripts/test-rpc.mjs && node scripts/test-contract-account.mjs && node scripts/test-antelope-client.mjs && node scripts/test-signing-request.mjs && node scripts/test-windswap-signing-request.mjs && node scripts/test-session.mjs && node scripts/test-native-antelope.mjs && node scripts/test-vexanium-abi.mjs",
     "test:signing-request": "node scripts/test-signing-request.mjs",
     "test:windswap-signing-request": "node scripts/test-windswap-signing-request.mjs",

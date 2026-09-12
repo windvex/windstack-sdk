@@ -69,7 +69,7 @@ The plugin signs the canonical transaction resolved by the session and returns t
 
 ### Telegram transport
 
-Use the WindStack-owned Telegram transport for connect, polling, session persistence, VSR construction, restore, disconnect, and Telegram return navigation.
+Use the WindStack-owned Telegram transport for connect, event-stream result delivery with status-poll fallback, session persistence, VSR construction, restore, disconnect, and Telegram return navigation.
 
 ```ts
 import { createVexaniumClient } from "@windstack/vexanium";
@@ -83,7 +83,7 @@ const vex = await createVexaniumClient({
 });
 
 const wisp = createWispTelegramTransport({
-  apiUrl: "https://api.windcrypto.com",
+  apiUrl: "https://api.windcrypto.com/wisp/v1",
   // For a Telegram Mini App, provide its own Telegram return link.
   // Omit this for ordinary browser use.
   telegramReturnUrl: "https://t.me/example_bot/example_app",
@@ -134,6 +134,8 @@ async function disconnectWisp() {
 }
 ```
 
+`apiUrl` is the Wisp API base, including its deployed path prefix. WindStack appends `telegram/dapp/*` beneath that base and preserves `/wisp/v1`; it does not use the shared domain's root `/telegram/*`, `/rpc`, `/v1/*`, or `/v3/*` routes.
+
 `connect()` is interactive and creates a new wallet authorization. It rejects when a live session is already connected, and it also rejects when a persisted pointer still needs `restore()` so an application cannot accidentally replace an unresolved session.
 
 `restore()` is the startup/session-recovery operation. It asks Wisp to validate the exact persisted session against DApp origin, Vexanium chain, account, permission, expiry, and revocation state. When Wisp already knows the session, restore completes from the authoritative session registry without opening the wallet Mini App. If the session is expired, revoked, or mismatched, restore returns no active session and clears the stale pointer. It never falls back to `connect()`.
@@ -182,7 +184,7 @@ This follows the same security purpose as the TON Connect app manifest: identity
 
 ## Runtime
 
-The package targets browser and Telegram Mini App consumers. Injected Wisp providers use the Vexanium provider bridge. External Wisp Telegram flows use the public Wisp handoff API plus Telegram-native link opening when the Telegram WebApp runtime is present.
+The package targets browser and Telegram Mini App consumers. Injected Wisp providers use the Vexanium provider bridge. External Wisp Telegram flows use the public Wisp handoff API, a server-sent event stream with status polling as a compatibility fallback, and Telegram-native link opening when the Telegram WebApp runtime is present.
 
 Persistent restore does not depend on an old JavaScript runtime remaining alive. The consumer keeps an opaque session pointer, while Wisp validates authoritative session state. A valid restore can therefore complete after a hard reload or later runtime without reopening the wallet; an expired, revoked, or mismatched session fails closed.
 
