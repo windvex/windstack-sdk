@@ -47,6 +47,16 @@ export {
   requestVexaniumProviders,
 } from "./discovery.js";
 export type { GetVexaniumProviderOptions } from "./discovery.js";
+export {
+  createVexaniumFrameHost,
+  createVexaniumFrameProvider,
+} from "./frame-provider.js";
+export type {
+  VexaniumFrameHost,
+  VexaniumFrameHostOptions,
+  VexaniumFrameProvider,
+  VexaniumFrameProviderOptions,
+} from "./frame-provider.js";
 export { restoreVexaniumSession } from "./session.js";
 export type {
   VexaniumRestoreSessionParams,
