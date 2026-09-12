@@ -4,6 +4,8 @@ import { createWispTelegramTransport } from "../packages/wallet-plugin-wisp/dist
 
 const CHAIN_ID = "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f";
 const TX_ID = "a".repeat(64);
+const SESSION_ID = "wisp_session_123";
+const SESSION_EXPIRES_AT = Date.now() + 7 * 24 * 60 * 60_000;
 
 function createStorage() {
   const values = new Map();
@@ -30,7 +32,18 @@ function response(status, body) {
   };
 }
 
-function createHarness() {
+function resultFor(body, extra = {}) {
+  return {
+    actor: body.expectedAccount || "gvexa",
+    permission: body.expectedPermission || "active",
+    sessionId: body.sessionId || SESSION_ID,
+    chainId: CHAIN_ID,
+    sessionExpiresAt: SESSION_EXPIRES_AT,
+    ...extra,
+  };
+}
+
+function createHarness({ immediateRestore = false, immediateDisconnect = false } = {}) {
   const prepared = new Map();
   const prepareBodies = [];
   const opened = [];
@@ -43,8 +56,29 @@ function createHarness() {
       const id = `handoff-${++sequence}`;
       prepareBodies.push(body);
       prepared.set(id, body);
+
+      if (body.kind === "restore" && immediateRestore) {
+        return response(200, {
+          id,
+          status: "approved",
+          expiresAt: Date.now() + 60_000,
+          launchUrl: "",
+          result: resultFor(body),
+        });
+      }
+      if (body.kind === "disconnect" && immediateDisconnect) {
+        return response(200, {
+          id,
+          status: "approved",
+          expiresAt: Date.now() + 60_000,
+          launchUrl: "",
+          result: resultFor(body),
+        });
+      }
+
       return response(200, {
         id,
+        status: "pending",
         expiresAt: Date.now() + 60_000,
         launchUrl: `https://t.me/wispwalletbot?startapp=dapp_${id}`,
       });
@@ -59,36 +93,22 @@ function createHarness() {
           id,
           status: "approved",
           expiresAt: Date.now() + 60_000,
-          result: {
-            actor: "gvexa",
-            permission: "active",
-            sessionId: "wisp_session_123",
-            chainId: CHAIN_ID,
-          },
+          result: resultFor(body),
         });
       }
-      if (body.kind === "restore") {
+      if (body.kind === "sign") {
         return response(200, {
           id,
           status: "approved",
           expiresAt: Date.now() + 60_000,
-          result: {
-            actor: body.expectedAccount,
-            permission: body.expectedPermission,
-            sessionId: body.sessionId,
-            chainId: CHAIN_ID,
-          },
+          result: resultFor(body, { transactionId: TX_ID }),
         });
       }
       return response(200, {
         id,
         status: "approved",
         expiresAt: Date.now() + 60_000,
-        result: {
-          actor: body.expectedAccount,
-          permission: body.expectedPermission,
-          transactionId: TX_ID,
-        },
+        result: resultFor(body),
       });
     }
 
@@ -117,13 +137,17 @@ const options = {
 
 const first = createWispTelegramTransport(options);
 const connected = await first.connect();
-assert.equal(connected.sessionId, "wisp_session_123");
+assert.equal(connected.sessionId, SESSION_ID);
 assert.equal(connected.account.permissionLevel, "gvexa@active");
+assert.equal(connected.accounts.length, 1);
+assert.equal(connected.expiresAt, SESSION_EXPIRES_AT);
+assert.deepEqual(first.getCapabilities(), ["vex.accounts", "vex.sessions", "vex.signingRequest"]);
+assert.equal(first.getChain(), CHAIN_ID);
 assert.equal(firstHarness.prepareBodies.length, 1);
 assert.equal(firstHarness.prepareBodies[0].kind, "connect");
 assert.equal(firstHarness.opened.length, 1);
 
-const secondHarness = createHarness();
+const secondHarness = createHarness({ immediateRestore: true, immediateDisconnect: true });
 const second = createWispTelegramTransport({
   ...options,
   fetch: secondHarness.fetch,
@@ -149,6 +173,11 @@ assert.equal(secondHarness.prepareBodies[0].sessionId, connected.sessionId);
 assert.equal(secondHarness.prepareBodies[0].origin, "https://swap.windcrypto.com");
 assert.equal(secondHarness.prepareBodies[0].expectedAccount, "gvexa");
 assert.equal(secondHarness.prepareBodies[0].expectedPermission, "active");
+assert.equal(
+  secondHarness.opened.length,
+  0,
+  "authoritative restore must not reopen the wallet Mini App",
+);
 
 const createdRequests = [];
 const actionInputs = [];
@@ -188,11 +217,21 @@ assert.equal(
   1,
   "multi-action transaction must open exactly one Telegram signing handoff",
 );
+assert.equal(secondHarness.opened.length, 1, "signing must open Wisp exactly once");
 
-await second.clearSession();
+await second.disconnect();
+const disconnectBody = secondHarness.prepareBodies.find((body) => body.kind === "disconnect");
+assert.ok(disconnectBody, "expected a wallet-authoritative disconnect request");
+assert.equal(disconnectBody.sessionId, connected.sessionId);
+assert.equal(
+  secondHarness.opened.length,
+  1,
+  "authoritative disconnect must not reopen Wisp after the signing handoff",
+);
 assert.equal(await second.getStoredSession(), null);
 
-console.log("PASS: Wisp Telegram transport persists an opaque wallet session id");
-console.log("PASS: cold restore revalidates the same wallet-authoritative session");
+console.log("PASS: Wisp Telegram transport persists only an opaque wallet session pointer");
+console.log("PASS: cold restore revalidates immediately without reopening Wisp");
 console.log("PASS: signing is bound to the restored session and account permission");
 console.log("PASS: multi-action transact produces one VSR and one Telegram signing handoff");
+console.log("PASS: disconnect revokes the authoritative session before clearing local state");
