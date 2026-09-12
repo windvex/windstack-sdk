@@ -8,17 +8,15 @@ Release history for the WindStack package set.
 
 - Added wallet-authoritative cold session restore through VexaniumProvider `1.1.0` and the explicit non-interactive `vex_restoreSession` method.
 - Persisted opaque wallet session identifiers through `@windstack/session` login, restore, logout, stale-session cleanup, and identity/session mismatch guards.
-- Updated `@windstack/wallet-plugin-wisp` so restored signing and disconnect use the authoritative wallet session identifier instead of depending on a previous JavaScript runtime.
-- Added `createWispTelegramTransport()` to `@windstack/wallet-plugin-wisp` so Telegram DApps can connect, cold-restore, sign VSR requests, and transact through one reusable WindStack-owned transport instead of application-specific handoff helpers.
-- Made persisted Telegram session data a restore pointer rather than a live connection: `connected()`, `getSessionId()`, accounts, signing, and transactions now require a session validated in the current runtime, while startup restore remains non-interactive.
+- Updated `@windstack/wallet-plugin-wisp` so restored signing and disconnect use the authoritative wallet session identifier across recreated application runtimes.
+- Added `createWispTelegramTransport()` to `@windstack/wallet-plugin-wisp` for Telegram DApp connection, cold restore, VSR signing, transactions, disconnect, and Telegram return navigation through one reusable transport.
+- Made persisted Telegram session data a restore pointer rather than a live connection: `connected()`, `getSessionId()`, accounts, signing, and transactions require a session validated in the current runtime, while startup restore remains non-interactive.
 - Added typed `WispTelegramAlreadyConnectedError`, `WispTelegramNotConnectedError`, and `WispTelegramRestoreRequiredError` exports so consumers can handle connection state explicitly without parsing error strings.
-- Aligned Telegram disconnect with established wallet-connection lifecycle semantics by clearing live local connection state first and then requesting authoritative wallet-side revocation with the captured opaque session pointer.
-- Bound Telegram signing requests to the restored wallet session, exact DApp origin, Vexanium chain, account, and permission while keeping the persisted DApp state limited to an opaque session pointer and public account metadata.
-- Added optional `telegramReturnUrl` transport policy for Telegram Mini Apps. It accepts only credential-free `https://t.me/` targets, is carried separately from DApp identity/session authorization, and gives Wisp an explicit TMA return target comparable in purpose to TON `twaReturnUrl` and OKX Telegram redirects.
-- Added multi-action Telegram transaction handling that resolves all actions into one canonical VSR and opens exactly one wallet handoff, preserving one review, one signature flow, and one broadcast for transactions such as WindSwap liquidity operations.
-- Added regression coverage proving a recreated Wisp client restores without reopening interactive account authorization and clears revoked sessions without connect fallback.
-- Added regression coverage proving an unrestored pointer is not reported as connected, duplicate connect is rejected, signing/transacting require restore after cold start, explicit Telegram return targets cannot point outside Telegram, and one-handoff multi-action behavior is preserved across the supported Node.js compatibility matrix.
-- Added the Wisp persistent-session SSOT checkpoint covering the official TON Connect, Telegram Mini Apps, and OKX-derived architectural constraints and the 0–100% rollout.
+- Aligned Telegram disconnect with wallet-connection lifecycle semantics by clearing live local connection state and requesting authoritative wallet-side revocation with the captured opaque session pointer.
+- Bound Telegram signing requests to the restored wallet session, exact DApp origin, Vexanium chain, account, and permission while keeping persisted DApp state limited to an opaque session pointer and public account metadata.
+- Added optional `telegramReturnUrl` transport policy for Telegram Mini Apps. It accepts only credential-free `https://t.me/` targets and remains separate from DApp identity and session authorization.
+- Added multi-action Telegram transaction handling that resolves all actions into one canonical VSR and opens exactly one wallet handoff, preserving one review, one signature flow, and one broadcast.
+- Added regression coverage for recreated-client restore, revoked-session cleanup, unrestored pointers, duplicate connect rejection, cold-start signing guards, Telegram return targets, and one-handoff multi-action transactions across the supported Node.js compatibility matrix.
 
 ### 2.1.1 — 2026-09-11
 
