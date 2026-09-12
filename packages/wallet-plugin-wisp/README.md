@@ -4,7 +4,7 @@
 
 `@windstack/wallet-plugin-wisp` connects WindStack applications to Wisp Wallet on Vexanium Mainnet. It supports the injected Vexanium provider used by browser wallets and the Wisp Telegram handoff transport used by web applications that open Wisp as a Telegram Mini App.
 
-The injected-wallet plugin selects the Wisp provider identified by `com.wisp.wallet` unless a provider or client is supplied explicitly. The Telegram transport keeps the same wallet-authoritative session model without exposing private keys or requiring application-specific compatibility helpers.
+The injected-wallet plugin selects the Wisp provider identified by `com.wisp.wallet` unless a provider or client is supplied explicitly. The Telegram transport keeps the same wallet-authoritative session model without exposing private keys or wallet unlock secrets.
 
 Connection restore and interactive connection are deliberately separate. Applications should try `restore()` during startup, finish that state transition, and only call `connect()` from an explicit user action when no valid session was restored. A persisted session pointer is never treated as a live connection before restore succeeds.
 
@@ -69,7 +69,7 @@ The plugin signs the canonical transaction resolved by the session and returns t
 
 ### Telegram transport
 
-Use the WindStack-owned Telegram transport instead of implementing connect, polling, session persistence, VSR construction, restore, disconnect, or Telegram return navigation inside the DApp.
+Use the WindStack-owned Telegram transport for connect, polling, session persistence, VSR construction, restore, disconnect, and Telegram return navigation.
 
 ```ts
 import { createVexaniumClient } from "@windstack/vexanium";
@@ -150,7 +150,7 @@ async function disconnectWisp() {
 
 `transact()` accepts one or more structured Vexanium actions, resolves them through the configured `VexaniumClient`, creates one canonical VSR, opens one Wisp signing handoff, and returns the wallet-broadcast transaction id. Multi-action transactions are never split into independent signatures.
 
-For an existing VSR, use `signSigningRequest(vsr)` directly after a successful `connect()` or `restore()`. The Telegram transport binds every signing handoff to that session id, origin, chain, account, and permission. Sessionless Telegram signing is not supported.
+For an existing VSR, use `signSigningRequest(vsr)` directly after a successful `connect()` or `restore()`. The Telegram transport expects a broadcasting VSR and returns the wallet-broadcast transaction id. Signature-only VSRs are not supported by this transport. Every signing handoff is bound to the active session id, origin, chain, account, and permission. Sessionless Telegram signing is not supported.
 
 ### DApp identity manifest
 
