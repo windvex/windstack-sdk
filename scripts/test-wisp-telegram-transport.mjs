@@ -174,8 +174,16 @@ assert.equal(
   "persisted session pointer must not masquerade as wallet validation",
 );
 assert.equal(second.connected(), false, "persisted pointer must not mean connected");
-assert.equal(await second.getSessionId(), null, "unrestored pointer must not expose active session id");
-assert.deepEqual(await second.getAccounts(), [], "unrestored pointer must not expose connected accounts");
+assert.equal(
+  await second.getSessionId(),
+  null,
+  "unrestored pointer must not expose active session id",
+);
+assert.deepEqual(
+  await second.getAccounts(),
+  [],
+  "unrestored pointer must not expose connected accounts",
+);
 await assert.rejects(
   () => second.signSigningRequest("vsr:requires-restore"),
   /Restore the persisted Wisp Telegram session/iu,
@@ -191,7 +199,10 @@ const restored = await second.restore();
 assert.ok(restored);
 assert.equal(second.connected(), true);
 assert.equal(await second.getSessionId(), connected.sessionId);
-assert.deepEqual((await second.getAccounts()).map((item) => item.permissionLevel), ["gvexa@active"]);
+assert.deepEqual(
+  (await second.getAccounts()).map((item) => item.permissionLevel),
+  ["gvexa@active"],
+);
 assert.equal(restored.sessionId, connected.sessionId);
 assert.equal(secondHarness.prepareBodies[0].kind, "restore");
 assert.equal(secondHarness.prepareBodies[0].sessionId, connected.sessionId);
@@ -268,4 +279,6 @@ console.log("PASS: cold restore revalidates immediately without reopening Wisp")
 console.log("PASS: connect/sign/transact enforce the restored active-session lifecycle");
 console.log("PASS: signing is bound to the restored session and account permission");
 console.log("PASS: multi-action transact produces one VSR and one Telegram signing handoff");
-console.log("PASS: disconnect clears local connection state and revokes the captured wallet session");
+console.log(
+  "PASS: disconnect clears local connection state and revokes the captured wallet session",
+);
