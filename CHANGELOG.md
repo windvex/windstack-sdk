@@ -9,7 +9,11 @@ Release history for the WindStack package set.
 - Added wallet-authoritative cold session restore through VexaniumProvider `1.1.0` and the explicit non-interactive `vex_restoreSession` method.
 - Persisted opaque wallet session identifiers through `@windstack/session` login, restore, logout, stale-session cleanup, and identity/session mismatch guards.
 - Updated `@windstack/wallet-plugin-wisp` so restored signing and disconnect use the authoritative wallet session identifier instead of depending on a previous JavaScript runtime.
+- Added `createWispTelegramTransport()` to `@windstack/wallet-plugin-wisp` so Telegram DApps can connect, cold-restore, sign VSR requests, and transact through one reusable WindStack-owned transport instead of application-specific handoff helpers.
+- Bound Telegram signing requests to the restored wallet session, exact DApp origin, Vexanium chain, account, and permission while keeping the persisted DApp state limited to an opaque session pointer and public account metadata.
+- Added multi-action Telegram transaction handling that resolves all actions into one canonical VSR and opens exactly one wallet handoff, preserving one review, one signature flow, and one broadcast for transactions such as WindSwap liquidity operations.
 - Added regression coverage proving a recreated Wisp client restores without reopening interactive account authorization and clears revoked sessions without connect fallback.
+- Added regression coverage for Telegram session persistence, wallet-authoritative restore, session-bound signing, and one-handoff multi-action transactions across the supported Node.js compatibility matrix.
 - Added the Wisp persistent-session SSOT checkpoint covering the official TON Connect, Telegram Mini Apps, and OKX-derived architectural constraints and the 0–100% rollout.
 
 ### 2.1.1 — 2026-09-11
