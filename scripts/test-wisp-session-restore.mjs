@@ -171,4 +171,47 @@ assert.equal(
 assert.equal(restoreCalls, 2);
 assert.equal(await storage.get("windstack:session"), null);
 
+const conflictingPlugin = new WispWalletPlugin({ provider });
+await conflictingPlugin.login({ chain, appName: "Restore Conflict Test" });
+const disconnectsBeforeSessionConflict = disconnectCalls;
+assert.equal(
+  await conflictingPlugin.restore({
+    chain,
+    appName: "Restore Conflict Test",
+    identity: {
+      actor: account.actor,
+      permission: account.permission,
+      publicKey: account.publicKey,
+    },
+    walletSessionId: "wallet-session-conflict",
+  }),
+  null,
+);
+assert.equal(
+  disconnectCalls,
+  disconnectsBeforeSessionConflict + 1,
+  "a conflicting in-memory session must be disconnected before restore returns null",
+);
+
+await conflictingPlugin.login({ chain, appName: "Restore Conflict Test" });
+const disconnectsBeforeIdentityConflict = disconnectCalls;
+assert.equal(
+  await conflictingPlugin.restore({
+    chain,
+    appName: "Restore Conflict Test",
+    identity: {
+      actor: "alice",
+      permission: account.permission,
+      publicKey: account.publicKey,
+    },
+    walletSessionId,
+  }),
+  null,
+);
+assert.equal(
+  disconnectCalls,
+  disconnectsBeforeIdentityConflict + 1,
+  "an account/permission conflict must not leave the Vexanium client connected",
+);
+
 console.log("Wisp cold session restore tests: PASS");

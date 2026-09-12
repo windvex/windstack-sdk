@@ -140,6 +140,15 @@ export class WispWalletPlugin implements WalletPlugin {
     };
   }
 
+  private async discardConflictingClientSession(client: VexaniumClient): Promise<void> {
+    if (!client.getSession()) return;
+    // A failed restore must not leave the provider client connected while the
+    // SessionManager has already discarded its persisted session pointer.
+    // disconnect() clears the local VexaniumClient session in a finally block,
+    // even when wallet-side revocation cannot be delivered.
+    await client.disconnect().catch(() => undefined);
+  }
+
   async login(context: WalletLoginContext): Promise<WalletLoginResult> {
     this.assertChain(context);
     const client = await this.getClient();
@@ -157,13 +166,17 @@ export class WispWalletPlugin implements WalletPlugin {
         context.walletSessionId !== undefined &&
         currentSession.walletSessionId !== context.walletSessionId
       ) {
+        await this.discardConflictingClientSession(client);
         return null;
       }
       const account = currentSession.accounts.find(
         (item) =>
           item.actor === context.identity.actor && item.permission === context.identity.permission,
       );
-      if (!account) return null;
+      if (!account) {
+        await this.discardConflictingClientSession(client);
+        return null;
+      }
       return this.loginResult(
         client,
         {
@@ -196,13 +209,18 @@ export class WispWalletPlugin implements WalletPlugin {
     }
 
     const restoredSession = client.getSession();
-    if (!restoredSession || restoredSession.walletSessionId !== context.walletSessionId)
+    if (!restoredSession || restoredSession.walletSessionId !== context.walletSessionId) {
+      await this.discardConflictingClientSession(client);
       return null;
+    }
     const account = restoredSession.accounts.find(
       (item) =>
         item.actor === context.identity.actor && item.permission === context.identity.permission,
     );
-    if (!account) return null;
+    if (!account) {
+      await this.discardConflictingClientSession(client);
+      return null;
+    }
 
     return this.loginResult(
       client,
