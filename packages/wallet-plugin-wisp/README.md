@@ -109,6 +109,32 @@ await wisp.disconnect();
 
 For an existing VSR, use `signSigningRequest(vsr)` directly. The Telegram transport requires an active wallet session and binds every signing handoff to that session id, origin, chain, account, and permission.
 
+### DApp identity manifest
+
+For Telegram connections, DApp-provided `name`, `icon`, and `description` are hints only. Wisp does not treat those fields as authoritative identity.
+
+A standard DApp must publish a public manifest at:
+
+```text
+https://your-dapp.example/wisp-wallet-manifest.json
+```
+
+Minimum manifest:
+
+```json
+{
+  "url": "https://your-dapp.example",
+  "name": "Example App",
+  "iconUrl": "https://your-dapp.example/icon-180.png"
+}
+```
+
+Optional fields are `description`, `termsOfUseUrl`, and `privacyPolicyUrl`. All URLs must use credential-free HTTPS, and the manifest `url` origin must exactly match the origin requesting the Wisp connection. The wallet fetches and validates this manifest independently before presenting a standard DApp connection.
+
+DApps that are already marked verified in Wisp's bundled registry use that wallet-owned registry entry as the identity anchor. A manifest can never mark itself verified or trusted. Trusted-session privileges remain wallet-owned policy.
+
+This follows the same security purpose as the TON Connect app manifest: the DApp cannot freely substitute the name/icon displayed by the wallet at approval time.
+
 ## Runtime
 
 The package targets browser and Telegram Mini App consumers. Injected Wisp providers use the Vexanium provider bridge. External Wisp Telegram flows use the public Wisp handoff API plus Telegram-native link opening when the Telegram WebApp runtime is present.
@@ -121,7 +147,7 @@ The runtime never stores private keys or wallet unlock secrets. Vault unlock and
 
 A persistent DApp connection is separate from wallet unlock and transaction approval. Restoring a session does not unlock the vault and does not grant silent signing. Wisp remains responsible for secure unlock, review UI, signing policy, revocation, and session expiry.
 
-Applications should provide accurate DApp metadata, but display metadata is not an authorization source. Wallet authorization is bound to the wallet-issued session and exact DApp origin.
+Application-supplied display metadata is not an authorization source. Wisp resolves approval identity from its wallet-owned verified registry or from the independently fetched origin manifest described above. Wallet authorization is then bound to the wallet-issued session and exact DApp origin.
 
 A chain other than Vexanium Mainnet is rejected. The package never stores private keys.
 
