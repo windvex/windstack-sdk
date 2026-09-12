@@ -208,6 +208,14 @@ assert.equal(typeof vexanium.decodeVexEvmContractAction, "function");
 
 const wisp = await import("@windstack/wallet-plugin-wisp");
 assert.equal(typeof wisp.WispWalletPlugin, "function");
+assert.equal(
+  typeof wisp.createWispTelegramTransport,
+  "function",
+  "Wisp Telegram transport must be available from the packed public package",
+);
+assert.equal(typeof wisp.WispTelegramAlreadyConnectedError, "function");
+assert.equal(typeof wisp.WispTelegramNotConnectedError, "function");
+assert.equal(typeof wisp.WispTelegramRestoreRequiredError, "function");
 
 console.log("Installed release tarballs imported successfully");
 `;
