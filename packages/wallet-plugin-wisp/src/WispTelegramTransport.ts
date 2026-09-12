@@ -351,9 +351,6 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
       throw new Error("Wisp Telegram returned an invalid handoff");
     }
 
-    // Wallet-authoritative restore/disconnect can complete at prepare time. In
-    // that case no Telegram launch is allowed: this is the persistent-session
-    // fast path equivalent to a restored wallet connection.
     if (terminalResult(prepared)) return prepared;
 
     if (!prepared.launchUrl) {
@@ -439,8 +436,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
       const sessionId = opaqueSessionId(value.sessionId);
       const actor = String(value.actor || "").trim();
       const permission = String(value.permission || "").trim();
-      const expiresAt =
-        value.expiresAt === undefined ? undefined : Number(value.expiresAt);
+      const expiresAt = value.expiresAt === undefined ? undefined : Number(value.expiresAt);
       if (
         value.version !== 1 ||
         !sessionId ||
@@ -448,8 +444,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
         !ACCOUNT_RE.test(permission) ||
         String(value.chainId || "").toLowerCase() !== VEXANIUM_MAINNET_CHAIN_ID ||
         value.origin !== origin ||
-        (expiresAt !== undefined &&
-          (!Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()))
+        (expiresAt !== undefined && (!Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()))
       ) {
         await clearSession();
         return null;
@@ -545,9 +540,6 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
       await clearSession();
     } catch (error) {
       if (error instanceof WispTelegramResultError && error.status === "failed") {
-        // Server-authoritative failure here means the session is already invalid,
-        // revoked, expired, or binding-mismatched. Clearing the stale pointer is
-        // therefore the safe local outcome.
         await clearSession();
         return;
       }
