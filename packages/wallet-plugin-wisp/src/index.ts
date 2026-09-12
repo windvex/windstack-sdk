@@ -5,7 +5,7 @@ export {
   WispTelegramAlreadyConnectedError,
   WispTelegramNotConnectedError,
   WispTelegramRestoreRequiredError,
-} from "./WispTelegramTmaTransport.js";
+} from "./WispTelegramTransport.js";
 export type {
   WispTelegramDappMetadata,
   WispTelegramSession,
@@ -13,4 +13,4 @@ export type {
   WispTelegramTransactArgs,
   WispTelegramTransport,
   WispTelegramTransportOptions,
-} from "./WispTelegramTmaTransport.js";
+} from "./WispTelegramTransport.js";
