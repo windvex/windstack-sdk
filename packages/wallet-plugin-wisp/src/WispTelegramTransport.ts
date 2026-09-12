@@ -327,11 +327,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
       } catch (error) {
         if (signal?.aborted) throw new DOMException("Wallet request cancelled", "AbortError");
         if (error instanceof WispTelegramResultError) throw error;
-        if (
-          error instanceof WispTelegramHttpError &&
-          error.status < 500 &&
-          error.status !== 429
-        ) {
+        if (error instanceof WispTelegramHttpError && error.status < 500 && error.status !== 429) {
           throw error;
         }
       }
@@ -399,7 +395,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
         account: {
           actor,
           permission,
-          permissionLevel: `${actor}@${permission}`,
+          permissionLevel: `${actor}@${permission}` as `${string}@${string}`,
           chainId: VEXANIUM_MAINNET_CHAIN_ID,
         },
         chainId: VEXANIUM_MAINNET_CHAIN_ID,
@@ -483,7 +479,9 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     if (result.sessionId && opaqueSessionId(result.sessionId) !== session.sessionId) {
       throw new Error("Wisp Telegram signing result does not match the active session");
     }
-    const transactionId = String(result.transactionId || "").trim().toLowerCase();
+    const transactionId = String(result.transactionId || "")
+      .trim()
+      .toLowerCase();
     if (!TRANSACTION_ID_RE.test(transactionId)) {
       throw new Error("Wisp Telegram did not return a broadcast transaction id");
     }
@@ -507,7 +505,8 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     client: VexaniumClient,
     args: WispTelegramTransactArgs,
   ): Promise<VexSigningRequestResult> {
-    if (!args.actions.length) throw new TypeError("Wisp Telegram transaction requires at least one action");
+    if (!args.actions.length)
+      throw new TypeError("Wisp Telegram transaction requires at least one action");
     const session = await sessionPointer();
     if (!session) throw new Error("Connect Wisp Telegram before transacting");
 
