@@ -404,8 +404,11 @@ export class SessionManager {
     if (this.#loginPending || this.#restorePending) {
       throw new Error("Cannot logout while a wallet session operation is in progress");
     }
+
     const session = this.#session;
+    let stored: StoredSession | null = null;
     let logoutError: unknown;
+
     try {
       if (session?.walletPlugin.logout) {
         await session.walletPlugin.logout({
@@ -414,6 +417,20 @@ export class SessionManager {
           identity: session.identity,
           walletSessionId: session.walletSessionId,
         });
+      } else if (!session) {
+        stored = await this.getStoredSession();
+        if (stored) {
+          const chain = this.chains.find((item) => item.id === stored?.chainId.toLowerCase());
+          const plugin = this.walletPlugins.find((item) => item.id === stored?.walletPluginId);
+          if (chain && plugin?.logout) {
+            await plugin.logout({
+              chain,
+              appName: this.appName,
+              identity: stored.identity,
+              walletSessionId: stored.walletSessionId,
+            });
+          }
+        }
       }
     } catch (error) {
       logoutError = error;
