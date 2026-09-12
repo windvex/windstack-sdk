@@ -135,7 +135,11 @@ const second = createWispTelegramTransport({
 const pointer = await second.getStoredSession();
 assert.ok(pointer);
 assert.equal(pointer.sessionId, connected.sessionId);
-assert.equal(pointer.validatedAt, 0, "persisted session pointer must not masquerade as wallet validation");
+assert.equal(
+  pointer.validatedAt,
+  0,
+  "persisted session pointer must not masquerade as wallet validation",
+);
 
 const restored = await second.restore();
 assert.ok(restored);
