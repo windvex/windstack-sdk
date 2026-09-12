@@ -321,7 +321,11 @@ const fallback = createWispTelegramTransport({
   pollIntervalMs: 250,
 });
 await fallback.connect();
-assert.equal(fallbackHarness.statusPolls(), 1, "status polling must remain as a compatibility fallback");
+assert.equal(
+  fallbackHarness.statusPolls(),
+  1,
+  "status polling must remain as a compatibility fallback",
+);
 
 console.log("PASS: Wisp Telegram API base paths preserve /wisp/v1");
 console.log("PASS: Wisp Telegram uses SSE first with status polling as compatibility fallback");

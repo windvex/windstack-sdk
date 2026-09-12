@@ -349,10 +349,10 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   const eventSourceFactory: WispTelegramEventSourceFactory | null =
     options.eventSource === null
       ? null
-      : options.eventSource ??
+      : (options.eventSource ??
         (typeof globalThis.EventSource === "function"
           ? (url) => new globalThis.EventSource(url) as unknown as WispTelegramEventSource
-          : null);
+          : null));
   const storage = options.storage ?? runtimeStorage() ?? memoryStorage();
   const storageKey = String(options.storageKey || DEFAULT_STORAGE_KEY).trim();
   if (!storageKey) throw new TypeError("Wisp Telegram storageKey must be non-empty");

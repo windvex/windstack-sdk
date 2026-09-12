@@ -1,14 +1,8 @@
 import type { RequestArguments } from "@windstack/core";
-import {
-  VEXANIUM_REQUEST_PROVIDER_EVENT,
-} from "./constants.js";
+import { VEXANIUM_REQUEST_PROVIDER_EVENT } from "./constants.js";
 import { announceVexaniumProvider } from "./discovery.js";
 import { isVexaniumProviderInfo } from "./standard.js";
-import type {
-  VexaniumProvider,
-  VexaniumProviderEventMap,
-  VexaniumProviderInfo,
-} from "./types.js";
+import type { VexaniumProvider, VexaniumProviderEventMap, VexaniumProviderInfo } from "./types.js";
 
 const FRAME_CHANNEL = "windstack:vexanium:frame:v1" as const;
 const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
@@ -37,10 +31,7 @@ type FrameEventMessage = {
 
 type FrameMessage = FrameRequestMessage | FrameResponseMessage | FrameEventMessage;
 
-type ListenerStore = Map<
-  keyof VexaniumProviderEventMap,
-  Set<(payload: unknown) => void>
->;
+type ListenerStore = Map<keyof VexaniumProviderEventMap, Set<(payload: unknown) => void>>;
 
 export type VexaniumFrameProvider = VexaniumProvider & {
   announce(): void;
@@ -118,7 +109,8 @@ function errorPayload(error: unknown): FrameResponseMessage["error"] {
     };
   }
   return {
-    message: error instanceof Error ? error.message : String(error || "Wallet provider request failed."),
+    message:
+      error instanceof Error ? error.message : String(error || "Wallet provider request failed."),
   };
 }
 
@@ -170,7 +162,11 @@ export function createVexaniumFrameProvider(
   let destroyed = false;
 
   const onMessage = (event: MessageEvent<unknown>) => {
-    if (event.source !== targetWindow || event.origin !== parentOrigin || !isFrameMessage(event.data)) {
+    if (
+      event.source !== targetWindow ||
+      event.origin !== parentOrigin ||
+      !isFrameMessage(event.data)
+    ) {
       return;
     }
     const message = event.data;
@@ -198,7 +194,9 @@ export function createVexaniumFrameProvider(
       chains: Object.freeze([...options.providerInfo.chains]),
       capabilities: Object.freeze([...options.providerInfo.capabilities]),
     }),
-    request<TResult = unknown, TParams = unknown>(args: RequestArguments<TParams>): Promise<TResult> {
+    request<TResult = unknown, TParams = unknown>(
+      args: RequestArguments<TParams>,
+    ): Promise<TResult> {
       if (destroyed) return Promise.reject(new Error("Frame provider has been destroyed"));
       const id = requestId(++counter);
       return new Promise<TResult>((resolve, reject) => {
@@ -258,9 +256,7 @@ export function createVexaniumFrameProvider(
  * window and exact dApp origin are accepted. No wildcard postMessage target is
  * used for provider responses or events.
  */
-export function createVexaniumFrameHost(
-  options: VexaniumFrameHostOptions,
-): VexaniumFrameHost {
+export function createVexaniumFrameHost(options: VexaniumFrameHostOptions): VexaniumFrameHost {
   const runtimeWindow = options.window ?? globalThis.window;
   if (!runtimeWindow) throw new Error("Frame host requires a browser window");
   const allowedOrigin = exactHttpsOrigin(options.allowedOrigin, "allowedOrigin");
