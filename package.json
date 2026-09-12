@@ -12,6 +12,7 @@
     "format:check": "biome format packages/*/src scripts package.json package-lock.json tsconfig.json tsconfig.base.json packages/*/package.json packages/*/tsconfig.json specs/wisp-provider-contract.json biome.json",
     "lint": "biome lint packages/*/src scripts",
     "check:release": "node scripts/check-release.mjs",
+    "check:public-content": "node scripts/check-public-content.mjs",
     "audit:native": "node scripts/audit-native.mjs",
     "audit:release": "node scripts/audit-release-tarballs.mjs",
     "build:native": "tsc -b packages/core packages/crypto packages/abi packages/rpc packages/contract packages/account packages/antelope packages/signing-request packages/session",
@@ -25,8 +26,8 @@
     "test:windswap-signing-request": "node scripts/test-windswap-signing-request.mjs",
     "test:vexanium-abi": "node scripts/test-vexanium-abi.mjs",
     "verify:vexanium": "node scripts/verify-vexanium-live.mjs",
-    "validate:native": "npm run clean && npm run format:check && npm run check:release && npm run build:native && npm run test:native && npm run pack:native",
-    "validate": "npm run clean && npm run format:check && npm run lint && npm run check:release && npm run build && npm run typecheck && npm test && npm run pack:dry-run",
+    "validate:native": "npm run clean && npm run format:check && npm run check:release && npm run check:public-content && npm run build:native && npm run test:native && npm run pack:native",
+    "validate": "npm run clean && npm run format:check && npm run lint && npm run check:release && npm run check:public-content && npm run build && npm run typecheck && npm test && npm run pack:dry-run",
     "release:dry-run": "npm run validate && npm run audit:release && npm run verify:vexanium && npm audit && npm run audit:native",
     "release:npm": "node scripts/publish-release.mjs"
   },
