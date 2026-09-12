@@ -14,9 +14,10 @@ Release history for the WindStack package set.
 - Added typed `WispTelegramAlreadyConnectedError`, `WispTelegramNotConnectedError`, and `WispTelegramRestoreRequiredError` exports so consumers can handle connection state explicitly without parsing error strings.
 - Aligned Telegram disconnect with established wallet-connection lifecycle semantics by clearing live local connection state first and then requesting authoritative wallet-side revocation with the captured opaque session pointer.
 - Bound Telegram signing requests to the restored wallet session, exact DApp origin, Vexanium chain, account, and permission while keeping the persisted DApp state limited to an opaque session pointer and public account metadata.
+- Added optional `telegramReturnUrl` transport policy for Telegram Mini Apps. It accepts only credential-free `https://t.me/` targets, is carried separately from DApp identity/session authorization, and gives Wisp an explicit TMA return target comparable in purpose to TON `twaReturnUrl` and OKX Telegram redirects.
 - Added multi-action Telegram transaction handling that resolves all actions into one canonical VSR and opens exactly one wallet handoff, preserving one review, one signature flow, and one broadcast for transactions such as WindSwap liquidity operations.
 - Added regression coverage proving a recreated Wisp client restores without reopening interactive account authorization and clears revoked sessions without connect fallback.
-- Added regression coverage proving an unrestored pointer is not reported as connected, duplicate connect is rejected, signing/transacting require restore after cold start, and one-handoff multi-action behavior is preserved across the supported Node.js compatibility matrix.
+- Added regression coverage proving an unrestored pointer is not reported as connected, duplicate connect is rejected, signing/transacting require restore after cold start, explicit Telegram return targets cannot point outside Telegram, and one-handoff multi-action behavior is preserved across the supported Node.js compatibility matrix.
 - Added the Wisp persistent-session SSOT checkpoint covering the official TON Connect, Telegram Mini Apps, and OKX-derived architectural constraints and the 0–100% rollout.
 
 ### 2.1.1 — 2026-09-11
