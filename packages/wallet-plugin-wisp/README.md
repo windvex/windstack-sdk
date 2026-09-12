@@ -33,7 +33,7 @@ const sessionManager = new SessionManager({
   walletPlugins: [new WispWalletPlugin()],
 });
 
-const session = await sessionManager.restore() ?? await sessionManager.login();
+const session = (await sessionManager.restore()) ?? (await sessionManager.login());
 
 const action = await session
   .account()
@@ -108,6 +108,14 @@ await wisp.disconnect();
 `transact()` accepts one or more structured Vexanium actions, resolves them through the configured `VexaniumClient`, creates one canonical VSR, opens one Wisp signing handoff, and returns the wallet-broadcast transaction id. Multi-action transactions are never split into independent signatures.
 
 For an existing VSR, use `signSigningRequest(vsr)` directly. The Telegram transport requires an active wallet session and binds every signing handoff to that session id, origin, chain, account, and permission.
+
+## Runtime
+
+The package targets browser and Telegram Mini App consumers. Injected Wisp providers use the Vexanium provider bridge. External Wisp Telegram flows use the public Wisp handoff API plus Telegram-native link opening when the Telegram WebApp runtime is present.
+
+Persistent restore does not depend on an old JavaScript runtime remaining alive. The consumer keeps an opaque session pointer, while Wisp validates authoritative session state. A valid restore can therefore complete after a hard reload or later runtime without reopening the wallet; an expired, revoked, or mismatched session fails closed.
+
+The runtime never stores private keys or wallet unlock secrets. Vault unlock and transaction approval remain wallet-owned even while a DApp connection is restored.
 
 ## Security model
 
