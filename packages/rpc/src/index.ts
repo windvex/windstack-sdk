@@ -152,10 +152,8 @@ export class RpcChainMismatchError extends RpcError {
 function rpcMessage(payload: unknown, fallback: string): string {
   if (!payload || typeof payload !== "object") return fallback;
   const record = payload as Record<string, unknown>;
-  if (typeof record.message === "string" && record.message) return record.message;
   if (record.error && typeof record.error === "object") {
     const error = record.error as Record<string, unknown>;
-    if (typeof error.what === "string" && error.what) return error.what;
     if (Array.isArray(error.details)) {
       const detail = error.details.find(
         (item) =>
@@ -165,7 +163,11 @@ function rpcMessage(payload: unknown, fallback: string): string {
       ) as Record<string, unknown> | undefined;
       if (detail?.message) return String(detail.message);
     }
+    if (typeof error.what === "string" && error.what) return error.what;
+    if (typeof error.message === "string" && error.message) return error.message;
+    if (typeof error.name === "string" && error.name) return error.name;
   }
+  if (typeof record.message === "string" && record.message) return record.message;
   return fallback;
 }
 
