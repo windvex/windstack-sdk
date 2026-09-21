@@ -4,6 +4,14 @@
 
 Release history for the WindStack package set.
 
+### 2.3.2 — 2026-09-21
+
+- Changed Vexanium resource exhaustion into structured preflight results with CPU, NET, and RAM requirements, deficits, and certainty.
+- Added VEX stake estimates for CPU and NET based on current account stake and live resource capacity, including a suggested safety margin.
+- Added live RAM-market quotes for required bytes through `quoteRam()`.
+- Added native contract-deployment RAM sizing for `setcode` and `setabi`, allowing RAM requirements to remain visible when CPU or NET stops execution first.
+- Kept non-resource compute failures as typed `VexaniumProviderError` failures.
+
 ### 2.3.1 — 2026-09-21
 
 - Fixed Vexanium resource estimation failures so dry-runs without an execution receipt surface the node exception instead of a receipt parser error.

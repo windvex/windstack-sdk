@@ -7,6 +7,24 @@ export {
 } from "./accounts.js";
 export { createVexaniumClient } from "./client.js";
 export {
+  estimateVexaniumActionRamBytes,
+  quoteVexaniumRamFromMarket,
+} from "./resources.js";
+export type {
+  VexaniumCpuRequirement,
+  VexaniumNetRequirement,
+  VexaniumRamFundingQuote,
+  VexaniumRamMarketQuote,
+  VexaniumRamMarketRow,
+  VexaniumRamRequirement,
+  VexaniumResourceCertainty,
+  VexaniumResourceFunding,
+  VexaniumResourceRequirements,
+  VexaniumResourceStatus,
+  VexaniumStakeFundingQuote,
+  VexaniumStakeSnapshot,
+} from "./resources.js";
+export {
   DEFAULT_PROVIDER_DISCOVERY_TIMEOUT_MS,
   VEXANIUM_ANNOUNCE_PROVIDER_EVENT,
   VEXANIUM_CAPABILITIES,

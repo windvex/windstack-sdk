@@ -113,7 +113,7 @@ const request = vex.parseSigningRequest(uri);
 
 ## Resource estimation
 
-Vexanium transactions can be evaluated before broadcast to measure CPU, NET, and RAM requirements against the connected account's current resources.
+Vexanium transactions can be evaluated before broadcast to measure the connected account's CPU, NET, and RAM requirements and estimate the VEX needed to cover any deficit.
 
 ```ts
 const estimate = await vex.estimateResources({
@@ -131,13 +131,18 @@ const estimate = await vex.estimateResources({
   ],
 });
 
-console.log(estimate.usage.cpuUs);
-console.log(estimate.usage.netBytes);
-console.log(estimate.usage.ramByAccount);
-console.log(estimate.check.sufficient);
+console.log(estimate.status);
+console.log(estimate.requirements.cpu);
+console.log(estimate.requirements.net);
+console.log(estimate.requirements.ram);
+console.log(estimate.funding.cpu.suggestedAdditionalStakeVex);
+console.log(estimate.funding.net.suggestedAdditionalStakeVex);
+console.log(estimate.funding.ram.estimatedPurchaseVex);
 ```
 
-The estimate uses Antelope transaction computation without broadcasting the transaction. The returned resource check compares measured usage with the connected account's current CPU, NET, and RAM availability.
+`estimateResources()` uses Antelope transaction computation without broadcasting state changes. Account resource exhaustion is returned as `status: "insufficient_resources"` with structured requirements instead of being treated as a generic execution failure. CPU and NET funding estimates are derived from the account's current stake and live resource capacity, while RAM purchase estimates use the current `vexcore::rammarket` state.
+
+Requirements include a `certainty` field. A completed compute result is `exact`; a resource limit reached during execution can produce a `minimum` requirement; deployment RAM inferred from native `setcode` or `setabi` sizing is an `estimate`; and resources that cannot yet be determined are `unknown`. Non-resource transaction failures still reject normally.
 
 ## Configure RPC
 

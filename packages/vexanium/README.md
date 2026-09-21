@@ -122,7 +122,7 @@ Contract and account APIs use the same RPC and ABI cache as `transact()`.
 
 ## Resource estimation
 
-Use `estimateResources()` before broadcast to evaluate the same structured actions used by `transact()`.
+Use `estimateResources()` before broadcast to evaluate the same structured actions used by `transact()`. The result is designed for transaction preflight: it reports what the account has, what the transaction requires, the deficit, and an estimated VEX funding amount.
 
 ```ts
 const estimate = await vex.estimateResources({
@@ -140,13 +140,36 @@ const estimate = await vex.estimateResources({
   ],
 });
 
-console.log(estimate.usage.cpuUs);
-console.log(estimate.usage.netBytes);
-console.log(estimate.usage.ramByAccount);
-console.log(estimate.check.sufficient);
+if (estimate.status === "insufficient_resources") {
+  console.log(estimate.requirements.cpu);
+  console.log(estimate.requirements.net);
+  console.log(estimate.requirements.ram);
+
+  console.log(estimate.funding.cpu.minimumAdditionalStakeVex);
+  console.log(estimate.funding.cpu.suggestedAdditionalStakeVex);
+  console.log(estimate.funding.net.minimumAdditionalStakeVex);
+  console.log(estimate.funding.net.suggestedAdditionalStakeVex);
+  console.log(estimate.funding.ram.estimatedPurchaseVex);
+}
 ```
 
-The transaction is computed by the configured Vexanium RPC without being broadcast. The result includes measured CPU and NET usage, RAM deltas by account, the connected account's current resource availability, and a direct sufficiency check.
+The transaction is computed by the configured Vexanium RPC without being broadcast. `tx_cpu_usage_exceeded`, `tx_net_usage_exceeded`, and `ram_usage_exceeded` are returned as structured resource results instead of generic failures. Other execution failures still reject with `VexaniumProviderError`.
+
+CPU and NET stake estimates use the account's current VEX stake and current resource limits rather than a fixed VEX-to-resource ratio. The suggested amount includes a safety margin because CPU and NET capacity can change with network conditions. RAM quotes use the live `vexcore::rammarket` reserves and include the RAM purchase fee.
+
+Each requirement includes `certainty`:
+
+- `exact` — the resource was measured from a completed compute result.
+- `minimum` — execution reached the resource limit and established at least this requirement.
+- `estimate` — the requirement is derived from deterministic native action sizing, including Vexanium `setcode` and `setabi` RAM billing.
+- `unknown` — the transaction stopped before that resource could be measured.
+
+A RAM-only quote is also available when an application already knows the required byte count:
+
+```ts
+const quote = await vex.quoteRam(32 * 1024);
+console.log(quote.estimatedCostVex);
+```
 
 ## Vexanium Signing Request (VSR)
 

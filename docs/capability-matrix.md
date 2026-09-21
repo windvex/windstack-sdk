@@ -6,7 +6,7 @@ WindStack provides a high-level Vexanium client together with independently inst
 
 | Package | Supported capabilities |
 | --- | --- |
-| `@windstack/vexanium` | Vexanium client, wallet connection, structured and multi-action transactions, transaction resource estimation, VSR, account and contract access, explorer routes, bridge utilities, and VEX EVM metadata/action decoding |
+| `@windstack/vexanium` | Vexanium client, wallet connection, structured and multi-action transactions, resource requirements and VEX funding quotes, VSR, account and contract access, explorer routes, bridge utilities, and VEX EVM metadata/action decoding |
 | `@windstack/wallet-plugin-wisp` | Wisp Wallet discovery, account authorization, Vexanium transaction signing, and session integration |
 | `@windstack/session` | Wallet plugins, login, restore, persistence, logout, and transaction orchestration |
 | `@windstack/antelope` | TAPOS, transaction preparation, canonical serialization/deserialization, digest and ID calculation, signers, required keys, broadcast, and keosd |
@@ -51,10 +51,12 @@ Multiple actions can be supplied in one transaction. Action order and authorizat
 
 ## Transaction resource estimation
 
-`estimateResources()` prepares the same ABI-aware actions used by `transact()`, computes the transaction through the configured Antelope chain API without broadcasting it, and returns CPU, NET, and RAM usage together with the connected account's current resource availability.
+`estimateResources()` prepares the same ABI-aware actions used by `transact()`, computes the transaction through the configured Antelope chain API without broadcasting it, and returns current CPU, NET, and RAM availability together with requirements, deficits, and VEX funding estimates.
+
+Resource exhaustion is a preflight result rather than a generic transaction error. CPU and NET funding estimates are based on the account's current stake and resource capacity, and RAM purchase estimates use the live `vexcore::rammarket` state.
 
 ```text
-structured actions → compute transaction → CPU / NET / RAM usage → account resource check
+structured actions → compute transaction → requirements → deficits → VEX funding estimate
 ```
 
 ## Vexanium Signing Request

@@ -3,7 +3,7 @@ import {
   AntelopeClient,
   checkAccountResources,
   deserializeTransaction,
-  extractTransactionResourceUsage,
+  normalizeAccountResources,
   serializeTransaction,
   type AuthorizationInput,
   type ComputeTransactionResponse,
@@ -27,6 +27,15 @@ import {
   normalizeVexaniumProviderError,
   vexaniumUnsupportedCapability,
 } from "./errors.js";
+import {
+  assessVexaniumResourceResponse,
+  estimateVexaniumActionRamBytes,
+  extractVexaniumStakeSnapshot,
+  quoteVexaniumRamFromMarket,
+  quoteVexaniumStake,
+  type VexaniumRamMarketRow,
+  type VexaniumStakeSnapshot,
+} from "./resources.js";
 import {
   createSigningRequest as createVexaniumSigningRequest,
   parseSigningRequest as parseVexaniumSigningRequest,
@@ -929,10 +938,62 @@ export async function createVexaniumClient(
         signal,
       );
 
+  const loadStakeSnapshot = async (
+    rawAccount: unknown,
+    actor: string,
+    signal?: AbortSignal,
+  ): Promise<VexaniumStakeSnapshot> => {
+    const accountSnapshot = extractVexaniumStakeSnapshot(rawAccount);
+    if (accountSnapshot.cpuStakeVex && accountSnapshot.netStakeVex) return accountSnapshot;
+
+    const response = await antelope.rpc.getTableRows<Record<string, unknown>>(
+      {
+        code: vexNative.contracts.system,
+        scope: actor,
+        table: "userres",
+        limit: 1,
+      },
+      signal,
+    );
+    const tableSnapshot = extractVexaniumStakeSnapshot(response.rows[0]);
+    return Object.freeze({
+      cpuStakeVex: tableSnapshot.cpuStakeVex ?? accountSnapshot.cpuStakeVex,
+      netStakeVex: tableSnapshot.netStakeVex ?? accountSnapshot.netStakeVex,
+    });
+  };
+
+  const quoteRam = async (bytes: number, signal?: AbortSignal) => {
+    if (!Number.isSafeInteger(bytes) || bytes < 0) {
+      throw new RangeError("RAM quote bytes must be a non-negative safe integer");
+    }
+    const response = await antelope.rpc.getTableRows<VexaniumRamMarketRow>(
+      {
+        code: vexNative.contracts.system,
+        scope: vexNative.contracts.system,
+        table: "rammarket",
+        limit: 1,
+      },
+      signal,
+    );
+    const market = response.rows[0];
+    if (!market) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INTERNAL_ERROR,
+        "Vexanium RAM market is unavailable",
+      );
+    }
+    return quoteVexaniumRamFromMarket(bytes, market);
+  };
+
   const estimateResources = async (
     args: VexaniumEstimateResourcesArgs,
   ): Promise<VexaniumResourceEstimate> => {
     const signer = requireSigner(args.signer);
+    const estimatedRamBytes = estimateVexaniumActionRamBytes(
+      args.actions,
+      signer.actor,
+      vexNative.contracts.system,
+    );
     const defaultAuthorization = [signer.permissionLevel];
     const actions = await Promise.all(
       args.actions.map((input) => buildAction(input, defaultAuthorization, args.signal)),
@@ -964,11 +1025,19 @@ export async function createVexaniumClient(
       },
       args.signal,
     );
-    const exception = response.processed.except;
-    const hasException = exception !== undefined && exception !== null;
-    const missingReceipt =
-      response.processed.receipt === undefined || response.processed.receipt === null;
-    if (hasException || missingReceipt) {
+
+    const account = antelope.account(signer.actor);
+    const rawAccount = await account.get<Record<string, unknown>>(args.signal);
+    const resources = normalizeAccountResources(rawAccount);
+    const assessment = assessVexaniumResourceResponse(
+      response,
+      resources,
+      signer.actor,
+      estimatedRamBytes,
+    );
+
+    if (!assessment) {
+      const exception = response.processed.except;
       const detail = computeFailureDetail(exception);
       throw new VexaniumProviderError(
         VEXANIUM_ERROR_CODES.INTERNAL_ERROR,
@@ -978,25 +1047,59 @@ export async function createVexaniumClient(
         { response, exception: exception ?? null },
       );
     }
+    if (!assessment.resourceFailure && assessment.usage.status !== "executed") {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INTERNAL_ERROR,
+        `Vexanium transaction dry-run returned status ${assessment.usage.status}`,
+        { response, exception: response.processed.except ?? null },
+      );
+    }
 
-    const usage = extractTransactionResourceUsage(response);
-    const account = antelope.account(signer.actor);
-    const resources = await account.resources(args.signal);
-    const ramBytes = Math.max(0, usage.ramByAccount[signer.actor] ?? 0);
+    const cpuRequired = assessment.requirements.cpu.requiredUs;
+    const netRequired = assessment.requirements.net.requiredBytes;
+    const ramRequired = assessment.requirements.ram.requiredBytes;
     const check = checkAccountResources(resources, {
-      cpuUs: usage.cpuUs,
-      netBytes: usage.netBytes,
-      ramBytes,
+      cpuUs: cpuRequired ?? assessment.usage.cpuUs,
+      netBytes: netRequired ?? assessment.usage.netBytes,
+      ramBytes: ramRequired ?? Math.max(0, assessment.usage.ramByAccount[signer.actor] ?? 0),
     });
-    const valid = usage.status === "executed";
+
+    const stakes = await loadStakeSnapshot(rawAccount, signer.actor, args.signal);
+    const cpuFunding = quoteVexaniumStake(resources.cpu, cpuRequired, stakes.cpuStakeVex);
+    const netFunding = quoteVexaniumStake(resources.net, netRequired, stakes.netStakeVex);
+    const ramDeficit = assessment.requirements.ram.deficitBytes;
+    const ramQuote =
+      ramDeficit !== null && ramDeficit > 0
+        ? await quoteRam(ramDeficit, args.signal)
+        : null;
+    const funding = Object.freeze({
+      cpu: cpuFunding,
+      net: netFunding,
+      ram: Object.freeze({
+        deficitBytes: ramDeficit,
+        estimatedPurchaseVex:
+          ramQuote?.estimatedCostVex ?? (ramDeficit === 0 ? "0.0000 VEX" : null),
+        quote: ramQuote,
+      }),
+    });
+
+    const valid = !assessment.resourceFailure && assessment.usage.status === "executed";
+    const status =
+      assessment.resourceFailure || !check.sufficient
+        ? ("insufficient_resources" as const)
+        : ("sufficient" as const);
 
     return Object.freeze({
+      status,
       transaction: prepared.transaction,
       serializedTransaction: prepared.serializedTransaction,
-      usage,
+      usage: assessment.usage,
       resources,
+      requirements: assessment.requirements,
+      funding,
       check,
       valid,
+      ...(assessment.exception !== undefined ? { exception: assessment.exception } : {}),
       response,
     });
   };
@@ -1124,6 +1227,7 @@ export async function createVexaniumClient(
       return buildAction(input, [signer.permissionLevel], signal);
     },
 
+    quoteRam,
     estimateResources,
     transact,
     createSigningRequest: createClientSigningRequest,

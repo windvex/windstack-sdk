@@ -1,7 +1,7 @@
 {
   "name": "@windstack/vexanium",
-  "version": "2.3.1",
-  "description": "Vexanium SDK client for wallet connection, ABI-aware transactions, resource estimation, VSR, chain presets, and VEX EVM utilities.",
+  "version": "2.3.2",
+  "description": "Vexanium SDK client for wallet connection, ABI-aware transactions, resource requirements and funding quotes, VSR, chain presets, and VEX EVM utilities.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -27,13 +27,13 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/antelope": "2.3.1",
-    "@windstack/abi": "2.3.1",
-    "@windstack/core": "2.3.1",
-    "@windstack/crypto": "2.3.1",
-    "@windstack/evm": "2.3.1",
-    "@windstack/rpc": "2.3.1",
-    "@windstack/signing-request": "2.3.1"
+    "@windstack/antelope": "2.3.2",
+    "@windstack/abi": "2.3.2",
+    "@windstack/core": "2.3.2",
+    "@windstack/crypto": "2.3.2",
+    "@windstack/evm": "2.3.2",
+    "@windstack/rpc": "2.3.2",
+    "@windstack/signing-request": "2.3.2"
   },
   "sideEffects": false,
   "keywords": [

@@ -33,6 +33,12 @@ import type {
   SigningRequestParseOptions,
 } from "@windstack/signing-request";
 import type { VEXANIUM_CAPABILITIES, VEXANIUM_PROVIDER_STANDARD } from "./constants.js";
+import type {
+  VexaniumRamMarketQuote,
+  VexaniumResourceFunding,
+  VexaniumResourceRequirements,
+  VexaniumResourceStatus,
+} from "./resources.js";
 
 export type VexaniumFullChainId = string;
 export type VexaniumCaip2ChainId = `antelope:${string}`;
@@ -210,10 +216,13 @@ export type VexaniumTransactArgs = {
 export type VexaniumEstimateResourcesArgs = Omit<VexaniumTransactArgs, "broadcast">;
 
 export type VexaniumResourceEstimate = Readonly<{
+  status: VexaniumResourceStatus;
   transaction: Transaction;
   serializedTransaction: Uint8Array;
   usage: TransactionResourceUsage;
   resources: AccountResources;
+  requirements: VexaniumResourceRequirements;
+  funding: VexaniumResourceFunding;
   check: AccountResourceCheck;
   valid: boolean;
   exception?: unknown;
@@ -311,6 +320,7 @@ export type VexaniumClient = {
   contract(account: string): Contract;
   account(name?: string): AccountClient;
   action(input: VexaniumActionInput, signal?: AbortSignal): Promise<Action>;
+  quoteRam(bytes: number, signal?: AbortSignal): Promise<VexaniumRamMarketQuote>;
   estimateResources(args: VexaniumEstimateResourcesArgs): Promise<VexaniumResourceEstimate>;
   transact<T = Record<string, unknown>>(args: VexaniumTransactArgs): Promise<TransactResult<T>>;
   createSigningRequest(
