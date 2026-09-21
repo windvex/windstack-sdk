@@ -226,7 +226,9 @@ function collectTraceRam(value: unknown, totals: Map<string, number>): void {
   }
 }
 
-function observedRamByAccount(response: ComputeTransactionResponse): Readonly<Record<string, number>> {
+function observedRamByAccount(
+  response: ComputeTransactionResponse,
+): Readonly<Record<string, number>> {
   const totals = new Map<string, number>();
   if (Array.isArray(response.processed.action_traces)) {
     for (const trace of response.processed.action_traces) collectTraceRam(trace, totals);
@@ -320,7 +322,8 @@ export function assessVexaniumResourceResponse(
 ): VexaniumResourceAssessment | null {
   const exception = response.processed.except;
   const hasException = exception !== undefined && exception !== null;
-  const hasReceipt = response.processed.receipt !== undefined && response.processed.receipt !== null;
+  const hasReceipt =
+    response.processed.receipt !== undefined && response.processed.receipt !== null;
 
   if (!hasException && hasReceipt) {
     const usage = extractTransactionResourceUsage(response);
