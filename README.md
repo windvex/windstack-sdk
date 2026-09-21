@@ -111,6 +111,34 @@ const uri = await vex.createSigningRequest({
 const request = vex.parseSigningRequest(uri);
 ```
 
+## Resource estimation
+
+Vexanium transactions can be evaluated before broadcast to measure CPU, NET, and RAM requirements against the connected account's current resources.
+
+```ts
+const estimate = await vex.estimateResources({
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      data: {
+        from: account.actor,
+        to: "bob",
+        quantity: "1.0000 VEX",
+        memo: "",
+      },
+    },
+  ],
+});
+
+console.log(estimate.usage.cpuUs);
+console.log(estimate.usage.netBytes);
+console.log(estimate.usage.ramByAccount);
+console.log(estimate.check.sufficient);
+```
+
+The estimate uses Antelope transaction computation without broadcasting the transaction. The returned resource check compares measured usage with the connected account's current CPU, NET, and RAM availability.
+
 ## Configure RPC
 
 WindStack includes Vexanium Mainnet defaults. A different trusted Vexanium RPC endpoint can be supplied through the same client API:

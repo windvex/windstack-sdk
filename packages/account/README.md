@@ -34,6 +34,26 @@ const buyRam = await account.buyRam("alice", "5.0000 TKN");
 const sellRam = await account.sellRam(4096);
 ```
 
+### Resource availability
+
+```ts
+const resources = await account.resources();
+
+console.log(resources.cpu.available);
+console.log(resources.net.available);
+console.log(resources.ram.availableBytes);
+
+const check = await account.checkResources({
+  cpuUs: 350,
+  netBytes: 168,
+  ramBytes: 240,
+});
+
+console.log(check.sufficient);
+```
+
+CPU values are expressed in microseconds. NET and RAM values are expressed in bytes.
+
 ### Voting and producer actions
 
 ```ts

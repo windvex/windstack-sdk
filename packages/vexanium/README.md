@@ -120,6 +120,34 @@ const balance = await currentAccount.getTokenBalance();
 
 Contract and account APIs use the same RPC and ABI cache as `transact()`.
 
+## Resource estimation
+
+Use `estimateResources()` before broadcast to evaluate the same structured actions used by `transact()`.
+
+```ts
+const estimate = await vex.estimateResources({
+  actions: [
+    {
+      account: "vex.token",
+      name: "transfer",
+      data: {
+        from: account.actor,
+        to: "bob",
+        quantity: "1.0000 VEX",
+        memo: "",
+      },
+    },
+  ],
+});
+
+console.log(estimate.usage.cpuUs);
+console.log(estimate.usage.netBytes);
+console.log(estimate.usage.ramByAccount);
+console.log(estimate.check.sufficient);
+```
+
+The transaction is computed by the configured Vexanium RPC without being broadcast. The result includes measured CPU and NET usage, RAM deltas by account, the connected account's current resource availability, and a direct sufficiency check.
+
 ## Vexanium Signing Request (VSR)
 
 Portable wallet requests use the `vsr:` scheme.

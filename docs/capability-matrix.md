@@ -6,14 +6,14 @@ WindStack provides a high-level Vexanium client together with independently inst
 
 | Package | Supported capabilities |
 | --- | --- |
-| `@windstack/vexanium` | Vexanium client, wallet connection, structured and multi-action transactions, VSR, account and contract access, explorer routes, bridge utilities, and VEX EVM metadata/action decoding |
+| `@windstack/vexanium` | Vexanium client, wallet connection, structured and multi-action transactions, transaction resource estimation, VSR, account and contract access, explorer routes, bridge utilities, and VEX EVM metadata/action decoding |
 | `@windstack/wallet-plugin-wisp` | Wisp Wallet discovery, account authorization, Vexanium transaction signing, and session integration |
 | `@windstack/session` | Wallet plugins, login, restore, persistence, logout, and transaction orchestration |
 | `@windstack/antelope` | TAPOS, transaction preparation, canonical serialization/deserialization, digest and ID calculation, signers, required keys, broadcast, and keosd |
 | `@windstack/contract` | ABI loading and caching, structured action serialization, contract access, and table queries |
-| `@windstack/account` | Token balances and transfers, resources, RAM, voting, producers, account creation, and permissions |
+| `@windstack/account` | Token balances and transfers, typed CPU/NET/RAM availability and checks, resource staking, RAM operations, voting, producers, account creation, and permissions |
 | `@windstack/abi` | ABI codec, names, assets, extended assets, token identity, and checked precision conversion |
-| `@windstack/rpc` | Typed chain RPC, endpoint verification and failover, cancellation, Spring transaction state, Hyperion history, and transaction submission |
+| `@windstack/rpc` | Typed chain RPC, endpoint verification and failover, transaction resource computation, cancellation, Spring transaction state, Hyperion history, and transaction submission |
 | `@windstack/signing-request` | VSR encoding, parsing, compression, callbacks, action inspection, ABI-aware decoding, resolution, transactions, identity requests, and verification |
 | `@windstack/crypto` | K1/R1 keys, canonical signatures, verification, recovery, WIF, and supported modern/legacy key encodings |
 | `@windstack/core` | Provider errors and events, exact decimal and basis-point operations, AMM quotes, routes, and liquidity math |
@@ -48,6 +48,14 @@ await vex.transact({
 ## Multi-action transactions
 
 Multiple actions can be supplied in one transaction. Action order and authorization are preserved, and wallets receive both canonical serialized bytes and the corresponding structured transaction for review.
+
+## Transaction resource estimation
+
+`estimateResources()` prepares the same ABI-aware actions used by `transact()`, computes the transaction through the configured Antelope chain API without broadcasting it, and returns CPU, NET, and RAM usage together with the connected account's current resource availability.
+
+```text
+structured actions → compute transaction → CPU / NET / RAM usage → account resource check
+```
 
 ## Vexanium Signing Request
 

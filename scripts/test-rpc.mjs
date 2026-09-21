@@ -10,6 +10,7 @@ import {
   RpcError,
   RpcResponseError,
   RpcTimeoutError,
+  extractTransactionResourceUsage,
 } from "../packages/rpc/dist/index.js";
 
 const requests = [];
@@ -162,6 +163,50 @@ await assert.rejects(
   /uncertain broadcast result/,
 );
 assert.equal(attempts, 3, "send_transaction2 must never retry automatically");
+
+const computeRequests = [];
+const computeRpc = new RpcClient({
+  endpoints: "https://compute.test",
+  fetch: async (_input, init) => {
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    computeRequests.push(body);
+    return Response.json({
+      transaction_id: "ab".repeat(32),
+      processed: {
+        receipt: { status: "executed", cpu_usage_us: 320, net_usage_words: 20 },
+        elapsed: 320,
+        net_usage: 160,
+        scheduled: false,
+        action_traces: [
+          {
+            account_ram_deltas: [{ account: "alice", delta: 240 }],
+            inline_traces: [
+              { account_ram_deltas: [{ account: "contract", delta: -16 }] },
+            ],
+          },
+        ],
+      },
+    });
+  },
+});
+const computed = await computeRpc.computeTransaction({ signatures: [], packed_trx: "00" });
+assert.deepEqual(computeRequests[0], {
+  transaction: {
+    compression: 0,
+    packed_context_free_data: "",
+    signatures: [],
+    packed_trx: "00",
+  },
+});
+assert.deepEqual(extractTransactionResourceUsage(computed), {
+  status: "executed",
+  cpuUs: 320,
+  cpuMs: 0.32,
+  netWords: 20,
+  netBytes: 160,
+  ramDeltaBytes: 224,
+  ramByAccount: { alice: 240, contract: -16 },
+});
 
 assert.throws(
   () => new RpcClient({ endpoints: ["https://same.test", "https://same.test"], retries: -1 }),

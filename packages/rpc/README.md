@@ -36,6 +36,22 @@ const rows = await rpc.getTableRows({
 });
 ```
 
+### Transaction resource computation
+
+```ts
+import { extractTransactionResourceUsage } from "@windstack/rpc";
+
+const response = await rpc.computeTransaction({
+  signatures: [],
+  packed_trx: packedTransaction,
+});
+
+const usage = extractTransactionResourceUsage(response);
+console.log(usage.cpuUs, usage.netBytes, usage.ramByAccount);
+```
+
+`computeTransaction()` uses the Antelope chain API to execute a transaction without broadcasting its state changes. Resource usage can then be normalized into CPU, NET, and per-account RAM deltas.
+
 Recent finality is read from Spring and historical lookup falls back to Hyperion only when Spring reports `UNKNOWN` or explicitly does not support the status API:
 
 ```ts

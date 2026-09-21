@@ -41,6 +41,14 @@ const rpc = new RpcClient({
       return Response.json({ rows: [], more: false });
     }
     if (url.endsWith("/get_currency_balance")) return Response.json(["1.0000 VEX"]);
+    if (url.endsWith("/get_account")) {
+      return Response.json({
+        ram_quota: 8192,
+        ram_usage: 4096,
+        cpu_limit: { used: 120, available: 1880, max: 2000 },
+        net_limit: { used: 64, available: 4032, max: 4096 },
+      });
+    }
     return Response.json({ message: "not found" }, { status: 404 });
   },
 });
@@ -82,6 +90,18 @@ const account = new AccountClient("alice", rpc, cache, {
   systemContract: "vexcore",
 });
 assert.deepEqual(await account.balance(), ["1.0000 VEX"]);
+const resources = await account.resources();
+assert.deepEqual(resources, {
+  ram: { quotaBytes: 8192, usedBytes: 4096, availableBytes: 4096 },
+  cpu: { used: 120, available: 1880, max: 2000 },
+  net: { used: 64, available: 4032, max: 4096 },
+});
+assert.deepEqual(await account.checkResources({ cpuUs: 320, netBytes: 160, ramBytes: 240 }), {
+  sufficient: true,
+  cpu: { requiredUs: 320, availableUs: 1880, sufficient: true },
+  net: { requiredBytes: 160, availableBytes: 4032, sufficient: true },
+  ram: { requiredBytes: 240, availableBytes: 4096, sufficient: true },
+});
 const publicKey = PrivateKey.fromBytes(
   "K1",
   Uint8Array.from({ length: 32 }, (_, index) => (index === 31 ? 1 : 0)),

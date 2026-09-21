@@ -4,6 +4,13 @@
 
 Release history for the WindStack package set.
 
+### 2.3.0 — 2026-09-21
+
+- Added Vexanium transaction resource estimation through `estimateResources()`, using Antelope `compute_transaction` to execute transactions without broadcasting state changes.
+- Added typed CPU, NET, and RAM account snapshots through `AccountClient.resources()` and direct sufficiency checks through `checkResources()`.
+- Added `RpcClient.computeTransaction()` and normalized transaction resource usage with CPU microseconds, NET words and bytes, and RAM deltas grouped by account.
+- Added coverage for resource computation payloads, account resource checks, and structured VEX transfer estimates.
+
 ### 2.2.0 — 2026-09-12
 
 - Added wallet-authoritative cold session restore through VexaniumProvider `1.1.0` and the explicit non-interactive `vex_restoreSession` method.
