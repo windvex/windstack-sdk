@@ -106,9 +106,7 @@ const vex = await createVexaniumClient({
           elapsed: 350,
           net_usage: 168,
           scheduled: false,
-          action_traces: [
-            { account_ram_deltas: [{ account: "alice", delta: 240 }] },
-          ],
+          action_traces: [{ account_ram_deltas: [{ account: "alice", delta: 240 }] }],
         },
       });
     }
