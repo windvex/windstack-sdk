@@ -1,5 +1,15 @@
 export { createEVMClient } from "./client.js";
 export {
+  createEvmFrameHost,
+  createEvmFrameProvider,
+} from "./frame-provider.js";
+export type {
+  EvmFrameHost,
+  EvmFrameHostOptions,
+  EvmFrameProvider,
+  EvmFrameProviderOptions,
+} from "./frame-provider.js";
+export {
   evmChainIdsEqual,
   formatEvmAddress,
   isEvmAddress,
