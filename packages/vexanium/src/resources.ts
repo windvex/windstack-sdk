@@ -188,8 +188,7 @@ function resourceFailure(response: ComputeTransactionResponse): ResourceFailure 
     return Object.freeze({
       resource: "cpu",
       name,
-      required:
-        firstInteger(data, ["billed"]) ?? nonNegativeInteger(response.processed.elapsed),
+      required: firstInteger(data, ["billed"]) ?? nonNegativeInteger(response.processed.elapsed),
       limit: firstInteger(data, ["limit", "billable"]),
       ramNeedsTotal: null,
     });
@@ -508,10 +507,7 @@ export function quoteVexaniumStake(
   const minimumAdditionalUnits =
     minimumTotalUnits > current.amount ? minimumTotalUnits - current.amount : 0n;
 
-  const bufferedTarget = ceilDiv(
-    targetMax * BigInt(10_000 + safetyBps),
-    10_000n,
-  );
+  const bufferedTarget = ceilDiv(targetMax * BigInt(10_000 + safetyBps), 10_000n);
   const suggestedTotalUnits = ceilDiv(current.amount * bufferedTarget, currentMax);
   const suggestedAdditionalUnits =
     suggestedTotalUnits > current.amount ? suggestedTotalUnits - current.amount : 0n;
@@ -519,17 +515,9 @@ export function quoteVexaniumStake(
   return Object.freeze({
     currentStakeVex: current.value,
     minimumTotalStakeVex: formatAsset(minimumTotalUnits, VEX_PRECISION, VEX_SYMBOL),
-    minimumAdditionalStakeVex: formatAsset(
-      minimumAdditionalUnits,
-      VEX_PRECISION,
-      VEX_SYMBOL,
-    ),
+    minimumAdditionalStakeVex: formatAsset(minimumAdditionalUnits, VEX_PRECISION, VEX_SYMBOL),
     suggestedTotalStakeVex: formatAsset(suggestedTotalUnits, VEX_PRECISION, VEX_SYMBOL),
-    suggestedAdditionalStakeVex: formatAsset(
-      suggestedAdditionalUnits,
-      VEX_PRECISION,
-      VEX_SYMBOL,
-    ),
+    suggestedAdditionalStakeVex: formatAsset(suggestedAdditionalUnits, VEX_PRECISION, VEX_SYMBOL),
     safetyBps,
   });
 }

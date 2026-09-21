@@ -1069,9 +1069,7 @@ export async function createVexaniumClient(
     const netFunding = quoteVexaniumStake(resources.net, netRequired, stakes.netStakeVex);
     const ramDeficit = assessment.requirements.ram.deficitBytes;
     const ramQuote =
-      ramDeficit !== null && ramDeficit > 0
-        ? await quoteRam(ramDeficit, args.signal)
-        : null;
+      ramDeficit !== null && ramDeficit > 0 ? await quoteRam(ramDeficit, args.signal) : null;
     const funding = Object.freeze({
       cpu: cpuFunding,
       net: netFunding,
