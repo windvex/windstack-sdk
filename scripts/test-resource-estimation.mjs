@@ -69,6 +69,7 @@ const provider = {
 };
 
 const rpcCalls = [];
+let computeFailure = false;
 const vex = await createVexaniumClient({
   provider,
   autoSync: false,
@@ -99,6 +100,25 @@ const vex = await createVexaniumClient({
     if (url.endsWith("/v1/chain/compute_transaction")) {
       assert.deepEqual(body.transaction.signatures, []);
       assert.equal(typeof body.transaction.packed_trx, "string");
+      if (computeFailure) {
+        return Response.json({
+          transaction_id: "04".repeat(32),
+          processed: {
+            receipt: null,
+            elapsed: 0,
+            net_usage: 0,
+            scheduled: false,
+            action_traces: [],
+            account_ram_delta: null,
+            except: {
+              code: 3080001,
+              name: "ram_usage_exceeded",
+              message: "account alice has insufficient ram",
+            },
+            error_code: 3080001,
+          },
+        });
+      }
       return Response.json({
         transaction_id: "03".repeat(32),
         processed: {
@@ -126,20 +146,20 @@ const vex = await createVexaniumClient({
 });
 
 const connected = await vex.connectOne();
-const estimate = await vex.estimateResources({
-  actions: [
-    {
-      account: "vex.token",
-      name: "transfer",
-      data: {
-        from: connected.actor,
-        to: "bob",
-        quantity: "1.0000 VEX",
-        memo: "",
-      },
+const resourceActions = [
+  {
+    account: "vex.token",
+    name: "transfer",
+    data: {
+      from: connected.actor,
+      to: "bob",
+      quantity: "1.0000 VEX",
+      memo: "",
     },
-  ],
-});
+  },
+];
+
+const estimate = await vex.estimateResources({ actions: resourceActions });
 
 assert.equal(estimate.valid, true);
 assert.equal("exception" in estimate, false);
@@ -150,6 +170,18 @@ assert.equal(estimate.check.sufficient, true);
 assert.equal(estimate.check.cpu.availableUs, 1900);
 assert.equal(estimate.check.ram.requiredBytes, 240);
 assert.ok(rpcCalls.some(({ url }) => url.endsWith("/v1/chain/compute_transaction")));
+
+computeFailure = true;
+await assert.rejects(
+  () => vex.estimateResources({ actions: resourceActions }),
+  (error) => {
+    assert.equal(error?.name, "VexaniumProviderError");
+    assert.match(error?.message ?? "", /account alice has insufficient ram/u);
+    assert.equal(error?.data?.response?.processed?.receipt, null);
+    assert.equal(error?.data?.exception?.name, "ram_usage_exceeded");
+    return true;
+  },
+);
 
 await vex.disconnect();
 vex.destroy();
