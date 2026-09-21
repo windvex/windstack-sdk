@@ -179,6 +179,30 @@ function normalizeOptionalHex(value: string | undefined, label: string): string 
   return value.toLowerCase();
 }
 
+function computeFailureDetail(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (value instanceof Error) return value.message.trim();
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record.details)) {
+    for (const item of record.details) {
+      if (
+        item &&
+        typeof item === "object" &&
+        typeof (item as Record<string, unknown>).message === "string"
+      ) {
+        const message = String((item as Record<string, unknown>).message).trim();
+        if (message) return message;
+      }
+    }
+  }
+
+  for (const candidate of [record.message, record.what, record.name]) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+  }
+  return "";
+}
 function assertAccountsResponse(value: unknown): asserts value is VexaniumAccountsResponse {
   if (
     typeof value !== "object" ||
@@ -939,6 +963,21 @@ export async function createVexaniumClient(
       },
       args.signal,
     );
+    const exception = response.processed.except;
+    const hasException = exception !== undefined && exception !== null;
+    const missingReceipt =
+      response.processed.receipt === undefined || response.processed.receipt === null;
+    if (hasException || missingReceipt) {
+      const detail = computeFailureDetail(exception);
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.INTERNAL_ERROR,
+        detail
+          ? `Vexanium transaction dry-run failed: ${detail}`
+          : "Vexanium transaction dry-run did not return an execution receipt",
+        { response, exception: exception ?? null },
+      );
+    }
+
     const usage = extractTransactionResourceUsage(response);
     const account = antelope.account(signer.actor);
     const resources = await account.resources(args.signal);
@@ -948,9 +987,7 @@ export async function createVexaniumClient(
       netBytes: usage.netBytes,
       ramBytes,
     });
-    const hasException =
-      response.processed.except !== undefined && response.processed.except !== null;
-    const valid = !hasException && usage.status === "executed";
+    const valid = usage.status === "executed";
 
     return Object.freeze({
       transaction: prepared.transaction,
@@ -959,7 +996,6 @@ export async function createVexaniumClient(
       resources,
       check,
       valid,
-      ...(hasException ? { exception: response.processed.except } : {}),
       response,
     });
   };
