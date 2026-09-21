@@ -4,6 +4,13 @@
 
 Release history for the WindStack package set.
 
+### 2.3.3 — 2026-09-21
+
+- Added a cross-origin EIP-1193 frame provider and wallet-host bridge for embedded DApps.
+- Added EIP-6963 announcement support for embedded providers with exact wallet-host and DApp-origin binding.
+- Added host-to-DApp EVM provider events and structured provider error propagation across the frame boundary.
+- Added regression coverage for embedded EVM discovery, requests, events, provider errors, and teardown.
+
 ### 2.3.2 — 2026-09-21
 
 - Changed Vexanium resource exhaustion into structured preflight results with CPU, NET, and RAM requirements, deficits, and certainty.
