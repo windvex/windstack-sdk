@@ -4,6 +4,11 @@
 
 Release history for the WindStack package set.
 
+### 2.3.4 — 2026-09-21
+
+- Reissued the EVM frame bridge so the public npm package exposes both `createEvmFrameHost` and `createEvmFrameProvider` together with their TypeScript declarations.
+- Strengthened the packed-release consumer audit to verify the EVM frame host/provider runtime exports and declaration exports before publication.
+
 ### 2.3.3 — 2026-09-21
 
 - Added a cross-origin EIP-1193 frame provider and wallet-host bridge for embedded DApps.
