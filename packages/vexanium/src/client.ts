@@ -904,7 +904,6 @@ export async function createVexaniumClient(
         signal,
       );
 
-
   const estimateResources = async (
     args: VexaniumEstimateResourcesArgs,
   ): Promise<VexaniumResourceEstimate> => {
@@ -958,9 +957,7 @@ export async function createVexaniumClient(
       resources,
       check,
       valid,
-      ...(response.processed.except === undefined
-        ? {}
-        : { exception: response.processed.except }),
+      ...(response.processed.except === undefined ? {} : { exception: response.processed.except }),
       response,
     });
   };
