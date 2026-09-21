@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { AbiSerializer } from "../packages/abi/dist/index.js";
 import { PrivateKey, PublicKey, sha256Digest } from "../packages/crypto/dist/index.js";
-import { decodeVexEvmContractAction } from "../packages/vexanium/dist/index.js";
+import {
+  decodeVexEvmContractAction,
+  quoteVexaniumRamFromMarket,
+} from "../packages/vexanium/dist/index.js";
 
 const RPC = "https://api.windcrypto.com";
 const CHAIN_ID = "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f";
@@ -354,6 +357,18 @@ for (const name of [
 ]) {
   assert.ok(systemTables.has(name), `vexcore is missing table ${name}`);
 }
+
+const ramMarket = await post("/v1/chain/get_table_rows", {
+  json: true,
+  code: "vexcore",
+  scope: "vexcore",
+  table: "rammarket",
+  limit: 1,
+});
+assert.ok(ramMarket.rows[0], "Vexanium RAM market is unavailable");
+const ramQuote = quoteVexaniumRamFromMarket(1024, ramMarket.rows[0]);
+assert.equal(ramQuote.bytes, 1024);
+assert.match(ramQuote.estimatedCostVex, /^\d+\.\d{4} VEX$/);
 
 console.log(
   `Vexanium read-only RPC and production ABI verified: ${token.abi.actions.length} vex.token actions, ${system.abi.actions.length} vexcore actions, ${evm.abi.actions.length} vex.evm actions`,
