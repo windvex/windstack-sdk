@@ -1,14 +1,7 @@
 import type { RequestArguments } from "@windstack/core";
-import {
-  EIP6963_ANNOUNCE_PROVIDER_EVENT,
-  EIP6963_REQUEST_PROVIDER_EVENT,
-} from "./constants.js";
+import { EIP6963_ANNOUNCE_PROVIDER_EVENT, EIP6963_REQUEST_PROVIDER_EVENT } from "./constants.js";
 import { isEIP6963ProviderInfo } from "./discovery.js";
-import type {
-  EIP1193Provider,
-  EIP6963ProviderInfo,
-  EVMProviderEventMap,
-} from "./types.js";
+import type { EIP1193Provider, EIP6963ProviderInfo, EVMProviderEventMap } from "./types.js";
 
 const FRAME_CHANNEL = "windstack:evm:frame:v1" as const;
 const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
@@ -112,9 +105,7 @@ function errorPayload(error: unknown): FrameResponseMessage["error"] {
   }
   return {
     message:
-      error instanceof Error
-        ? error.message
-        : String(error || "Wallet provider request failed."),
+      error instanceof Error ? error.message : String(error || "Wallet provider request failed."),
   };
 }
 
@@ -128,9 +119,7 @@ function providerError(error: NonNullable<FrameResponseMessage["error"]>) {
   return value;
 }
 
-export function createEvmFrameProvider(
-  options: EvmFrameProviderOptions,
-): EvmFrameProvider {
+export function createEvmFrameProvider(options: EvmFrameProviderOptions): EvmFrameProvider {
   const runtimeWindow = options.window ?? globalThis.window;
   if (!runtimeWindow) throw new Error("Frame provider requires a browser window");
   const targetWindow = options.parentWindow ?? runtimeWindow.parent;

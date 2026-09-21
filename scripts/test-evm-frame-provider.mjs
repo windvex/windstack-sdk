@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  createEvmFrameHost,
-  createEvmFrameProvider,
-} from "../packages/evm/dist/index.js";
+import { createEvmFrameHost, createEvmFrameProvider } from "../packages/evm/dist/index.js";
 
 function messageEvent(source, origin, data) {
   const event = new Event("message");
@@ -82,12 +79,8 @@ let changed = null;
 provider.on("accountsChanged", (accounts) => {
   changed = accounts;
 });
-host.emit("accountsChanged", [
-  "0x0000000000000000000000000000000000000002",
-]);
-assert.deepEqual(changed, [
-  "0x0000000000000000000000000000000000000002",
-]);
+host.emit("accountsChanged", ["0x0000000000000000000000000000000000000002"]);
+assert.deepEqual(changed, ["0x0000000000000000000000000000000000000002"]);
 
 await assert.rejects(
   () => provider.request({ method: "eth_notSupported" }),
@@ -96,10 +89,7 @@ await assert.rejects(
 
 provider.destroy();
 host.destroy();
-await assert.rejects(
-  () => provider.request({ method: "eth_chainId" }),
-  /destroyed/u,
-);
+await assert.rejects(() => provider.request({ method: "eth_chainId" }), /destroyed/u);
 assert.equal(calls.length, 3);
 
 console.log("EVM frame provider tests: PASS");
