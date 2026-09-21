@@ -203,6 +203,7 @@ function computeFailureDetail(value: unknown): string {
   }
   return "";
 }
+
 function assertAccountsResponse(value: unknown): asserts value is VexaniumAccountsResponse {
   if (
     typeof value !== "object" ||
