@@ -1,9 +1,12 @@
 import { bytesToHex } from "@windstack/abi";
 import {
   AntelopeClient,
+  checkAccountResources,
   deserializeTransaction,
+  extractTransactionResourceUsage,
   serializeTransaction,
   type AuthorizationInput,
+  type ComputeTransactionResponse,
   type Transaction,
 } from "@windstack/antelope";
 import { getRuntimeWindow, resolveDappMetadata, resolveDappRequestContext } from "@windstack/core";
@@ -48,7 +51,9 @@ import type {
   VexaniumConnectRequest,
   VexaniumConnectResponse,
   VexaniumDappSession,
+  VexaniumEstimateResourcesArgs,
   VexaniumPermissionLevel,
+  VexaniumResourceEstimate,
   VexaniumProvider,
   VexaniumProviderEventMap,
   VexaniumSessionSyncOptions,
@@ -899,6 +904,67 @@ export async function createVexaniumClient(
         signal,
       );
 
+
+  const estimateResources = async (
+    args: VexaniumEstimateResourcesArgs,
+  ): Promise<VexaniumResourceEstimate> => {
+    const signer = requireSigner(args.signer);
+    const defaultAuthorization = [signer.permissionLevel];
+    const actions = await Promise.all(
+      args.actions.map((input) => buildAction(input, defaultAuthorization, args.signal)),
+    );
+    const contextFreeActions = await Promise.all(
+      (args.contextFreeActions ?? []).map((input) => buildAction(input, [], args.signal)),
+    );
+    const prepared = await antelope.prepareTransaction({
+      actions,
+      contextFreeActions,
+      contextFreeData: args.contextFreeData,
+      transactionExtensions: args.transactionExtensions,
+      expireSeconds: args.expireSeconds,
+      signal: args.signal,
+    });
+    if (!sameVexaniumChain(prepared.chainId, signer.chainId)) {
+      throw new VexaniumProviderError(
+        VEXANIUM_ERROR_CODES.CHAIN_DISCONNECTED,
+        "Connected wallet chain does not match the configured Vexanium RPC chain",
+      );
+    }
+
+    const response = await antelope.rpc.computeTransaction<ComputeTransactionResponse>(
+      {
+        signatures: [],
+        compression: 0,
+        packed_context_free_data: bytesToHex(prepared.serializedContextFreeData),
+        packed_trx: bytesToHex(prepared.serializedTransaction),
+      },
+      args.signal,
+    );
+    const usage = extractTransactionResourceUsage(response);
+    const account = antelope.account(signer.actor);
+    const resources = await account.resources(args.signal);
+    const ramBytes = Math.max(0, usage.ramByAccount[signer.actor] ?? 0);
+    const check = checkAccountResources(resources, {
+      cpuUs: usage.cpuUs,
+      netBytes: usage.netBytes,
+      ramBytes,
+    });
+    const valid = response.processed.except === undefined && usage.status === "executed";
+
+    return Object.freeze({
+      transaction: prepared.transaction,
+      serializedTransaction: prepared.serializedTransaction,
+      usage,
+      resources,
+      check,
+      valid,
+      ...(response.processed.except === undefined
+        ? {}
+        : { exception: response.processed.except }),
+      response,
+    });
+  };
+
   const transact = async <T = Record<string, unknown>>(args: VexaniumTransactArgs) => {
     const signer = requireSigner(args.signer);
     const defaultAuthorization = [signer.permissionLevel];
@@ -1022,6 +1088,7 @@ export async function createVexaniumClient(
       return buildAction(input, [signer.permissionLevel], signal);
     },
 
+    estimateResources,
     transact,
     createSigningRequest: createClientSigningRequest,
     parseSigningRequest: parseClientSigningRequest,

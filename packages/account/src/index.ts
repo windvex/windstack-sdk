@@ -8,6 +8,13 @@ import { nameToBigInt } from "@windstack/abi";
 import { AbiCache, Contract, type ContractAction } from "@windstack/contract";
 import { PublicKey } from "@windstack/crypto";
 import type { RpcClient } from "@windstack/rpc";
+import {
+  checkAccountResources,
+  normalizeAccountResources,
+  type AccountResourceCheck,
+  type AccountResourceEstimate,
+  type AccountResources,
+} from "./resources.js";
 
 export type AccountClientOptions = {
   tokenContract?: string;
@@ -129,6 +136,17 @@ export class AccountClient {
 
   get<T = Record<string, unknown>>(signal?: AbortSignal): Promise<T> {
     return this.rpc.getAccount<T>(this.name, signal);
+  }
+
+  async resources(signal?: AbortSignal): Promise<AccountResources> {
+    return normalizeAccountResources(await this.get(signal));
+  }
+
+  async checkResources(
+    estimate: AccountResourceEstimate,
+    signal?: AbortSignal,
+  ): Promise<AccountResourceCheck> {
+    return checkAccountResources(await this.resources(signal), estimate);
   }
 
   balance(
@@ -521,3 +539,11 @@ export class AccountClient {
     );
   }
 }
+
+export { checkAccountResources, normalizeAccountResources } from "./resources.js";
+export type {
+  AccountResourceCheck,
+  AccountResourceEstimate,
+  AccountResourceLimit,
+  AccountResources,
+} from "./resources.js";

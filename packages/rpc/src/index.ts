@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: MIT
  */
 import { ResponseSizeError, readResponseText } from "@windstack/core";
+import type { ComputeTransactionResponse } from "./resources.js";
 
 export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 export type RpcClientOptions = {
@@ -185,6 +186,7 @@ function isRetriable(error: unknown): boolean {
 }
 
 const SAFE_RPC_PATHS = new Set([
+  "/v1/chain/compute_transaction",
   "/v1/chain/get_abi",
   "/v1/chain/get_account",
   "/v1/chain/get_block",
@@ -597,6 +599,24 @@ export class RpcClient {
     return response;
   }
 
+  computeTransaction<T = ComputeTransactionResponse>(
+    transaction: PackedTransaction,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.request(
+      "/v1/chain/compute_transaction",
+      {
+        transaction: {
+          compression: 0,
+          packed_context_free_data: "",
+          ...transaction,
+        },
+      },
+      signal,
+      { retry: "safe" },
+    );
+  }
+
   pushTransaction<T = Record<string, unknown>>(
     transaction: PackedTransaction,
     signal?: AbortSignal,
@@ -633,6 +653,13 @@ export class RpcClient {
     );
   }
 }
+
+export { extractTransactionResourceUsage } from "./resources.js";
+export type {
+  ComputeTransactionResponse,
+  TransactionResourceReceipt,
+  TransactionResourceUsage,
+} from "./resources.js";
 
 export {
   AntelopeTransactionHistory,

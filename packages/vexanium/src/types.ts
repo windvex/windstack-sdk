@@ -6,7 +6,11 @@
  */
 import type {
   AccountClient,
+  AccountResourceCheck,
+  AccountResources,
   Action,
+  ComputeTransactionResponse,
+  TransactionResourceUsage,
   AuthorizationInput,
   Contract,
   Transaction,
@@ -203,6 +207,19 @@ export type VexaniumTransactArgs = {
   signal?: AbortSignal;
 };
 
+export type VexaniumEstimateResourcesArgs = Omit<VexaniumTransactArgs, "broadcast">;
+
+export type VexaniumResourceEstimate = Readonly<{
+  transaction: Transaction;
+  serializedTransaction: Uint8Array;
+  usage: TransactionResourceUsage;
+  resources: AccountResources;
+  check: AccountResourceCheck;
+  valid: boolean;
+  exception?: unknown;
+  response: ComputeTransactionResponse;
+}>;
+
 export type CanonicalSigningRequestUri = `vsr:${string}`;
 /** Public Vexanium signing-request URIs always use the canonical `vsr:` scheme. */
 export type VexSigningRequestUri = CanonicalSigningRequestUri;
@@ -294,6 +311,7 @@ export type VexaniumClient = {
   contract(account: string): Contract;
   account(name?: string): AccountClient;
   action(input: VexaniumActionInput, signal?: AbortSignal): Promise<Action>;
+  estimateResources(args: VexaniumEstimateResourcesArgs): Promise<VexaniumResourceEstimate>;
   transact<T = Record<string, unknown>>(args: VexaniumTransactArgs): Promise<TransactResult<T>>;
   createSigningRequest(
     args: VexSigningRequestCreateInput,
