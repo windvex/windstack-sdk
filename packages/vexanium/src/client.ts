@@ -948,7 +948,8 @@ export async function createVexaniumClient(
       netBytes: usage.netBytes,
       ramBytes,
     });
-    const hasException = response.processed.except !== undefined && response.processed.except !== null;
+    const hasException =
+      response.processed.except !== undefined && response.processed.except !== null;
     const valid = !hasException && usage.status === "executed";
 
     return Object.freeze({
