@@ -948,7 +948,8 @@ export async function createVexaniumClient(
       netBytes: usage.netBytes,
       ramBytes,
     });
-    const valid = response.processed.except === undefined && usage.status === "executed";
+    const hasException = response.processed.except !== undefined && response.processed.except !== null;
+    const valid = !hasException && usage.status === "executed";
 
     return Object.freeze({
       transaction: prepared.transaction,
@@ -957,7 +958,7 @@ export async function createVexaniumClient(
       resources,
       check,
       valid,
-      ...(response.processed.except === undefined ? {} : { exception: response.processed.except }),
+      ...(hasException ? { exception: response.processed.except } : {}),
       response,
     });
   };
