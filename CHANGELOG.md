@@ -4,6 +4,12 @@
 
 Release history for the WindStack package set.
 
+### 2.3.1 — 2026-09-21
+
+- Fixed Vexanium resource estimation failures so dry-runs without an execution receipt surface the node exception instead of a receipt parser error.
+- Preserved failed compute responses and node exceptions in `VexaniumProviderError.data` for application diagnostics.
+- Added regression coverage for failed `compute_transaction` responses with a null receipt.
+
 ### 2.3.0 — 2026-09-21
 
 - Added Vexanium transaction resource estimation through `estimateResources()`, using Antelope `compute_transaction` to execute transactions without broadcasting state changes.
