@@ -107,6 +107,9 @@ const vex = await createVexaniumClient({
           net_usage: 168,
           scheduled: false,
           action_traces: [{ account_ram_deltas: [{ account: "alice", delta: 240 }] }],
+          account_ram_delta: null,
+          except: null,
+          error_code: null,
         },
       });
     }
@@ -139,6 +142,7 @@ const estimate = await vex.estimateResources({
 });
 
 assert.equal(estimate.valid, true);
+assert.equal("exception" in estimate, false);
 assert.equal(estimate.usage.cpuUs, 350);
 assert.equal(estimate.usage.netBytes, 168);
 assert.equal(estimate.usage.ramByAccount.alice, 240);
