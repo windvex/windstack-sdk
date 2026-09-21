@@ -1,6 +1,6 @@
 {
   "name": "@windstack/signing-request",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Vexanium Signing Request primitives for actions, multi-action transactions, identity, callbacks, resolution, and verification.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,10 +23,10 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/abi": "2.3.0",
-    "@windstack/antelope": "2.3.0",
-    "@windstack/crypto": "2.3.0",
-    "@windstack/rpc": "2.3.0",
+    "@windstack/abi": "2.3.1",
+    "@windstack/antelope": "2.3.1",
+    "@windstack/crypto": "2.3.1",
+    "@windstack/rpc": "2.3.1",
     "pako": "^2.2.0"
   },
   "devDependencies": {
