@@ -43,19 +43,14 @@ function object(value: unknown, label: string): Record<string, unknown> {
 }
 
 function integer(value: unknown, label: string): number {
-  const normalized =
-    typeof value === "string" && /^-?\d+$/.test(value) ? Number(value) : value;
+  const normalized = typeof value === "string" && /^-?\d+$/.test(value) ? Number(value) : value;
   if (!Number.isSafeInteger(normalized)) {
     throw new TypeError(`${label} must be a safe integer`);
   }
   return normalized as number;
 }
 
-function collectRamDelta(
-  value: unknown,
-  totals: Map<string, number>,
-  label: string,
-): boolean {
+function collectRamDelta(value: unknown, totals: Map<string, number>, label: string): boolean {
   const delta = object(value, label);
   if (typeof delta.account !== "string" || !delta.account) {
     throw new TypeError(`${label}.account must be a non-empty string`);
