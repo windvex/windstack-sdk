@@ -42,8 +42,7 @@ function object(value: unknown, label: string): Record<string, unknown> {
 }
 
 function nonNegativeInteger(value: unknown, label: string): number {
-  const normalized =
-    typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
+  const normalized = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
   if (!Number.isSafeInteger(normalized) || (normalized as number) < 0) {
     throw new TypeError(`${label} must be a non-negative safe integer`);
   }
