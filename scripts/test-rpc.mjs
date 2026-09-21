@@ -180,9 +180,7 @@ const computeRpc = new RpcClient({
         action_traces: [
           {
             account_ram_deltas: [{ account: "alice", delta: 240 }],
-            inline_traces: [
-              { account_ram_deltas: [{ account: "contract", delta: -16 }] },
-            ],
+            inline_traces: [{ account_ram_deltas: [{ account: "contract", delta: -16 }] }],
           },
         ],
       },
