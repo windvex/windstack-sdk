@@ -1,6 +1,6 @@
 # WindStack SDK
 
-[![Build](https://github.com/windvex/windstack-sdk/actions/workflows/validate.yml/badge.svg)](https://github.com/windvex/windstack-sdk/actions/workflows/validate.yml)
+[![npm](https://img.shields.io/npm/v/@windstack/vexanium?label=npm)](https://www.npmjs.com/package/@windstack/vexanium) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Node.js](https://img.shields.io/badge/node-%3E%3D20.19.0-brightgreen.svg)](package.json)
 
 ## Overview
 
