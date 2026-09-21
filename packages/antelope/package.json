@@ -1,6 +1,6 @@
 {
   "name": "@windstack/antelope",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "Antelope transaction, TAPOS, signing, keosd, contract, account, and verified RPC toolkit.",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,12 +27,12 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/account": "2.3.3",
-    "@windstack/abi": "2.3.3",
-    "@windstack/contract": "2.3.3",
-    "@windstack/core": "2.3.3",
-    "@windstack/crypto": "2.3.3",
-    "@windstack/rpc": "2.3.3"
+    "@windstack/account": "2.3.4",
+    "@windstack/abi": "2.3.4",
+    "@windstack/contract": "2.3.4",
+    "@windstack/core": "2.3.4",
+    "@windstack/crypto": "2.3.4",
+    "@windstack/rpc": "2.3.4"
   },
   "sideEffects": false,
   "keywords": [

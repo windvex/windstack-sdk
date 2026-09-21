@@ -1,6 +1,6 @@
 {
   "name": "@windstack/account",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "Typed Antelope account access for balances, CPU/NET/RAM resources, staking, governance, and permission operations.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,9 +23,9 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/contract": "2.3.3",
-    "@windstack/crypto": "2.3.3",
-    "@windstack/rpc": "2.3.3"
+    "@windstack/contract": "2.3.4",
+    "@windstack/crypto": "2.3.4",
+    "@windstack/rpc": "2.3.4"
   },
   "sideEffects": false,
   "keywords": [
