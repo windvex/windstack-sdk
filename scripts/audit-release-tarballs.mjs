@@ -193,6 +193,16 @@ assert.equal(typeof rpc.HyperionClient, "function");
 const evm = await import("@windstack/evm");
 assert.equal(typeof evm.normalizeEvmAddress, "function");
 assert.equal(typeof evm.EvmRpcClient, "function");
+assert.equal(typeof evm.createEvmFrameHost, "function");
+assert.equal(typeof evm.createEvmFrameProvider, "function");
+const evmDeclarations = await readFile(
+  new URL("./node_modules/@windstack/evm/dist/index.d.ts", import.meta.url),
+  "utf8",
+);
+assert.match(evmDeclarations, /createEvmFrameHost/u);
+assert.match(evmDeclarations, /createEvmFrameProvider/u);
+assert.match(evmDeclarations, /EvmFrameHost/u);
+assert.match(evmDeclarations, /EvmFrameProvider/u);
 
 const signingRequest = await import("@windstack/signing-request");
 assert.equal(typeof signingRequest.SigningRequest, "function");
