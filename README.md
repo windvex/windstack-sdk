@@ -1,5 +1,9 @@
 # WindStack SDK
 
+<p align="center">
+  <img src="docs/assets/windstack-sdk.png" width="128" height="128" alt="WindStack SDK icon">
+</p>
+
 [![npm](https://img.shields.io/npm/v/@windstack/vexanium?label=npm)](https://www.npmjs.com/package/@windstack/vexanium) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Node.js](https://img.shields.io/badge/node-%3E%3D20.19.0-brightgreen.svg)](package.json)
 
 ## Overview
