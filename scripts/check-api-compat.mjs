@@ -128,7 +128,9 @@ function snapshotSymbol(checker, symbol) {
       .sort();
     constructSignatures = checker
       .getSignaturesOfType(type, ts.SignatureKind.Construct)
-      .map((signature) => normalizeText(checker.signatureToString(signature, location, formatFlags)))
+      .map((signature) =>
+        normalizeText(checker.signatureToString(signature, location, formatFlags)),
+      )
       .sort();
   }
 
