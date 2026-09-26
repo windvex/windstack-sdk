@@ -120,7 +120,7 @@ function appendMetadata(url: URL, metadata: WispLaunchMetadata): void {
   if (expiresAt) url.searchParams.set("expiresAt", String(expiresAt));
 }
 
-function createLaunchUrl(value = WISP_LAUNCH_DEFAULT_URL): URL {
+function createLaunchUrl(value: string = WISP_LAUNCH_DEFAULT_URL): URL {
   return new URL(normalizeWispHttpsUrl(value, "Wisp launch URL"));
 }
 
