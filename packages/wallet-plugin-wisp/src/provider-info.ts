@@ -40,8 +40,7 @@ export function createWispVexaniumProviderInfo(
     version: options.version ?? VEXANIUM_PROVIDER_VERSION,
     chains: options.chains ?? [VEXANIUM_MAINNET_CHAIN_ID],
     capabilities:
-      options.capabilities ??
-      (Object.values(VEXANIUM_CAPABILITIES) as VexaniumCapability[]),
+      options.capabilities ?? (Object.values(VEXANIUM_CAPABILITIES) as VexaniumCapability[]),
   });
 }
 
