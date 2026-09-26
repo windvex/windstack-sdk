@@ -58,7 +58,7 @@ export function requestVexaniumProviders(): void {
  */
 export function announceVexaniumProvider(
   provider: VexaniumProvider,
-  runtimeWindow: Window | null = getRuntimeWindow(),
+  runtimeWindow: Window | null | undefined = getRuntimeWindow(),
 ): void {
   if (!runtimeWindow || !isVexaniumProvider(provider)) return;
   const detail = providerDetail(provider);
