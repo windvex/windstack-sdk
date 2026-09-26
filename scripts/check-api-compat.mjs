@@ -136,7 +136,9 @@ async function collectDeclarationClosure(entryPath, packageRoot) {
     for (const specifier of specifiers) {
       const dependency = await readableFile(declarationCandidates(filePath, specifier));
       if (!dependency) {
-        throw new Error(`Unable to resolve public declaration dependency ${specifier} from ${filePath}`);
+        throw new Error(
+          `Unable to resolve public declaration dependency ${specifier} from ${filePath}`,
+        );
       }
       queue.push(dependency);
     }
@@ -308,6 +310,7 @@ try {
 
   console.log(
     `API compatibility: ${additions.length} additive changes, ${changes.length} reviewed changes, ${unapproved.length} unapproved.`,
+
   );
   for (const change of unapproved) {
     console.error(
