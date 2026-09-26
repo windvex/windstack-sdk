@@ -1,6 +1,6 @@
 {
   "name": "@windstack/wallet-plugin-wisp",
-  "version": "2.3.4",
+  "version": "2.4.0",
   "description": "WindStack integration primitives for Wisp Wallet sessions, providers, embedded apps, and Telegram transport.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,11 +23,11 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/antelope": "2.3.4",
-    "@windstack/core": "2.3.4",
-    "@windstack/evm": "2.3.4",
-    "@windstack/session": "2.3.4",
-    "@windstack/vexanium": "2.3.4"
+    "@windstack/antelope": "2.4.0",
+    "@windstack/core": "2.4.0",
+    "@windstack/evm": "2.4.0",
+    "@windstack/session": "2.4.0",
+    "@windstack/vexanium": "2.4.0"
   },
   "sideEffects": false,
   "keywords": [
