@@ -1,6 +1,6 @@
 {
   "name": "@windstack/rpc",
-  "version": "2.3.4",
+  "version": "2.4.0",
   "description": "Typed Antelope RPC with endpoint verification, transaction resource estimation, finality, history, and safe transaction submission.",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@windstack/core": "2.3.4"
+    "@windstack/core": "2.4.0"
   },
   "sideEffects": false,
   "keywords": [
