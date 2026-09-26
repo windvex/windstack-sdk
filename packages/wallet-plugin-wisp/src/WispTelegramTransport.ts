@@ -453,9 +453,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
 
       try {
         source = eventSourceFactory(
-          apiEndpoint(
-            `${WISP_TELEGRAM_HANDOFF_EVENTS_PATH}?id=${encodeURIComponent(prepared.id)}`,
-          ),
+          apiEndpoint(`${WISP_TELEGRAM_HANDOFF_EVENTS_PATH}?id=${encodeURIComponent(prepared.id)}`),
         );
         source.onmessage = (event) => {
           try {
