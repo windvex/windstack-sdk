@@ -29,7 +29,9 @@ function run(command, args) {
 }
 
 const branch = git(["branch", "--show-current"]);
-if (branch !== "main") throw new Error(`Candidate creation requires main, not ${branch || "detached"}`);
+if (branch !== "main") {
+  throw new Error(`Candidate creation requires main, not ${branch || "detached"}`);
+}
 if (git(["status", "--porcelain"])) {
   throw new Error("Candidate creation requires a clean working tree");
 }
