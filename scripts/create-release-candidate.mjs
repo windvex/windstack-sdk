@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: MIT
  */
 import { spawnSync } from "node:child_process";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   currentCandidatePointer,
@@ -64,49 +64,58 @@ try {
   if (error?.code !== "ENOENT") throw error;
 }
 
-await mkdir(candidateDirectory, { recursive: true });
+await mkdir(path.dirname(candidateDirectory), { recursive: true });
+const stagingDirectory = await mkdtemp(path.join(releaseRoot, "candidate-staging-"));
 
-const packages = [];
-for (const { manifest } of entries) {
-  run("npm", [
-    "pack",
-    "--workspace",
-    manifest.name,
-    "--pack-destination",
-    candidateDirectory,
-  ]);
-  const filename = tarballFilename(manifest.name, manifest.version);
-  const filePath = path.join(candidateDirectory, filename);
-  await access(filePath);
-  packages.push({
-    name: manifest.name,
-    version: manifest.version,
-    filename,
-    sha256: await sha256File(filePath),
-  });
+try {
+  const packages = [];
+  for (const { manifest } of entries) {
+    run("npm", [
+      "pack",
+      "--workspace",
+      manifest.name,
+      "--pack-destination",
+      stagingDirectory,
+    ]);
+    const filename = tarballFilename(manifest.name, manifest.version);
+    const filePath = path.join(stagingDirectory, filename);
+    await access(filePath);
+    packages.push({
+      name: manifest.name,
+      version: manifest.version,
+      filename,
+      sha256: await sha256File(filePath),
+    });
+  }
+
+  const manifest = {
+    schemaVersion: 1,
+    version: rootManifest.version,
+    gitSha: head,
+    apiBaseline: apiReport.baseline,
+    apiReportSha256: await sha256File(apiReportPath),
+    packages,
+  };
+  await writeFile(
+    path.join(stagingDirectory, "manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
+  await rename(stagingDirectory, candidateDirectory);
+  await writeFile(
+    currentCandidatePointer,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        manifest: path.relative(releaseRoot, manifestPath).replaceAll(path.sep, "/"),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  console.log(`Immutable WindStack candidate created: ${candidateId}`);
+  for (const entry of packages) console.log(`- ${entry.filename}  ${entry.sha256}`);
+} catch (error) {
+  await rm(stagingDirectory, { recursive: true, force: true });
+  throw error;
 }
-
-const manifest = {
-  schemaVersion: 1,
-  version: rootManifest.version,
-  gitSha: head,
-  apiBaseline: apiReport.baseline,
-  apiReportSha256: await sha256File(apiReportPath),
-  packages,
-};
-await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-await mkdir(releaseRoot, { recursive: true });
-await writeFile(
-  currentCandidatePointer,
-  `${JSON.stringify(
-    {
-      schemaVersion: 1,
-      manifest: path.relative(releaseRoot, manifestPath).replaceAll(path.sep, "/"),
-    },
-    null,
-    2,
-  )}\n`,
-);
-
-console.log(`Immutable WindStack candidate created: ${candidateId}`);
-for (const entry of packages) console.log(`- ${entry.filename}  ${entry.sha256}`);
