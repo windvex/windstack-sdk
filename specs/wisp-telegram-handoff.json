@@ -26,13 +26,7 @@
     "terminal": ["approved", "rejected", "failed"]
   },
   "result": {
-    "sessionFields": [
-      "sessionId",
-      "actor",
-      "permission",
-      "chainId",
-      "sessionExpiresAt"
-    ],
+    "sessionFields": ["sessionId", "actor", "permission", "chainId", "sessionExpiresAt"],
     "transactionId": "required-for-approved-sign",
     "sessionInvalidated": "allowed-only-on-failed-existing-session"
   },
