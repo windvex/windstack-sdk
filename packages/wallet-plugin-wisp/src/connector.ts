@@ -123,7 +123,9 @@ function isTelegramTransport(
 }
 
 function connectorError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error || "Wisp connector request failed"));
+  return error instanceof Error
+    ? error
+    : new Error(String(error || "Wisp connector request failed"));
 }
 
 function providerAccount(session: Session): VexaniumAccount {
@@ -145,8 +147,7 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
 
   const metadata = resolveDappMetadata(options.dapp);
   const listeners = new Set<() => void>();
-  const storage =
-    options.sessionStorage ?? runtimeSessionStorage() ?? new MemorySessionStorage();
+  const storage = options.sessionStorage ?? runtimeSessionStorage() ?? new MemorySessionStorage();
 
   let snapshot: WispConnectorSnapshot = Object.freeze({
     status: "idle",
@@ -172,7 +173,9 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
     }
   };
 
-  const begin = (status: Extract<WispConnectorStatus, "connecting" | "restoring" | "disconnecting">) => {
+  const begin = (
+    status: Extract<WispConnectorStatus, "connecting" | "restoring" | "disconnecting">,
+  ) => {
     if (destroyed) throw new Error("Wisp connector has been destroyed");
     if (
       snapshot.status === "connecting" ||
@@ -357,7 +360,8 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
   return Object.freeze({
     getSnapshot: () => snapshot,
     subscribe(listener: () => void) {
-      if (typeof listener !== "function") throw new TypeError("Wisp connector listener is required");
+      if (typeof listener !== "function")
+        throw new TypeError("Wisp connector listener is required");
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
