@@ -88,3 +88,13 @@ export type {
   WispTelegramHandoffStatusValue,
   WispTelegramPreparedHandoff,
 } from "./telegram-protocol.js";
+export { createWispConnector } from "./connector.js";
+export type {
+  WispConnector,
+  WispConnectorConnectOptions,
+  WispConnectorOptions,
+  WispConnectorRoute,
+  WispConnectorSnapshot,
+  WispConnectorStatus,
+  WispConnectorTransport,
+} from "./connector.js";
