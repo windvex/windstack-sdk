@@ -61,12 +61,8 @@ const frameRequest = {
   args: { method: "vex_getChain" },
 };
 
-parentRuntime.dispatchEvent(
-  messageEvent({ postMessage() {} }, childOrigin, frameRequest),
-);
-parentRuntime.dispatchEvent(
-  messageEvent(childProxy, "https://attacker.example", frameRequest),
-);
+parentRuntime.dispatchEvent(messageEvent({ postMessage() {} }, childOrigin, frameRequest));
+parentRuntime.dispatchEvent(messageEvent(childProxy, "https://attacker.example", frameRequest));
 parentRuntime.dispatchEvent(
   messageEvent(childProxy, childOrigin, {
     channel: "unknown:channel",
