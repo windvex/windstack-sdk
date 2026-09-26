@@ -1,4 +1,47 @@
 {
   "schemaVersion": 1,
-  "approvals": []
+  "approvals": [
+    {
+      "kind": "declaration-changed",
+      "package": "@windstack/signing-request",
+      "entry": ".",
+      "file": "dist/index.d.ts",
+      "reason": "Adds public generic Antelope scheme constants while preserving all existing exports."
+    },
+    {
+      "kind": "declaration-changed",
+      "package": "@windstack/signing-request",
+      "entry": ".",
+      "file": "dist/types.d.ts",
+      "reason": "Widens SigningRequestScheme from vsr-only to esr-or-vsr; existing vsr consumers remain valid."
+    },
+    {
+      "kind": "declaration-changed",
+      "package": "@windstack/vexanium",
+      "entry": ".",
+      "file": "dist/discovery.d.ts",
+      "reason": "Adds an optional runtimeWindow argument to wallet-author announcement; existing one-argument calls remain valid."
+    },
+    {
+      "kind": "declaration-changed",
+      "package": "@windstack/vexanium",
+      "entry": ".",
+      "file": "dist/index.d.ts",
+      "reason": "Adds provider-author event helpers and aliases while preserving all existing Vexanium exports."
+    },
+    {
+      "kind": "declaration-changed",
+      "package": "@windstack/vexanium",
+      "entry": ".",
+      "file": "dist/standard.d.ts",
+      "reason": "Adds chainChanged and disconnect event validators without changing existing validator signatures."
+    },
+    {
+      "kind": "declaration-changed",
+      "package": "@windstack/vexanium",
+      "entry": ".",
+      "file": "dist/types.d.ts",
+      "reason": "Names existing event payload shapes with aliases while keeping their structural types unchanged."
+    }
+  ]
 }
