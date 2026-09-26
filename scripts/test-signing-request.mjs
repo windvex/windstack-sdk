@@ -184,7 +184,10 @@ assert.equal(inspectedActions[1].account, "other.token");
 assert.equal(inspectedActions[1].data.quantity, "3.00000000 ALT");
 assert.equal(inspectedActions[2].account, "sample.token");
 assert.equal(inspectedActions[2].data.quantity, "4.0000 TST");
-assert.equal(multiAbiCalls.get("sample.token") - (callsBeforeInspection.get("sample.token") ?? 0), 1);
+assert.equal(
+  multiAbiCalls.get("sample.token") - (callsBeforeInspection.get("sample.token") ?? 0),
+  1,
+);
 assert.equal(multiAbiCalls.get("other.token") - (callsBeforeInspection.get("other.token") ?? 0), 1);
 const multiResolved = await resolveSigningRequest(multiParsed, {
   actor: "windstack",
