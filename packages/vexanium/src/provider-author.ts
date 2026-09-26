@@ -5,10 +5,7 @@
  * SPDX-License-Identifier: MIT
  */
 import { normalizeVexaniumAccounts } from "./accounts.js";
-import {
-  VEXANIUM_PROVIDER_STANDARD,
-  VEXANIUM_PROVIDER_VERSION,
-} from "./constants.js";
+import { VEXANIUM_PROVIDER_STANDARD, VEXANIUM_PROVIDER_VERSION } from "./constants.js";
 import {
   assertVexaniumAccountsResponse,
   assertVexaniumCapabilitiesResponse,
