@@ -99,13 +99,26 @@ const dirtyFiles = git(["status", "--porcelain"])
   .filter(Boolean)
   .map((line) => line.slice(3));
 const configuredBaseline = process.env.RELEASE_BASE_REF?.trim();
-const latestReleaseTag = git(["describe", "--tags", "--match", "v[0-9]*", "--abbrev=0"], true);
-const baseline =
-  configuredBaseline && !/^0+$/.test(configuredBaseline)
-    ? configuredBaseline
-    : dirtyFiles.length
-      ? "HEAD"
-      : latestReleaseTag || "HEAD^";
+
+function resolveReleaseBaseline() {
+  if (configuredBaseline && !/^0+$/u.test(configuredBaseline)) return configuredBaseline;
+
+  const tags = git(["tag", "--list", "v[0-9]*", "--sort=-version:refname"], true)
+    .split("\n")
+    .filter(Boolean);
+  for (const tag of tags) {
+    const manifestText = git(["show", `${tag}:package.json`], true);
+    if (!manifestText) continue;
+    try {
+      if (JSON.parse(manifestText).version !== rootPackage.version) return tag;
+    } catch {
+      // Ignore malformed historical tags.
+    }
+  }
+  return "HEAD^";
+}
+
+const baseline = resolveReleaseBaseline();
 const changedFiles = dirtyFiles.length
   ? dirtyFiles
   : git(["diff", "--name-only", baseline, "HEAD"], true).split("\n").filter(Boolean);
