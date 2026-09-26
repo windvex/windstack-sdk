@@ -93,7 +93,7 @@ function git(args, allowFailure = false) {
 }
 
 const releaseRelevant =
-  /^(?:packages\/[^/]+\/(?:src\/|package\.json|README\.md|tsconfig\.json)|package(?:-lock)?\.json|README\.md|CHANGELOG\.md|docs\/|specs\/|test\/fixtures\/|tsconfig(?:\.base)?\.json|scripts\/(?:check-release|publish-release|audit-release-tarballs|verify-vexanium)\.mjs|\.github\/workflows\/)/;
+  /^(?:packages\/[^/]+\/(?:src\/|package\.json|README\.md|tsconfig\.json)|package(?:-lock)?\.json|README\.md|CHANGELOG\.md|docs\/|specs\/|test\/fixtures\/|tsconfig(?:\.base)?\.json|scripts\/(?:check-release|check-api-compat|create-release-candidate|verify-release-candidate|release-artifacts|publish-release|audit-release-tarballs|verify-vexanium)\.mjs|\.github\/workflows\/)/;
 const dirtyFiles = git(["status", "--porcelain"])
   .split("\n")
   .filter(Boolean)
