@@ -50,6 +50,79 @@ const vex = await createVexaniumClient({
 
 The configured RPC is shared by account access, contract ABI loading, transaction preparation, VSR creation, and broadcasting.
 
+## Third-party wallet provider
+
+Wallet developers can implement the Vexanium provider contract using only public `@windstack/vexanium` APIs. Wisp source code is not required.
+
+```ts
+import {
+  VEXANIUM_CAPABILITIES,
+  VEXANIUM_MAINNET_CHAIN_ID,
+  VEXANIUM_METHODS,
+  createVexaniumAccountsChangedEvent,
+  createVexaniumCapabilitiesResponse,
+  createVexaniumConnectResponse,
+  createVexaniumDisconnectEvent,
+  createVexaniumProviderInfo,
+  type VexaniumProvider,
+} from "@windstack/vexanium";
+
+const capabilities = Object.values(VEXANIUM_CAPABILITIES);
+const sessionId = "wallet-issued-session-id";
+
+const provider: VexaniumProvider = {
+  providerInfo: createVexaniumProviderInfo({
+    uuid: crypto.randomUUID(),
+    name: "Example Wallet",
+    rdns: "org.example.wallet",
+    chains: [VEXANIUM_MAINNET_CHAIN_ID],
+    capabilities,
+  }),
+
+  async request({ method }) {
+    if (method === VEXANIUM_METHODS.GET_CAPABILITIES) {
+      return createVexaniumCapabilitiesResponse({
+        capabilities,
+        chains: [VEXANIUM_MAINNET_CHAIN_ID],
+        methods: Object.values(VEXANIUM_METHODS),
+      });
+    }
+
+    if (method === VEXANIUM_METHODS.REQUEST_ACCOUNTS) {
+      return createVexaniumConnectResponse({
+        sessionId,
+        chainId: VEXANIUM_MAINNET_CHAIN_ID,
+        accounts: ["alice@active"],
+        capabilities,
+      });
+    }
+
+    if (method === VEXANIUM_METHODS.DISCONNECT) {
+      return null;
+    }
+
+    throw new Error(`Unsupported provider method: ${method}`);
+  },
+};
+```
+
+Wallet runtimes should emit account changes with `createVexaniumAccountsChangedEvent()`, chain changes with `createVexaniumChainChangedEvent()`, and disconnect payloads with `createVexaniumDisconnectEvent()`. Session IDs are opaque wallet-issued identifiers; restoring a session validates an existing wallet session and must not silently create a new authorization.
+
+Example event payloads:
+
+```ts
+const accountsChanged = createVexaniumAccountsChangedEvent({
+  sessionId,
+  chainId: VEXANIUM_MAINNET_CHAIN_ID,
+  accounts: ["alice@active"],
+});
+
+const disconnected = createVexaniumDisconnectEvent({
+  code: 4900,
+  message: "Wallet disconnected",
+});
+```
+
 ## Transactions
 
 Structured action data is ABI-encoded automatically. When `authorization` is omitted, transaction actions use the connected wallet permission.

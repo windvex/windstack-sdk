@@ -25,10 +25,11 @@
     "test:signing-request": "node scripts/test-signing-request.mjs",
     "test:vexanium-abi": "node scripts/test-vexanium-abi.mjs",
     "verify:vexanium": "node scripts/verify-vexanium-live.mjs",
-    "validate:native": "npm run clean && npm run format:check && npm run check:release && npm run check:public-content && npm run build:native && npm run test:native && npm run pack:native",
-    "validate": "npm run clean && npm run format:check && npm run lint && npm run check:release && npm run check:public-content && npm run build && npm run typecheck && npm test && npm run pack:dry-run",
+    "validate:native": "npm run clean && npm run format:check && npm run check:boundaries && npm run check:release && npm run check:public-content && npm run build:native && npm run test:native && npm run pack:native",
+    "validate": "npm run clean && npm run format:check && npm run lint && npm run check:boundaries && npm run check:release && npm run check:public-content && npm run build && npm run typecheck && npm test && npm run pack:dry-run",
     "release:dry-run": "npm run validate && npm run audit:release && npm run verify:vexanium && npm audit && npm run audit:native",
-    "release:npm": "node scripts/publish-release.mjs"
+    "release:npm": "node scripts/publish-release.mjs",
+    "check:boundaries": "node scripts/check-package-boundaries.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
