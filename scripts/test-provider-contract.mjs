@@ -14,6 +14,7 @@ import {
   createSigningRequest,
   createVexaniumClient,
   isVexaniumProvider,
+  restoreVexaniumSession,
 } from "../packages/vexanium/dist/index.js";
 
 const capabilities = Object.values(VEXANIUM_CAPABILITIES);
@@ -76,7 +77,7 @@ const rpcFetch = async (input, init) => {
     return Response.json({ id: blockId, block_num: 99, timestamp: "2026-09-10T11:59:00.000" });
   }
   if (url.endsWith("/get_abi")) {
-    assert.ok(body.account_name === "vex.token" || body.account_name === "token.wind");
+    assert.equal(body.account_name, "vex.token");
     return Response.json({ account_name: body.account_name, abi: transferAbi });
   }
   if (url.endsWith("/push_transaction")) {
@@ -88,7 +89,13 @@ const rpcFetch = async (input, init) => {
 
 function makeProvider(overrides = {}) {
   const calls = [];
+  const listeners = new Map();
   let connected = false;
+
+  const emit = (event, payload) => {
+    for (const listener of listeners.get(event) ?? []) listener(payload);
+  };
+
   const provider = {
     providerInfo: {
       uuid: "com.test.wallet",
@@ -123,6 +130,23 @@ function makeProvider(overrides = {}) {
             accounts: [account],
             capabilities,
           };
+        case VEXANIUM_METHODS.RESTORE_SESSION:
+          if (overrides.restoreError) throw overrides.restoreError;
+          if (params?.sessionId !== "wallet-session-v1") {
+            throw new VexaniumProviderError(
+              VEXANIUM_ERROR_CODES.UNAUTHORIZED,
+              "Unknown wallet session",
+            );
+          }
+          connected = true;
+          return {
+            standard: VEXANIUM_PROVIDER_STANDARD,
+            version: VEXANIUM_PROVIDER_VERSION,
+            sessionId: "wallet-session-v1",
+            chainId: VEXANIUM_MAINNET_CHAIN_ID,
+            accounts: [account],
+            capabilities,
+          };
         case VEXANIUM_METHODS.GET_ACCOUNTS:
           return {
             sessionId: "wallet-session-v1",
@@ -135,6 +159,10 @@ function makeProvider(overrides = {}) {
           return { signatures: [signature] };
         case VEXANIUM_METHODS.SIGNING_REQUEST:
           return { signatures: [signature], broadcast: false };
+        case VEXANIUM_METHODS.SIGN_MESSAGE:
+          return { signature };
+        case VEXANIUM_METHODS.SIGN_DIGEST:
+          return { signature };
         case VEXANIUM_METHODS.DISCONNECT:
           connected = false;
           return null;
@@ -145,8 +173,16 @@ function makeProvider(overrides = {}) {
           );
       }
     },
+    on(event, handler) {
+      const current = listeners.get(event) ?? new Set();
+      current.add(handler);
+      listeners.set(event, current);
+    },
+    off(event, handler) {
+      listeners.get(event)?.delete(handler);
+    },
   };
-  return { provider, calls };
+  return { provider, calls, emit };
 }
 
 assert.equal(isVexaniumProvider({ request: async () => null }), false);
@@ -245,19 +281,19 @@ const highLevelResult = await client.transact({
       name: "transfer",
       data: {
         from: "windstack",
-        to: "swapv2.wind",
+        to: "receiver",
         quantity: "2.0000 VEX",
-        memo: "liquidity",
+        memo: "first transfer",
       },
     },
     {
-      account: "token.wind",
+      account: "vex.token",
       name: "transfer",
       data: {
         from: "windstack",
-        to: "swapv2.wind",
-        quantity: "3.00000000 WIND",
-        memo: "liquidity",
+        to: "treasury",
+        quantity: "3.0000 VEX",
+        memo: "second transfer",
       },
     },
   ],
@@ -265,7 +301,7 @@ const highLevelResult = await client.transact({
 });
 assert.equal(highLevelResult.transaction.actions.length, 2);
 assert.equal(highLevelResult.transaction.actions[0].account, "vex.token");
-assert.equal(highLevelResult.transaction.actions[1].account, "token.wind");
+assert.equal(highLevelResult.transaction.actions[1].account, "vex.token");
 assert.equal(highLevelResult.transaction.actions[0].authorization[0].actor, "windstack");
 assert.equal(rpcPushes, 0);
 const highLevelSignCall = calls
@@ -278,6 +314,105 @@ await client.signSigningRequest({ request: portableRequest, broadcast: false });
 const requestCall = calls.find((call) => call.method === VEXANIUM_METHODS.SIGNING_REQUEST);
 assert.equal(requestCall.params.request, portableRequest);
 assert.match(requestCall.params.request, /^vsr:\/\//);
+
+await client.signMessage("hello", "windstack");
+const messageCall = calls.find((call) => call.method === VEXANIUM_METHODS.SIGN_MESSAGE);
+assert.equal(messageCall.params.sessionId, "wallet-session-v1");
+assert.equal(messageCall.params.message, "hello");
+
+await client.signDigest("11".repeat(32), "windstack");
+const digestCall = calls.find((call) => call.method === VEXANIUM_METHODS.SIGN_DIGEST);
+assert.equal(digestCall.params.sessionId, "wallet-session-v1");
+assert.equal(digestCall.params.digest, "11".repeat(32));
+
+const { provider: restoreProvider, calls: restoreCalls } = makeProvider();
+const restoreClient = await createVexaniumClient({
+  provider: restoreProvider,
+  autoSync: false,
+});
+const restored = await restoreVexaniumSession(restoreClient, {
+  sessionId: "wallet-session-v1",
+});
+assert.equal(restored.sessionId, "wallet-session-v1");
+assert.equal(restoreClient.getSession().walletSessionId, "wallet-session-v1");
+assert.equal(
+  restoreCalls.some((call) => call.method === VEXANIUM_METHODS.REQUEST_ACCOUNTS),
+  false,
+);
+
+const staleError = new VexaniumProviderError(
+  VEXANIUM_ERROR_CODES.UNAUTHORIZED,
+  "Wallet session expired",
+);
+const { provider: staleProvider, calls: staleCalls } = makeProvider({
+  restoreError: staleError,
+});
+const staleClient = await createVexaniumClient({
+  provider: staleProvider,
+  autoSync: false,
+});
+await assert.rejects(
+  () => restoreVexaniumSession(staleClient, { sessionId: "wallet-session-v1" }),
+  (error) =>
+    error instanceof VexaniumProviderError && error.code === VEXANIUM_ERROR_CODES.UNAUTHORIZED,
+);
+assert.equal(
+  staleCalls.some((call) => call.method === VEXANIUM_METHODS.REQUEST_ACCOUNTS),
+  false,
+);
+
+const { provider: eventProvider, emit } = makeProvider();
+const eventClient = await createVexaniumClient({
+  provider: eventProvider,
+  autoSync: {
+    providerEvents: true,
+    windowFocus: false,
+    visibilityChange: false,
+  },
+});
+await eventClient.connect();
+
+let accountsChangedCount = 0;
+let chainChangedCount = 0;
+let disconnectCount = 0;
+eventClient.on("accountsChanged", () => {
+  accountsChangedCount += 1;
+});
+eventClient.on("chainChanged", () => {
+  chainChangedCount += 1;
+});
+eventClient.on("disconnect", () => {
+  disconnectCount += 1;
+});
+
+const secondAccount = {
+  actor: "windstack2",
+  permission: "active",
+  permissionLevel: "windstack2@active",
+  chainId: VEXANIUM_MAINNET_CHAIN_ID,
+};
+emit("accountsChanged", {
+  sessionId: "wallet-session-v1",
+  chainId: VEXANIUM_MAINNET_CHAIN_ID,
+  accounts: [secondAccount],
+});
+assert.equal(accountsChangedCount, 1);
+assert.equal(eventClient.getSession().accounts[0].permissionLevel, "windstack2@active");
+
+emit("chainChanged", "11".repeat(32));
+assert.equal(chainChangedCount, 1);
+assert.equal(eventClient.getSession(), null);
+
+await eventClient.connect();
+emit("disconnect", { code: 4900, message: "Wallet disconnected" });
+assert.equal(disconnectCount, 1);
+assert.equal(eventClient.getSession(), null);
+eventClient.destroy();
+
+await client.disconnect();
+assert.equal(client.getSession(), null);
+const disconnectCall = calls.find((call) => call.method === VEXANIUM_METHODS.DISCONNECT);
+assert.equal(disconnectCall.params.sessionId, "wallet-session-v1");
 
 const { provider: incompatibleProvider } = makeProvider({
   providerInfo: { version: "2.0.0" },
