@@ -21,13 +21,8 @@
     "internalError": -32603
   },
   "errorPayload": {
-    "required": [
-      "code",
-      "message"
-    ],
-    "optional": [
-      "data"
-    ],
+    "required": ["code", "message"],
+    "optional": ["data"],
     "code": "integer",
     "message": "non-empty-string"
   },
