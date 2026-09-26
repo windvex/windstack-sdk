@@ -77,6 +77,12 @@ parentRuntime.dispatchEvent(
 );
 assert.equal(requestCount, 0);
 
+let announcements = 0;
+childRuntime.addEventListener("vexanium:announceProvider", (event) => {
+  announcements += 1;
+  assert.equal(event.detail.info.rdns, "org.example.framewallet");
+});
+
 const provider = createVexaniumFrameProvider({
   parentOrigin,
   parentWindow: parentProxy,
@@ -91,6 +97,9 @@ const provider = createVexaniumFrameProvider({
   }),
 });
 
+assert.equal(announcements, 1);
+childRuntime.dispatchEvent(new Event("vexanium:requestProvider"));
+assert.equal(announcements, 2);
 assert.equal(await provider.request({ method: "vex_getChain" }), VEXANIUM_MAINNET_CHAIN_ID);
 assert.equal(requestCount, 1);
 
