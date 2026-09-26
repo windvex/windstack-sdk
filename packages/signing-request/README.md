@@ -12,7 +12,9 @@ The generic package defaults to the standard `esr:` URI scheme. It can also pars
 npm install @windstack/signing-request @windstack/rpc
 ```
 
-## Generic Antelope usage
+## Usage
+
+### Generic Antelope
 
 ```ts
 import { RpcSigningRequestAbiProvider, createSigningRequest } from "@windstack/signing-request";
