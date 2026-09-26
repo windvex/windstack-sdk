@@ -10,12 +10,7 @@ export const WISP_TELEGRAM_HANDOFF_PREPARE_PATH = "telegram/dapp/prepare" as con
 export const WISP_TELEGRAM_HANDOFF_EVENTS_PATH = "telegram/dapp/events" as const;
 export const WISP_TELEGRAM_HANDOFF_EVENT_RETRY_MS = 1_500 as const;
 
-export const WISP_TELEGRAM_HANDOFF_KINDS = [
-  "connect",
-  "restore",
-  "sign",
-  "disconnect",
-] as const;
+export const WISP_TELEGRAM_HANDOFF_KINDS = ["connect", "restore", "sign", "disconnect"] as const;
 export const WISP_TELEGRAM_HANDOFF_STATUSES = [
   "pending",
   "opened",
@@ -23,15 +18,10 @@ export const WISP_TELEGRAM_HANDOFF_STATUSES = [
   "rejected",
   "failed",
 ] as const;
-export const WISP_TELEGRAM_HANDOFF_TERMINAL_STATUSES = [
-  "approved",
-  "rejected",
-  "failed",
-] as const;
+export const WISP_TELEGRAM_HANDOFF_TERMINAL_STATUSES = ["approved", "rejected", "failed"] as const;
 
 export type WispTelegramHandoffKind = (typeof WISP_TELEGRAM_HANDOFF_KINDS)[number];
-export type WispTelegramHandoffStatusValue =
-  (typeof WISP_TELEGRAM_HANDOFF_STATUSES)[number];
+export type WispTelegramHandoffStatusValue = (typeof WISP_TELEGRAM_HANDOFF_STATUSES)[number];
 
 export type WispTelegramHandoffPrepareRequest = {
   kind: WispTelegramHandoffKind;
@@ -129,17 +119,13 @@ function isHandoffResult(value: unknown, status: WispTelegramHandoffStatusValue)
   return true;
 }
 
-export function isWispTelegramHandoffStatus(
-  value: unknown,
-): value is WispTelegramHandoffStatus {
+export function isWispTelegramHandoffStatus(value: unknown): value is WispTelegramHandoffStatus {
   if (!isRecord(value)) return false;
   if (
     !isOpaqueId(value.id) ||
     !Number.isSafeInteger(value.eventId) ||
     Number(value.eventId) <= 0 ||
-    !WISP_TELEGRAM_HANDOFF_STATUSES.includes(
-      value.status as WispTelegramHandoffStatusValue,
-    ) ||
+    !WISP_TELEGRAM_HANDOFF_STATUSES.includes(value.status as WispTelegramHandoffStatusValue) ||
     !Number.isSafeInteger(value.expiresAt) ||
     Number(value.expiresAt) <= 0
   ) {
