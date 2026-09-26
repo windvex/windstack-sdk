@@ -12,3 +12,4 @@ pnpm-debug.log*
 *.tsbuildinfo
 /push.txt
 /windstack-sdk.zip
+/.release/
