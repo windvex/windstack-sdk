@@ -5,10 +5,9 @@
  * SPDX-License-Identifier: MIT
  */
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import * as ts from "typescript";
 import {
   git,
   loadReleaseEntries,
@@ -28,6 +27,7 @@ function resolveApiBaseline() {
   })
     .split("\n")
     .filter(Boolean);
+
   for (const tag of tags) {
     const manifestText = git(["show", `${tag}:package.json`], { allowFailure: true });
     if (!manifestText) continue;
@@ -37,37 +37,121 @@ function resolveApiBaseline() {
       // Ignore malformed historical tags.
     }
   }
+
   throw new Error("Unable to resolve the previous WindStack release tag");
 }
 
-const baseline = resolveApiBaseline();
-
-const formatFlags =
-  ts.TypeFormatFlags.NoTruncation |
-  ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope |
-  ts.TypeFormatFlags.WriteTypeArgumentsOfSignature;
-
-function normalizeText(value) {
-  return String(value).replace(/\s+/gu, " ").trim();
+function runBuild(repositoryRoot) {
+  const tscPath = path.join(root, "node_modules", "typescript", "bin", "tsc");
+  const result = spawnSync(
+    process.execPath,
+    [tscPath, "-b", ...packageDirectories.map((directory) => `packages/${directory}`)],
+    {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      stdio: "inherit",
+    },
+  );
+  if (result.status !== 0) {
+    throw new Error(`Unable to build public declarations in ${repositoryRoot}`);
+  }
 }
 
-async function walk(directory, suffix) {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const full = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...(await walk(full, suffix)));
-    else if (entry.name.endsWith(suffix)) files.push(full);
+function normalizeDeclaration(source) {
+  return String(source)
+    .replaceAll("\r\n", "\n")
+    .split("\n")
+    .map((line) => line.trim().replace(/\s+/gu, " "))
+    .filter(Boolean);
+}
+
+function isSubsequence(previousLines, candidateLines) {
+  let candidateIndex = 0;
+  for (const previousLine of previousLines) {
+    while (
+      candidateIndex < candidateLines.length &&
+      candidateLines[candidateIndex] !== previousLine
+    ) {
+      candidateIndex += 1;
+    }
+    if (candidateIndex >= candidateLines.length) return false;
+    candidateIndex += 1;
   }
+  return true;
+}
+
+function declarationCandidates(filePath, specifier) {
+  const base = path.resolve(path.dirname(filePath), specifier);
+  const candidates = [];
+
+  if (/\.js$/u.test(base)) candidates.push(base.replace(/\.js$/u, ".d.ts"));
+  if (/\.mjs$/u.test(base)) candidates.push(base.replace(/\.mjs$/u, ".d.mts"));
+  if (/\.cjs$/u.test(base)) candidates.push(base.replace(/\.cjs$/u, ".d.cts"));
+  if (/\.d\.(?:ts|mts|cts)$/u.test(base)) candidates.push(base);
+  if (!path.extname(base)) {
+    candidates.push(`${base}.d.ts`);
+    candidates.push(path.join(base, "index.d.ts"));
+  }
+
+  return [...new Set(candidates)];
+}
+
+async function readableFile(candidates) {
+  for (const filePath of candidates) {
+    try {
+      await readFile(filePath, "utf8");
+      return filePath;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+  return null;
+}
+
+async function collectDeclarationClosure(entryPath, packageRoot) {
+  const seen = new Set();
+  const files = new Map();
+  const queue = [entryPath];
+
+  while (queue.length) {
+    const filePath = queue.shift();
+    if (seen.has(filePath)) continue;
+    seen.add(filePath);
+
+    const source = await readFile(filePath, "utf8");
+    const relativePath = path.relative(packageRoot, filePath).replaceAll(path.sep, "/");
+    files.set(relativePath, normalizeDeclaration(source));
+
+    const specifiers = new Set();
+    const patterns = [
+      /(?:export|import)\s+(?:type\s+)?(?:[^"'\n]*?\s+from\s+)?["']([^"']+)["']/gu,
+      /import\(["']([^"']+)["']\)/gu,
+    ];
+    for (const pattern of patterns) {
+      for (const match of source.matchAll(pattern)) {
+        if (match[1]?.startsWith(".")) specifiers.add(match[1]);
+      }
+    }
+
+    for (const specifier of specifiers) {
+      const dependency = await readableFile(declarationCandidates(filePath, specifier));
+      if (!dependency) {
+        throw new Error(`Unable to resolve public declaration dependency ${specifier} from ${filePath}`);
+      }
+      queue.push(dependency);
+    }
+  }
+
   return files;
 }
 
-async function publicEntries(repositoryRoot) {
-  const entries = [];
+async function snapshotRepository(repositoryRoot) {
+  const snapshot = {};
+
   for (const directory of packageDirectories) {
-    const manifest = JSON.parse(
-      await readFile(path.join(repositoryRoot, "packages", directory, "package.json"), "utf8"),
-    );
+    const packageRoot = path.join(repositoryRoot, "packages", directory);
+    const manifest = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
+
     for (const [entry, conditions] of Object.entries(manifest.exports ?? {})) {
       const target =
         typeof conditions === "string"
@@ -76,124 +160,22 @@ async function publicEntries(repositoryRoot) {
             ? conditions.types
             : undefined;
       if (typeof target !== "string" || !target.endsWith(".d.ts")) continue;
-      entries.push({
-        packageName: manifest.name,
-        entry,
-        declarationPath: path.join(repositoryRoot, "packages", directory, target),
-      });
-    }
-  }
-  return entries;
-}
 
-function compilerOptions(repositoryRoot) {
-  const paths = Object.fromEntries(
-    packageDirectories.map((directory) => [
-      `@windstack/${directory}`,
-      [`./packages/${directory}/dist/index.d.ts`],
-    ]),
-  );
-  return {
-    target: ts.ScriptTarget.ES2022,
-    module: ts.ModuleKind.NodeNext,
-    moduleResolution: ts.ModuleResolutionKind.NodeNext,
-    skipLibCheck: true,
-    strict: true,
-    baseUrl: repositoryRoot,
-    paths,
-  };
-}
-
-function snapshotSymbol(checker, symbol) {
-  const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
-  const declarations = target.declarations ?? symbol.declarations ?? [];
-  const location = target.valueDeclaration ?? declarations[0];
-  const declarationKinds = [
-    ...new Set(declarations.map((declaration) => ts.SyntaxKind[declaration.kind])),
-  ].sort();
-
-  let valueType = null;
-  let declaredType = null;
-  let callSignatures = [];
-  let constructSignatures = [];
-
-  if (location && target.flags & ts.SymbolFlags.Value) {
-    const type = checker.getTypeOfSymbolAtLocation(target, location);
-    valueType = normalizeText(checker.typeToString(type, location, formatFlags));
-    callSignatures = checker
-      .getSignaturesOfType(type, ts.SignatureKind.Call)
-      .map((signature) =>
-        normalizeText(checker.signatureToString(signature, location, formatFlags)),
-      )
-      .sort();
-    constructSignatures = checker
-      .getSignaturesOfType(type, ts.SignatureKind.Construct)
-      .map((signature) =>
-        normalizeText(checker.signatureToString(signature, location, formatFlags)),
-      )
-      .sort();
-  }
-
-  if (location && target.flags & ts.SymbolFlags.Type) {
-    try {
-      declaredType = normalizeText(
-        checker.typeToString(checker.getDeclaredTypeOfSymbol(target), location, formatFlags),
-      );
-    } catch {
-      declaredType = null;
-    }
-  }
-
-  return {
-    declarationKinds,
-    declarations: declarations.map((declaration) => normalizeText(declaration.getText())).sort(),
-    valueType,
-    declaredType,
-    callSignatures,
-    constructSignatures,
-  };
-}
-
-async function snapshotRepository(repositoryRoot) {
-  const declarationFiles = [];
-  for (const directory of packageDirectories) {
-    declarationFiles.push(
-      ...(await walk(path.join(repositoryRoot, "packages", directory, "dist"), ".d.ts")),
-    );
-  }
-  const program = ts.createProgram({
-    rootNames: declarationFiles,
-    options: compilerOptions(repositoryRoot),
-  });
-  const checker = program.getTypeChecker();
-  const result = {};
-
-  for (const entry of await publicEntries(repositoryRoot)) {
-    const source = program.getSourceFile(entry.declarationPath);
-    if (!source) {
-      throw new Error(
-        `Unable to load declaration entry ${entry.packageName}${
-          entry.entry === "." ? "" : entry.entry
-        }`,
+      const entryPath = path.join(packageRoot, target);
+      const key = `${manifest.name}::${entry}`;
+      snapshot[key] = Object.fromEntries(
+        [...(await collectDeclarationClosure(entryPath, packageRoot)).entries()].sort(
+          ([left], [right]) => left.localeCompare(right),
+        ),
       );
     }
-    const moduleSymbol = checker.getSymbolAtLocation(source);
-    if (!moduleSymbol) throw new Error(`No module symbol for ${entry.declarationPath}`);
-
-    const key = `${entry.packageName}::${entry.entry}`;
-    result[key] = Object.fromEntries(
-      checker
-        .getExportsOfModule(moduleSymbol)
-        .map((symbol) => [symbol.getName(), snapshotSymbol(checker, symbol)])
-        .sort(([left], [right]) => left.localeCompare(right)),
-    );
   }
 
-  return result;
+  return snapshot;
 }
 
 function compareSnapshots(previous, candidate) {
-  const added = [];
+  const additions = [];
   const changes = [];
   const entryKeys = new Set([...Object.keys(previous), ...Object.keys(candidate)]);
 
@@ -203,87 +185,81 @@ function compareSnapshots(previous, candidate) {
     const after = candidate[key];
 
     if (!before) {
-      added.push({ kind: "entry-added", package: packageName, entry });
+      additions.push({ kind: "entry-added", package: packageName, entry, file: "*" });
       continue;
     }
     if (!after) {
-      changes.push({ kind: "entry-removed", package: packageName, entry, export: "*" });
+      changes.push({ kind: "entry-removed", package: packageName, entry, file: "*" });
       continue;
     }
 
-    const names = new Set([...Object.keys(before), ...Object.keys(after)]);
-    for (const name of [...names].sort()) {
-      if (!(name in before)) {
-        added.push({ kind: "export-added", package: packageName, entry, export: name });
+    const files = new Set([...Object.keys(before), ...Object.keys(after)]);
+    for (const file of [...files].sort()) {
+      if (!(file in before)) {
+        additions.push({ kind: "declaration-added", package: packageName, entry, file });
         continue;
       }
-      if (!(name in after)) {
-        changes.push({ kind: "export-removed", package: packageName, entry, export: name });
+      if (!(file in after)) {
+        changes.push({ kind: "declaration-removed", package: packageName, entry, file });
         continue;
       }
-      if (JSON.stringify(before[name]) !== JSON.stringify(after[name])) {
-        changes.push({
-          kind: "export-changed",
+
+      const previousLines = before[file];
+      const candidateLines = after[file];
+      if (JSON.stringify(previousLines) === JSON.stringify(candidateLines)) continue;
+
+      if (isSubsequence(previousLines, candidateLines)) {
+        additions.push({
+          kind: "declaration-additive-change",
           package: packageName,
           entry,
-          export: name,
-          before: before[name],
-          after: after[name],
+          file,
         });
+        continue;
       }
+
+      changes.push({
+        kind: "declaration-changed",
+        package: packageName,
+        entry,
+        file,
+        previousLines,
+        candidateLines,
+      });
     }
   }
 
-  return { added, changes };
+  return { additions, changes };
 }
 
 function approvalKey(value) {
-  return [value.kind, value.package, value.entry, value.export ?? "*"].join("::");
+  return [value.kind, value.package, value.entry, value.file].join("::");
 }
 
-const tscPath = path.join(root, "node_modules", "typescript", "bin", "tsc");
-const candidateBuild = spawnSync(
-  process.execPath,
-  [tscPath, "-b", ...packageDirectories.map((directory) => `packages/${directory}`)],
-  {
-    cwd: root,
-    encoding: "utf8",
-    stdio: "inherit",
-  },
-);
-if (candidateBuild.status !== 0) {
-  throw new Error("Unable to build candidate public declarations");
-}
-
+const baseline = resolveApiBaseline();
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), "windstack-api-baseline-"));
 const baselineRoot = path.join(temporaryRoot, "baseline");
 let worktreeAdded = false;
 
 try {
+  runBuild(root);
+
   const add = spawnSync("git", ["worktree", "add", "--detach", baselineRoot, baseline], {
     cwd: root,
     encoding: "utf8",
     stdio: "inherit",
   });
-  if (add.status !== 0) throw new Error(`Unable to create API baseline worktree for ${baseline}`);
+  if (add.status !== 0) {
+    throw new Error(`Unable to create API baseline worktree for ${baseline}`);
+  }
   worktreeAdded = true;
 
   await symlink(path.join(root, "node_modules"), path.join(baselineRoot, "node_modules"), "dir");
-
-  const build = spawnSync(
-    process.execPath,
-    [tscPath, "-b", ...packageDirectories.map((directory) => `packages/${directory}`)],
-    {
-      cwd: baselineRoot,
-      encoding: "utf8",
-      stdio: "inherit",
-    },
-  );
-  if (build.status !== 0) throw new Error(`Unable to build API baseline ${baseline}`);
+  runBuild(baselineRoot);
 
   const previous = await snapshotRepository(baselineRoot);
   const candidate = await snapshotRepository(root);
-  const { added, changes } = compareSnapshots(previous, candidate);
+  const { additions, changes } = compareSnapshots(previous, candidate);
 
   const approvalsDocument = JSON.parse(
     await readFile(path.join(root, "specs", "api-compat-approvals.json"), "utf8"),
@@ -298,7 +274,7 @@ try {
         typeof approval.kind !== "string" ||
         typeof approval.package !== "string" ||
         typeof approval.entry !== "string" ||
-        typeof approval.export !== "string" ||
+        typeof approval.file !== "string" ||
         typeof approval.reason !== "string" ||
         approval.reason.trim().length < 12
       ) {
@@ -313,12 +289,13 @@ try {
     approval: approvals.get(approvalKey(change)) ?? null,
   }));
   const unapproved = reviewedChanges.filter(({ approval }) => !approval);
+
   const report = {
     schemaVersion: 1,
     baseline,
     candidateVersion: candidateManifest.version,
     gitSha: git(["rev-parse", "HEAD"]),
-    added,
+    additions,
     changes: reviewedChanges,
     unapprovedBreakingChanges: unapproved.length,
   };
@@ -330,17 +307,17 @@ try {
   );
 
   console.log(
-    `API compatibility: ${added.length} additions, ${changes.length} reviewed changes, ${unapproved.length} unapproved.`,
-
+    `API compatibility: ${additions.length} additive changes, ${changes.length} reviewed changes, ${unapproved.length} unapproved.`,
   );
   for (const change of unapproved) {
     console.error(
-      `- ${change.kind}: ${change.package} ${change.entry} :: ${change.export ?? "*"}`,
+      `- ${change.kind}: ${change.package} ${change.entry} :: ${change.file}`,
     );
   }
+
   if (unapproved.length) {
     throw new Error(
-      "Public API changes require explicit entries in specs/api-compat-approvals.json",
+      "Public declaration changes require explicit entries in specs/api-compat-approvals.json",
     );
   }
 } finally {
