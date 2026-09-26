@@ -17,10 +17,7 @@ const genericPackages = [
   "solana",
 ];
 
-const forbiddenDependencies = new Set([
-  "@windstack/vexanium",
-  "@windstack/wallet-plugin-wisp",
-]);
+const forbiddenDependencies = new Set(["@windstack/vexanium", "@windstack/wallet-plugin-wisp"]);
 
 const forbiddenSourcePatterns = [
   { label: "Wisp runtime coupling", pattern: /\bwisp\b/iu },
