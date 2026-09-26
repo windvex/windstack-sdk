@@ -230,7 +230,7 @@ export function createVexaniumFrameProvider(
       listeners.get(event)?.delete(handler as (payload: unknown) => void);
     },
     announce() {
-      if (!destroyed) announceVexaniumProvider(provider);
+      if (!destroyed) announceVexaniumProvider(provider, runtimeWindow);
     },
     destroy() {
       if (destroyed) return;
