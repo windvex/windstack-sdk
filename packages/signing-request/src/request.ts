@@ -42,8 +42,10 @@ export const SIGNING_REQUEST_FLAG_BACKGROUND = 2;
 export const SIGNING_REQUEST_PLACEHOLDER_ACTOR = "............1";
 export const SIGNING_REQUEST_PLACEHOLDER_PERMISSION = "............2";
 export const SIGNING_REQUEST_DEFAULT_SCHEME: SigningRequestScheme = "esr";
-export const SIGNING_REQUEST_SCHEMES = ["esr", "vsr"] as const satisfies readonly
-  SigningRequestScheme[];
+export const SIGNING_REQUEST_SCHEMES = [
+  "esr",
+  "vsr",
+] as const satisfies readonly SigningRequestScheme[];
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
