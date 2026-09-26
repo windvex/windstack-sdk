@@ -29,6 +29,14 @@ export const VEXANIUM_METHODS = {
   DISCONNECT: "vex_disconnect",
 } as const;
 
+export const VEXANIUM_PROVIDER_EVENTS = {
+  CONNECT: "connect",
+  DISCONNECT: "disconnect",
+  ACCOUNTS_CHANGED: "accountsChanged",
+  CHAIN_CHANGED: "chainChanged",
+  MESSAGE: "message",
+} as const;
+
 export const VEXANIUM_MAINNET_CHAIN_ID =
   "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f" as const;
 export const VEXANIUM_MAINNET_SCOPE = "antelope:f9f432b1851b5c179d2091a96f593aae" as const;

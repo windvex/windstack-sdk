@@ -131,11 +131,15 @@ export type VexaniumAccountsResponse = {
   accounts: VexaniumAccount[];
 };
 
+export type VexaniumAccountsChangedEvent = VexaniumAccountsResponse;
+export type VexaniumDisconnectEvent = { code: number; message: string };
+export type VexaniumChainChangedEvent = VexaniumChainId;
+
 export type VexaniumProviderEventMap = {
   connect: VexaniumConnectResponse;
-  disconnect: { code: number; message: string };
-  accountsChanged: VexaniumAccountsResponse;
-  chainChanged: VexaniumChainId;
+  disconnect: VexaniumDisconnectEvent;
+  accountsChanged: VexaniumAccountsChangedEvent;
+  chainChanged: VexaniumChainChangedEvent;
   message: unknown;
 };
 

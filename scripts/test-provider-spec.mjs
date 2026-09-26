@@ -14,6 +14,7 @@ import {
   VEXANIUM_MAINNET_CHAIN_ID,
   VEXANIUM_MAINNET_SCOPE,
   VEXANIUM_METHODS,
+  VEXANIUM_PROVIDER_EVENTS,
   VEXANIUM_PROVIDER_GLOBAL,
   VEXANIUM_PROVIDER_STANDARD,
   VEXANIUM_PROVIDER_VERSION,
@@ -30,6 +31,8 @@ assert.equal(contract.provider.name, "Wisp");
 assert.equal(contract.provider.marker, "isWispWallet");
 assert.equal(contract.provider.rdns, "com.wisp.wallet");
 assert.deepEqual(Object.values(contract.errors), Object.values(PROVIDER_ERROR_CODES));
+assert.deepEqual(contract.errorPayload.required, ["code", "message"]);
+assert.deepEqual(contract.errorPayload.optional, ["data"]);
 
 assert.equal(contract.vex.global, VEXANIUM_PROVIDER_GLOBAL);
 assert.equal(contract.vex.standard, VEXANIUM_PROVIDER_STANDARD);
@@ -40,6 +43,13 @@ assert.deepEqual(contract.vex.capabilities, Object.values(VEXANIUM_CAPABILITIES)
 assert.deepEqual(Object.values(contract.vex.methods), Object.values(VEXANIUM_METHODS));
 assert.equal(contract.vex.events.requestProvider, VEXANIUM_REQUEST_PROVIDER_EVENT);
 assert.equal(contract.vex.events.announceProvider, VEXANIUM_ANNOUNCE_PROVIDER_EVENT);
+assert.deepEqual(Object.values(contract.vex.providerEvents), Object.values(VEXANIUM_PROVIDER_EVENTS));
+assert.equal(contract.vex.versioning.independentFromNpmSemver, true);
+assert.equal(contract.vex.versioning.compatibility, "same-major");
+assert.equal(contract.vex.session.walletSessionId, "opaque-wallet-issued");
+assert.equal(contract.vex.session.restoreCreatesSession, false);
+assert.equal(contract.vex.session.disconnectRevokesSession, true);
+assert.equal(contract.vex.session.localSessionIdOnWire, false);
 
 assert.equal(contract.evm.global, EVM_PROVIDER_GLOBAL);
 assert.equal(contract.evm.chainId, vexEvm.chainId);

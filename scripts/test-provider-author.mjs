@@ -8,9 +8,14 @@ import {
   VEXANIUM_PROVIDER_VERSION,
   assertVexaniumAccountsResponse,
   assertVexaniumCapabilitiesRequest,
+  assertVexaniumChainChangedEvent,
+  assertVexaniumDisconnectEvent,
+  createVexaniumAccountsChangedEvent,
   createVexaniumAccountsResponse,
   createVexaniumCapabilitiesResponse,
+  createVexaniumChainChangedEvent,
   createVexaniumConnectResponse,
+  createVexaniumDisconnectEvent,
   createVexaniumProviderInfo,
 } from "../packages/vexanium/dist/index.js";
 import {
@@ -75,6 +80,26 @@ assert.throws(() =>
     accounts: [],
   }),
 );
+
+const accountsChanged = createVexaniumAccountsChangedEvent({
+  sessionId: "wallet-session-1",
+  chainId: VEXANIUM_MAINNET_CHAIN_ID,
+  accounts: ["alice@active"],
+});
+assertVexaniumAccountsResponse(accountsChanged);
+
+const chainChanged = createVexaniumChainChangedEvent(VEXANIUM_MAINNET_CHAIN_ID);
+assert.equal(chainChanged, VEXANIUM_MAINNET_CHAIN_ID);
+assertVexaniumChainChangedEvent(chainChanged);
+assert.throws(() => assertVexaniumChainChangedEvent("not-a-chain"));
+
+const disconnectEvent = createVexaniumDisconnectEvent({
+  code: 4900,
+  message: "Wallet disconnected",
+});
+assert.deepEqual(disconnectEvent, { code: 4900, message: "Wallet disconnected" });
+assertVexaniumDisconnectEvent(disconnectEvent);
+assert.throws(() => createVexaniumDisconnectEvent({ code: 4900, message: "" }));
 
 assert.equal(WISP_PROVIDER_NAME, "Wisp");
 assert.equal(WISP_PROVIDER_RDNS, "com.wisp.wallet");

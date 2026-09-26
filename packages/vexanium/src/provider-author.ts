@@ -9,7 +9,9 @@ import { VEXANIUM_PROVIDER_STANDARD, VEXANIUM_PROVIDER_VERSION } from "./constan
 import {
   assertVexaniumAccountsResponse,
   assertVexaniumCapabilitiesResponse,
+  assertVexaniumChainChangedEvent,
   assertVexaniumConnectResponse,
+  assertVexaniumDisconnectEvent,
   assertVexaniumProviderInfo,
 } from "./standard.js";
 import type {
@@ -18,7 +20,10 @@ import type {
   VexaniumCapabilitiesResponse,
   VexaniumCapability,
   VexaniumChainId,
+  VexaniumAccountsChangedEvent,
+  VexaniumChainChangedEvent,
   VexaniumConnectResponse,
+  VexaniumDisconnectEvent,
   VexaniumFullChainId,
   VexaniumProviderInfo,
 } from "./types.js";
@@ -52,6 +57,11 @@ export type CreateVexaniumAccountsResponseInput = {
   sessionId: string;
   chainId: VexaniumFullChainId;
   accounts: readonly (VexaniumAccount | string)[];
+};
+
+export type CreateVexaniumDisconnectEventInput = {
+  code: number;
+  message: string;
 };
 
 export function createVexaniumProviderInfo(
@@ -114,4 +124,27 @@ export function createVexaniumAccountsResponse(
   };
   assertVexaniumAccountsResponse(value);
   return value;
+}
+export function createVexaniumAccountsChangedEvent(
+  input: CreateVexaniumAccountsResponseInput,
+): VexaniumAccountsChangedEvent {
+  return createVexaniumAccountsResponse(input);
+}
+
+export function createVexaniumChainChangedEvent(
+  chainId: VexaniumChainId,
+): VexaniumChainChangedEvent {
+  assertVexaniumChainChangedEvent(chainId);
+  return chainId;
+}
+
+export function createVexaniumDisconnectEvent(
+  input: CreateVexaniumDisconnectEventInput,
+): VexaniumDisconnectEvent {
+  const value: VexaniumDisconnectEvent = {
+    code: input.code,
+    message: input.message,
+  };
+  assertVexaniumDisconnectEvent(value);
+  return Object.freeze({ ...value });
 }
