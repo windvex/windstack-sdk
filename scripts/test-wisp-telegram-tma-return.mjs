@@ -33,6 +33,7 @@ const transport = createWispTelegramTransport({
         async json() {
           return {
             id: "handoff-tma-return",
+            eventId: 3,
             status: "approved",
             expiresAt: Date.now() + 60_000,
             result: {
