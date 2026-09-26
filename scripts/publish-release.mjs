@@ -6,12 +6,7 @@
  */
 import { execFileSync, spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import {
-  git,
-  root,
-  sortForPublish,
-  verifyCurrentCandidate,
-} from "./release-artifacts.mjs";
+import { git, root, sortForPublish, verifyCurrentCandidate } from "./release-artifacts.mjs";
 
 const registry = "https://registry.npmjs.org/";
 const visibilityAttempts = 240;
