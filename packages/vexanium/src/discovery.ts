@@ -56,8 +56,10 @@ export function requestVexaniumProviders(): void {
  * VexaniumProvider v1 requires providerInfo on the provider object itself.
  * Discovery never invents, defaults, or patches provider identity.
  */
-export function announceVexaniumProvider(provider: VexaniumProvider): void {
-  const runtimeWindow = getRuntimeWindow();
+export function announceVexaniumProvider(
+  provider: VexaniumProvider,
+  runtimeWindow: Window | null = getRuntimeWindow(),
+): void {
   if (!runtimeWindow || !isVexaniumProvider(provider)) return;
   const detail = providerDetail(provider);
   runtimeWindow.dispatchEvent(new CustomEvent(VEXANIUM_ANNOUNCE_PROVIDER_EVENT, { detail }));
