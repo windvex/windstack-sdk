@@ -41,6 +41,8 @@ export const SIGNING_REQUEST_FLAG_BROADCAST = 1;
 export const SIGNING_REQUEST_FLAG_BACKGROUND = 2;
 export const SIGNING_REQUEST_PLACEHOLDER_ACTOR = "............1";
 export const SIGNING_REQUEST_PLACEHOLDER_PERMISSION = "............2";
+export const SIGNING_REQUEST_DEFAULT_SCHEME: SigningRequestScheme = "esr";
+export const SIGNING_REQUEST_SCHEMES = ["esr", "vsr"] as const satisfies readonly SigningRequestScheme[];
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -443,14 +445,16 @@ function parseUri(uri: string): {
   slashes: boolean;
 } {
   if (typeof uri !== "string" || !uri.length || uri !== uri.trim()) {
-    throw new TypeError("Invalid Vexanium Signing Request URI");
+    throw new TypeError("Invalid Antelope signing-request URI");
   }
-  const match = /^vsr:(\/\/)?([A-Za-z0-9_-]+)$/i.exec(uri);
-  if (!match) throw new TypeError("Vexanium Signing Request URI must use a valid vsr: payload");
+  const match = /^(esr|vsr):(\/\/)?([A-Za-z0-9_-]+)$/i.exec(uri);
+  if (!match) {
+    throw new TypeError("Antelope signing-request URI must use a valid esr: or vsr: payload");
+  }
   return {
-    scheme: "vsr",
-    slashes: Boolean(match[1]),
-    payload: match[2]!,
+    scheme: match[1]!.toLowerCase() as SigningRequestScheme,
+    slashes: Boolean(match[2]),
+    payload: match[3]!,
   };
 }
 
@@ -659,7 +663,7 @@ export class SigningRequest {
   encode(
     compress = false,
     slashes = false,
-    scheme: SigningRequestScheme = "vsr",
+    scheme: SigningRequestScheme = SIGNING_REQUEST_DEFAULT_SCHEME,
     compressionProvider: CompressionProvider = pakoCompressionProvider,
   ): string {
     const raw = this.serializePayload();

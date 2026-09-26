@@ -15,7 +15,7 @@ import {
   verifyResolvedSigningRequestSignature,
 } from "../packages/signing-request/dist/index.js";
 
-const VEX_CHAIN_ID = "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f";
+const TEST_CHAIN_ID = "12".repeat(32);
 const transferAbi = {
   version: "eosio::abi/1.2",
   structs: [
@@ -34,16 +34,16 @@ const transferAbi = {
 };
 const abiProvider = {
   async getAbi(account) {
-    assert.equal(account, "vex.token");
+    assert.equal(account, "sample.token");
     return transferAbi;
   },
 };
 
 const request = await SigningRequest.create(
   {
-    chainId: VEX_CHAIN_ID,
+    chainId: TEST_CHAIN_ID,
     action: {
-      account: "vex.token",
+      account: "sample.token",
       name: "transfer",
       authorization: [
         {
@@ -54,24 +54,29 @@ const request = await SigningRequest.create(
       data: {
         from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
         to: "receiver",
-        quantity: "1.0000 VEX",
+        quantity: "1.0000 TST",
         memo: "WindStack",
       },
     },
     broadcast: true,
     callback: "https://app.example/complete?tx={{tx}}&sig={{sig}}",
-    info: { note: "WindStack VSR" },
+    info: { note: "Antelope ESR" },
   },
   { abiProvider },
 );
 assert.equal(request.version, 2);
-assert.equal(request.getInfoText("note"), "WindStack VSR");
+assert.equal(request.getInfoText("note"), "Antelope ESR");
 
-const vsr = request.encode(true, true, "vsr");
-assert.match(vsr, /^vsr:\/\/[A-Za-z0-9_-]+$/);
-const parsed = SigningRequest.from(vsr);
+const esr = request.encode(true, true);
+assert.match(esr, /^esr:\/\/[A-Za-z0-9_-]+$/);
+const parsed = SigningRequest.from(esr);
+assert.equal(parsed.sourceScheme, "esr");
+
+const explicitVsr = request.encode(false, false, "vsr");
+assert.match(explicitVsr, /^vsr:[A-Za-z0-9_-]+$/);
+assert.equal(SigningRequest.from(explicitVsr).sourceScheme, "vsr");
 assert.equal(parsed.data.chainId.type, "chain_id");
-assert.equal(parsed.data.chainId.value, VEX_CHAIN_ID);
+assert.equal(parsed.data.chainId.value, TEST_CHAIN_ID);
 assert.equal(parsed.isBroadcast, true);
 assert.equal(parsed.data.request.type, "action");
 
@@ -86,7 +91,7 @@ const resolved = await resolveSigningRequest(parsed, {
     refBlockId: "11".repeat(32),
   },
 });
-assert.equal(resolved.chainId, VEX_CHAIN_ID);
+assert.equal(resolved.chainId, TEST_CHAIN_ID);
 assert.equal(resolved.transaction.ref_block_num, 3);
 assert.equal(resolved.transaction.ref_block_prefix, 123456789);
 assert.equal(resolved.transaction.actions[0].authorization[0].actor, "windstack");
@@ -99,22 +104,22 @@ const resolvedTransfer = new AbiSerializer(transferAbi).decodeAction(
 );
 assert.equal(resolvedTransfer.from, "windstack");
 assert.equal(resolvedTransfer.to, "receiver");
-assert.equal(resolvedTransfer.quantity, "1.0000 VEX");
+assert.equal(resolvedTransfer.quantity, "1.0000 TST");
 
 const multiAbiCalls = new Map();
 const multiAbiProvider = {
   async getAbi(account) {
     multiAbiCalls.set(account, (multiAbiCalls.get(account) ?? 0) + 1);
-    if (account === "vex.token" || account === "token.wind") return transferAbi;
+    if (account === "sample.token" || account === "other.token") return transferAbi;
     throw new Error(`Unexpected ABI account: ${account}`);
   },
 };
 const multiRequest = await SigningRequest.create(
   {
-    chainId: VEX_CHAIN_ID,
+    chainId: TEST_CHAIN_ID,
     actions: [
       {
-        account: "vex.token",
+        account: "sample.token",
         name: "transfer",
         authorization: [
           {
@@ -125,12 +130,12 @@ const multiRequest = await SigningRequest.create(
         data: {
           from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
           to: "receiver",
-          quantity: "2.0000 VEX",
+          quantity: "2.0000 TST",
           memo: "first",
         },
       },
       {
-        account: "token.wind",
+        account: "other.token",
         name: "transfer",
         authorization: [
           {
@@ -141,12 +146,12 @@ const multiRequest = await SigningRequest.create(
         data: {
           from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
           to: "receiver",
-          quantity: "3.00000000 WIND",
+          quantity: "3.00000000 ALT",
           memo: "second",
         },
       },
       {
-        account: "vex.token",
+        account: "sample.token",
         name: "transfer",
         authorization: [
           {
@@ -156,8 +161,8 @@ const multiRequest = await SigningRequest.create(
         ],
         data: {
           from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
-          to: "reserve.wind",
-          quantity: "4.0000 VEX",
+          to: "treasury",
+          quantity: "4.0000 TST",
           memo: "third",
         },
       },
@@ -167,20 +172,20 @@ const multiRequest = await SigningRequest.create(
   { abiProvider: multiAbiProvider },
 );
 assert.equal(multiRequest.version, 2);
-const multiParsed = SigningRequest.from(multiRequest.encode(true, false, "vsr"));
+const multiParsed = SigningRequest.from(multiRequest.encode(true, false));
 assert.equal(multiParsed.data.request.type, "action[]");
 assert.equal(getSigningRequestActions(multiParsed).length, 3);
 const callsBeforeInspection = new Map(multiAbiCalls);
 const inspectedActions = await decodeSigningRequestActions(multiParsed, multiAbiProvider);
 assert.equal(inspectedActions.length, 3);
-assert.equal(inspectedActions[0].account, "vex.token");
-assert.equal(inspectedActions[0].data.quantity, "2.0000 VEX");
-assert.equal(inspectedActions[1].account, "token.wind");
-assert.equal(inspectedActions[1].data.quantity, "3.00000000 WIND");
-assert.equal(inspectedActions[2].account, "vex.token");
-assert.equal(inspectedActions[2].data.quantity, "4.0000 VEX");
-assert.equal(multiAbiCalls.get("vex.token") - (callsBeforeInspection.get("vex.token") ?? 0), 1);
-assert.equal(multiAbiCalls.get("token.wind") - (callsBeforeInspection.get("token.wind") ?? 0), 1);
+assert.equal(inspectedActions[0].account, "sample.token");
+assert.equal(inspectedActions[0].data.quantity, "2.0000 TST");
+assert.equal(inspectedActions[1].account, "other.token");
+assert.equal(inspectedActions[1].data.quantity, "3.00000000 ALT");
+assert.equal(inspectedActions[2].account, "sample.token");
+assert.equal(inspectedActions[2].data.quantity, "4.0000 TST");
+assert.equal(multiAbiCalls.get("sample.token") - (callsBeforeInspection.get("sample.token") ?? 0), 1);
+assert.equal(multiAbiCalls.get("other.token") - (callsBeforeInspection.get("other.token") ?? 0), 1);
 const multiResolved = await resolveSigningRequest(multiParsed, {
   actor: "windstack",
   permission: "active",
@@ -200,7 +205,7 @@ const scalarOne = Uint8Array.from({ length: 32 }, (_, index) => (index === 31 ? 
 const privateKey = PrivateKey.fromBytes("K1", scalarOne);
 const signedRequest = request.sign("windstack", privateKey);
 assert.equal(signedRequest.verifyRequestSignature(privateKey.toPublicKey()), true);
-const signedRoundTrip = SigningRequest.from(signedRequest.encode(true, false, "vsr"));
+const signedRoundTrip = SigningRequest.from(signedRequest.encode(true, false));
 assert.equal(signedRoundTrip.requestSignature.signer, "windstack");
 assert.equal(signedRoundTrip.verifyRequestSignature(privateKey.toPublicKey()), true);
 
@@ -216,19 +221,19 @@ const callback = createSigningRequestCallback(resolved, {
 });
 assert.equal(callback.background, false);
 assert.equal(callback.payload.bn, "123");
-assert.equal(callback.payload.cid, VEX_CHAIN_ID);
+assert.equal(callback.payload.cid, TEST_CHAIN_ID);
 assert.ok(callback.url.includes("tx=abab"));
 
 const identity = await SigningRequest.create({
-  chainId: VEX_CHAIN_ID,
+  chainId: TEST_CHAIN_ID,
   identity: { scope: "windstack" },
   callback: "https://app.example/login?actor={{sa}}",
 });
 assert.equal(identity.version, SIGNING_REQUEST_PROTOCOL_VERSION);
 assert.equal(identity.isIdentity, true);
 assert.throws(
-  () => SigningRequest.from(identity.encode(false, false, "vsr").replace(/^vsr:/, "http:")),
-  /vsr:/,
+  () => SigningRequest.from(identity.encode(false, false).replace(/^esr:/, "http:")),
+  /esr: or vsr:/,
 );
 const identityResolved = await resolveSigningRequest(identity, {
   actor: "windstack",
@@ -259,18 +264,18 @@ assert.equal(identityData.scope, "windstack");
 assert.deepEqual(identityData.permission, { actor: "windstack", permission: "active" });
 
 const revision2Identity = await SigningRequest.create({
-  chainId: VEX_CHAIN_ID,
+  chainId: TEST_CHAIN_ID,
   identity: {},
   callback: "https://app.example/login",
 });
 assert.equal(revision2Identity.version, 2);
-const revision2Uri = revision2Identity.encode(false, true, "vsr");
+const revision2Uri = revision2Identity.encode(false, true);
 const revision2RoundTrip = SigningRequest.from(revision2Uri);
 assert.equal(revision2RoundTrip.version, 2);
 assert.equal(revision2RoundTrip.isIdentity, true);
 assert.equal(revision2RoundTrip.data.request.type, "identity");
 assert.equal(revision2RoundTrip.data.request.value.scope, undefined);
-assert.equal(revision2RoundTrip.encode(false, true, "vsr"), revision2Uri);
+assert.equal(revision2RoundTrip.encode(false, true), revision2Uri);
 const revision2Resolved = await resolveSigningRequest(revision2RoundTrip, {
   actor: "windstack",
   permission: "active",
@@ -292,25 +297,25 @@ assert.equal(multiChain.version, SIGNING_REQUEST_PROTOCOL_VERSION);
 const selected = await resolveSigningRequest(multiChain, {
   actor: "windstack",
   permission: "active",
-  selectedChainId: VEX_CHAIN_ID,
+  selectedChainId: TEST_CHAIN_ID,
   abiProvider,
   tapos: { expiration: "2026-09-07T04:00:00", refBlockNum: 0, refBlockPrefix: 0 },
 });
-assert.equal(selected.chainId, VEX_CHAIN_ID);
+assert.equal(selected.chainId, TEST_CHAIN_ID);
 
 const compressedBytes = pakoCompressionProvider.deflate(new Uint8Array(16_384));
 assert.throws(() => pakoCompressionProvider.inflate(compressedBytes, 1024), /size limit/);
-assert.throws(() => SigningRequest.from("vsr:not+base64"), /valid vsr:/);
+assert.throws(() => SigningRequest.from("esr:not+base64"), /valid esr: or vsr:/);
 assert.throws(
-  () => SigningRequest.from(`vsr:${Buffer.from(Uint8Array.of(4, 0)).toString("base64url")}`),
+  () => SigningRequest.from(`esr:${Buffer.from(Uint8Array.of(4, 0)).toString("base64url")}`),
   /Unsupported signing-request protocol version/,
 );
 
 const placeholderCompatibilityRequest = await SigningRequest.create(
   {
-    chainId: VEX_CHAIN_ID,
+    chainId: TEST_CHAIN_ID,
     action: {
-      account: "vex.token",
+      account: "sample.token",
       name: "transfer",
       authorization: [
         {
@@ -321,7 +326,7 @@ const placeholderCompatibilityRequest = await SigningRequest.create(
       data: {
         from: SIGNING_REQUEST_PLACEHOLDER_ACTOR,
         to: "receiver",
-        quantity: "1.0000 VEX",
+        quantity: "1.0000 TST",
         memo: "placeholder compatibility",
       },
     },
@@ -357,4 +362,4 @@ assert.notEqual(
 );
 
 assert.equal(bytesToHex(resolved.digest).length, 64);
-console.log("Native signing-request protocol tests: PASS");
+console.log("Generic Antelope signing-request protocol tests: PASS");

@@ -2,61 +2,61 @@
 
 ## Overview
 
-`@windstack/signing-request` creates, parses, resolves, signs, verifies, and inspects Vexanium Signing Requests (VSR). It supports single actions, multiple actions, full transactions, identity requests, callbacks, request signatures, compression, full chain IDs, multi-chain requests, and ABI-aware placeholder resolution.
+`@windstack/signing-request` provides chain-neutral Antelope signing-request primitives. It creates, parses, resolves, signs, verifies, and inspects requests containing actions, action lists, full transactions, identity requests, callbacks, request signatures, compression, full chain IDs, and multi-chain selectors.
 
-VSR uses the canonical `vsr:` URI scheme. Protocol revisions are selected automatically according to the features used by the request.
+The generic package defaults to the standard `esr:` URI scheme. It can also parse and encode `vsr:` when a chain-specific integration requires it. Vexanium applications should normally use the convenience APIs from `@windstack/vexanium`, which enforce the Vexanium Mainnet chain and canonical `vsr:` scheme.
 
 ## Installation
 
 ```bash
-npm install @windstack/signing-request
+npm install @windstack/signing-request @windstack/rpc
 ```
 
-## Usage
+## Generic Antelope usage
 
 ```ts
-import {
-  RpcSigningRequestAbiProvider,
-  createSigningRequest,
-} from "@windstack/signing-request";
+import { RpcSigningRequestAbiProvider, createSigningRequest } from "@windstack/signing-request";
 import { RpcClient } from "@windstack/rpc";
 
-const rpc = new RpcClient({ endpoints: "https://api.windcrypto.com" });
+const rpc = new RpcClient({ endpoints: "https://your-antelope-rpc.example" });
 const abiProvider = new RpcSigningRequestAbiProvider(rpc);
 
 const request = await createSigningRequest(
   {
-    chainId: "f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f",
+    chainId: "1212121212121212121212121212121212121212121212121212121212121212",
     action: {
-      account: "vex.token",
+      account: "sample.token",
       name: "transfer",
-      authorization: [
-        { actor: "............1", permission: "............2" },
-      ],
+      authorization: [{ actor: "............1", permission: "............2" }],
       data: {
         from: "............1",
-        to: "bob",
-        quantity: "1.0000 VEX",
-        memo: "VSR example",
+        to: "receiver",
+        quantity: "1.0000 TST",
+        memo: "Example transfer",
       },
     },
-    callback: "https://app.example/signed?tx={{tx}}",
+    broadcast: true,
   },
   { abiProvider },
 );
 
-const uri = request.encode(true, true, "vsr");
+const uri = request.encode(true, true);
 ```
 
-A wallet resolves actor and permission placeholders against the selected signer before signing:
+`encode()` defaults to `esr:`. Supply `"vsr"` explicitly only when the chain integration defines that scheme.
+
+## Resolution and inspection
 
 ```ts
 import {
   SigningRequest,
+  decodeSigningRequestActions,
   resolveSigningRequestWithRpc,
 } from "@windstack/signing-request";
 
 const parsed = SigningRequest.from(uri);
+const decoded = await decodeSigningRequestActions(parsed, abiProvider);
+
 const resolved = await resolveSigningRequestWithRpc(parsed, {
   rpc,
   abiProvider,
@@ -64,57 +64,44 @@ const resolved = await resolveSigningRequestWithRpc(parsed, {
   permission: "active",
 });
 
+console.log(decoded);
 console.log(resolved.serializedTransaction);
 console.log(resolved.digest);
 ```
 
-## Action inspection
-
-Use the inspection APIs to enumerate or ABI-decode executable actions from a request:
-
-```ts
-import {
-  decodeSigningRequestActions,
-  getSigningRequestActions,
-} from "@windstack/signing-request";
-
-const actions = getSigningRequestActions(parsed);
-const decoded = await decodeSigningRequestActions(parsed, abiProvider);
-
-for (const action of decoded) {
-  console.log(action.account, action.name, action.data);
-}
-```
-
-`decodeSigningRequestActions()` preserves action order and authorization data and supports single-action, multi-action, and full-transaction requests. Context-free actions can be included with `{ includeContextFree: true }`.
-
-## Request types
-
-The package supports action, action-list, transaction, and identity requests. Identity requests produce an off-chain proof transaction and require a callback.
-
-Multi-chain requests use chain alias `0` and require an explicit chain during resolution. Nonzero aliases require an application-provided alias resolver.
-
-Callbacks are returned as structured data. Parsing a request does not automatically open callback URLs, broadcast transactions, or approve wallet permissions.
+Parsing a request never opens a callback URL, broadcasts a transaction, approves a wallet permission, or selects a signer automatically.
 
 ## Vexanium
 
-Use the full Vexanium Mainnet chain ID for VSR requests:
+For Vexanium, prefer `@windstack/vexanium`:
 
-```text
-f9f432b1851b5c179d2091a96f593aaed50ec7466b74f89301f957a83e56ce1f
+```ts
+import { createSigningRequest } from "@windstack/vexanium";
+
+const vsr = await createSigningRequest({
+  action: {
+    account: "vex.token",
+    name: "transfer",
+    authorization: [{ actor: "............1", permission: "............2" }],
+    data: {
+      from: "............1",
+      to: "receiver",
+      quantity: "1.0000 VEX",
+      memo: "Example transfer",
+    },
+  },
+});
 ```
 
-The Vexanium system contract is `vexcore`. The native VEX token contract is `vex.token`, with symbol `VEX` and precision `4`.
-
-## Runtime
-
-The package is ESM-first and requires Node.js 20.19 or newer when used directly in Node.js. Browser and React Native environments must provide the Web APIs required by the selected WindStack packages. Raw-deflate compression is provided through `pako`.
+That wrapper owns Vexanium-specific chain validation, RPC defaults, and the canonical `vsr:` scheme. The generic package does not own Vexanium presets.
 
 ## Security
 
-VSR URIs are untrusted input. Parsing and resolution enforce supported protocol versions, flags, payload bounds, chain constraints, and ABI-aware structured data handling.
+Signing-request URIs are untrusted input. Parsing and resolution enforce protocol versions, flags, payload-size limits, chain selectors, and ABI-aware structured data handling. Request signatures prove that request bytes were signed by a supplied public key; applications requiring account-level authority must separately verify that key against the claimed account permission.
 
-Request signatures prove that request bytes were signed by a supplied public key. Applications that require account-level authority verification must also verify that the key is authorized for the claimed account permission.
+## Runtime
+
+The package is ESM-first and requires Node.js 20.19 or newer when used directly in Node.js. Browser and React Native environments must provide the Web APIs required by the selected WindStack packages.
 
 ## License
 
