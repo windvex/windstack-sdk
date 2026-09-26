@@ -172,9 +172,7 @@ export function parseWispWalletLaunchUrl(
     return null;
   }
 
-  const linkHosts = (options.linkHosts ?? WISP_LAUNCH_HOSTS).map((host) =>
-    host.toLowerCase(),
-  );
+  const linkHosts = (options.linkHosts ?? WISP_LAUNCH_HOSTS).map((host) => host.toLowerCase());
   const walletSchemes = (options.walletSchemes ?? []).map((scheme) =>
     scheme.replace(/:$/u, "").toLowerCase(),
   );

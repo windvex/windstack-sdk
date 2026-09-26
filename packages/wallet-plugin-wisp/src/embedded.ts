@@ -4,14 +4,8 @@
  * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
  * SPDX-License-Identifier: MIT
  */
-import {
-  createEvmFrameProvider,
-  type EvmFrameProvider,
-} from "@windstack/evm";
-import {
-  createVexaniumFrameProvider,
-  type VexaniumFrameProvider,
-} from "@windstack/vexanium";
+import { createEvmFrameProvider, type EvmFrameProvider } from "@windstack/evm";
+import { createVexaniumFrameProvider, type VexaniumFrameProvider } from "@windstack/vexanium";
 import {
   createWispEip6963ProviderInfo,
   createWispVexaniumProviderInfo,

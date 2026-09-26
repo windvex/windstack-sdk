@@ -54,10 +54,7 @@ export function parseWispBrowserNavigationMessage(
     return null;
   }
   try {
-    return createWispBrowserNavigationMessage(
-      candidate.url,
-      candidate.disposition ?? "browser",
-    );
+    return createWispBrowserNavigationMessage(candidate.url, candidate.disposition ?? "browser");
   } catch {
     return null;
   }

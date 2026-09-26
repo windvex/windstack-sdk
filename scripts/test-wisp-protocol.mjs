@@ -55,10 +55,7 @@ assert.equal(
   "https://tg.windcrypto.com",
 );
 assert.throws(() =>
-  resolveWispEmbeddedParentOrigin(
-    "https://tg.windcrypto.com",
-    "https://example.com/embedded",
-  ),
+  resolveWispEmbeddedParentOrigin("https://tg.windcrypto.com", "https://example.com/embedded"),
 );
 
 assert.equal(launchSpec.schemaVersion, 1);
@@ -99,10 +96,7 @@ assert.equal(
   })?.kind,
   "browser",
 );
-assert.equal(
-  parseWispWalletLaunchUrl("wispwallet://dapp?url=https%3A%2F%2Fexample.com"),
-  null,
-);
+assert.equal(parseWispWalletLaunchUrl("wispwallet://dapp?url=https%3A%2F%2Fexample.com"), null);
 
 assert.throws(() =>
   buildWispBrowserLaunchUrl({

@@ -2,22 +2,13 @@
   "schemaVersion": 1,
   "link": {
     "defaultUrl": "https://link.windcrypto.com/dapp",
-    "hosts": [
-      "link.windcrypto.com",
-      "windcrypto.com"
-    ],
+    "hosts": ["link.windcrypto.com", "windcrypto.com"],
     "targetProtocol": "https",
     "credentials": false
   },
-  "requestKinds": [
-    "browser",
-    "signing-request"
-  ],
+  "requestKinds": ["browser", "signing-request"],
   "signingRequest": {
-    "schemes": [
-      "vsr",
-      "esr"
-    ],
+    "schemes": ["vsr", "esr"],
     "canonicalVexaniumScheme": "vsr",
     "esrPolicy": "accepted-for-antelope-interoperability"
   },

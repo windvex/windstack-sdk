@@ -3,10 +3,7 @@
   "message": {
     "type": "wisp:browser:navigate",
     "version": 1,
-    "dispositions": [
-      "browser",
-      "external"
-    ],
+    "dispositions": ["browser", "external"],
     "url": {
       "protocol": "https",
       "credentials": false
