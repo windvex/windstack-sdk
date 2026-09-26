@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import ts from "typescript";
+import * as ts from "typescript";
 import {
   git,
   loadReleaseEntries,
@@ -17,14 +17,30 @@ import {
   root,
 } from "./release-artifacts.mjs";
 
-const baseline = process.env.API_BASE_TAG?.trim() || git([
-  "describe",
-  "--tags",
-  "--match",
-  "v[0-9]*",
-  "--abbrev=0",
-]);
-if (!baseline) throw new Error("Unable to resolve the previous WindStack release tag");
+const { rootManifest: candidateManifest } = await loadReleaseEntries();
+
+function resolveApiBaseline() {
+  const configured = process.env.API_BASE_TAG?.trim();
+  if (configured) return configured;
+
+  const tags = git(["tag", "--list", "v[0-9]*", "--sort=-version:refname"], {
+    allowFailure: true,
+  })
+    .split("\n")
+    .filter(Boolean);
+  for (const tag of tags) {
+    const manifestText = git(["show", `${tag}:package.json`], { allowFailure: true });
+    if (!manifestText) continue;
+    try {
+      if (JSON.parse(manifestText).version !== candidateManifest.version) return tag;
+    } catch {
+      // Ignore malformed historical tags.
+    }
+  }
+  throw new Error("Unable to resolve the previous WindStack release tag");
+}
+
+const baseline = resolveApiBaseline();
 
 const formatFlags =
   ts.TypeFormatFlags.NoTruncation |
@@ -217,6 +233,20 @@ function approvalKey(value) {
   return [value.kind, value.package, value.entry, value.export ?? "*"].join("::");
 }
 
+const tscPath = path.join(root, "node_modules", "typescript", "bin", "tsc");
+const candidateBuild = spawnSync(
+  process.execPath,
+  [tscPath, "-b", ...packageDirectories.map((directory) => `packages/${directory}`)],
+  {
+    cwd: root,
+    encoding: "utf8",
+    stdio: "inherit",
+  },
+);
+if (candidateBuild.status !== 0) {
+  throw new Error("Unable to build candidate public declarations");
+}
+
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), "windstack-api-baseline-"));
 const baselineRoot = path.join(temporaryRoot, "baseline");
 let worktreeAdded = false;
@@ -232,7 +262,6 @@ try {
 
   await symlink(path.join(root, "node_modules"), path.join(baselineRoot, "node_modules"), "dir");
 
-  const tscPath = path.join(root, "node_modules", "typescript", "bin", "tsc");
   const build = spawnSync(
     process.execPath,
     [tscPath, "-b", ...packageDirectories.map((directory) => `packages/${directory}`)],
@@ -276,11 +305,10 @@ try {
     approval: approvals.get(approvalKey(change)) ?? null,
   }));
   const unapproved = reviewedChanges.filter(({ approval }) => !approval);
-  const { rootManifest } = await loadReleaseEntries();
   const report = {
     schemaVersion: 1,
     baseline,
-    candidateVersion: rootManifest.version,
+    candidateVersion: candidateManifest.version,
     gitSha: git(["rev-parse", "HEAD"]),
     added,
     changes: reviewedChanges,
