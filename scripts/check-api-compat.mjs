@@ -312,9 +312,7 @@ try {
     `API compatibility: ${additions.length} additive changes, ${changes.length} reviewed changes, ${unapproved.length} unapproved.`,
   );
   for (const change of unapproved) {
-    console.error(
-      `- ${change.kind}: ${change.package} ${change.entry} :: ${change.file}`,
-    );
+    console.error(`- ${change.kind}: ${change.package} ${change.entry} :: ${change.file}`);
   }
 
   if (unapproved.length) {
