@@ -43,7 +43,10 @@ assert.deepEqual(contract.vex.capabilities, Object.values(VEXANIUM_CAPABILITIES)
 assert.deepEqual(Object.values(contract.vex.methods), Object.values(VEXANIUM_METHODS));
 assert.equal(contract.vex.events.requestProvider, VEXANIUM_REQUEST_PROVIDER_EVENT);
 assert.equal(contract.vex.events.announceProvider, VEXANIUM_ANNOUNCE_PROVIDER_EVENT);
-assert.deepEqual(Object.values(contract.vex.providerEvents), Object.values(VEXANIUM_PROVIDER_EVENTS));
+assert.deepEqual(
+  Object.values(contract.vex.providerEvents),
+  Object.values(VEXANIUM_PROVIDER_EVENTS),
+);
 assert.equal(contract.vex.versioning.independentFromNpmSemver, true);
 assert.equal(contract.vex.versioning.compatibility, "same-major");
 assert.equal(contract.vex.session.walletSessionId, "opaque-wallet-issued");
