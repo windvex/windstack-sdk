@@ -175,11 +175,7 @@ export function assertVexaniumAccountsResponse(
 export function assertVexaniumDisconnectEvent(
   value: unknown,
 ): asserts value is VexaniumDisconnectEvent {
-  if (
-    !isRecord(value) ||
-    !Number.isInteger(value.code) ||
-    !isNonEmptyString(value.message)
-  ) {
+  if (!isRecord(value) || !Number.isInteger(value.code) || !isNonEmptyString(value.message)) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_REQUEST,
       "Malformed VexaniumProvider disconnect event",
@@ -188,9 +184,7 @@ export function assertVexaniumDisconnectEvent(
   }
 }
 
-export function assertVexaniumChainChangedEvent(
-  value: unknown,
-): asserts value is VexaniumChainId {
+export function assertVexaniumChainChangedEvent(value: unknown): asserts value is VexaniumChainId {
   if (!isVexaniumChainId(value)) {
     throw new VexaniumProviderError(
       VEXANIUM_ERROR_CODES.INVALID_REQUEST,
