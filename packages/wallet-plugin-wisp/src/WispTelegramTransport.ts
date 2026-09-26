@@ -12,6 +12,15 @@ import {
   type VexSigningRequestResult,
   type VexSigningRequestUri,
 } from "@windstack/vexanium";
+import {
+  WISP_TELEGRAM_HANDOFF_EVENTS_PATH,
+  WISP_TELEGRAM_HANDOFF_PREPARE_PATH,
+  parseWispTelegramWispTelegramHandoffStatus,
+  parseWispTelegramWispTelegramPreparedHandoff,
+  type WispTelegramWispTelegramHandoffResult,
+  type WispTelegramWispTelegramHandoffStatus,
+  type WispTelegramWispTelegramPreparedHandoff,
+} from "./telegram-protocol.js";
 
 const DEFAULT_STORAGE_KEY = "windstack:wisp-telegram-session:v1";
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/u;
@@ -84,30 +93,6 @@ export type WispTelegramSession = Readonly<{
 export type WispTelegramTransactArgs = {
   actions: readonly VexaniumActionInput[];
   signal?: AbortSignal;
-};
-
-type HandoffResult = {
-  actor?: string;
-  permission?: string;
-  sessionId?: string;
-  chainId?: string;
-  transactionId?: string;
-  sessionExpiresAt?: number;
-  sessionInvalidated?: boolean;
-  error?: string;
-};
-
-type HandoffStatusValue = "pending" | "opened" | "approved" | "rejected" | "failed";
-
-type HandoffStatus = {
-  id: string;
-  status: HandoffStatusValue;
-  expiresAt: number;
-  result?: HandoffResult;
-};
-
-type PreparedHandoff = HandoffStatus & {
-  launchUrl?: string;
 };
 
 type StoredSession = {
@@ -250,7 +235,7 @@ function memoryStorage(): WispTelegramSessionStorage {
   };
 }
 
-function normalizeAccount(result: HandoffResult): VexaniumAccount {
+function normalizeAccount(result: WispTelegramHandoffResult): VexaniumAccount {
   const actor = String(result.actor || "").trim();
   const permission = String(result.permission || "active").trim();
   if (!ACCOUNT_RE.test(actor) || !ACCOUNT_RE.test(permission)) {
@@ -281,7 +266,7 @@ function resultErrorMessage(value: unknown, fallback: string) {
   return fallback;
 }
 
-function terminalResult(status: HandoffStatus): HandoffResult | null {
+function terminalResult(status: WispTelegramHandoffStatus): WispTelegramHandoffResult | null {
   if (status.status === "approved") return status.result ?? {};
   if (status.status === "rejected") {
     throw new WispTelegramResultError(
@@ -393,21 +378,23 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   async function prepare(
     body: Record<string, unknown>,
     signal?: AbortSignal,
-  ): Promise<PreparedHandoff> {
-    const prepared = await requestJson<PreparedHandoff>("telegram/dapp/prepare", {
-      method: "POST",
-      signal,
-      body: JSON.stringify({
-        name,
-        description,
-        icon,
-        origin,
-        url: pageUrl.toString(),
-        chainId: VEXANIUM_MAINNET_CHAIN_ID,
-        ...body,
-        ...(telegramReturnUrl ? { telegramReturnUrl } : {}),
+  ): Promise<WispTelegramPreparedHandoff> {
+    const prepared = parseWispTelegramPreparedHandoff(
+      await requestJson<unknown>(WISP_TELEGRAM_HANDOFF_PREPARE_PATH, {
+        method: "POST",
+        signal,
+        body: JSON.stringify({
+          name,
+          description,
+          icon,
+          origin,
+          url: pageUrl.toString(),
+          chainId: VEXANIUM_MAINNET_CHAIN_ID,
+          ...body,
+          ...(telegramReturnUrl ? { telegramReturnUrl } : {}),
+        }),
       }),
-    });
+    );
     if (!prepared.id || prepared.expiresAt <= Date.now()) {
       throw new Error("Wisp Telegram returned an invalid handoff");
     }
@@ -422,9 +409,9 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   }
 
   async function waitForEventResult(
-    prepared: PreparedHandoff,
+    prepared: WispTelegramPreparedHandoff,
     signal?: AbortSignal,
-  ): Promise<HandoffResult> {
+  ): Promise<WispTelegramHandoffResult> {
     if (!eventSourceFactory) {
       throw new TypeError(
         "Wisp Telegram transport requires EventSource; polling fallback was removed in WindStack 2.2",
@@ -432,7 +419,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     }
     if (signal?.aborted) throw new DOMException("Wallet request cancelled", "AbortError");
 
-    return new Promise<HandoffResult>((resolve, reject) => {
+    return new Promise<WispTelegramHandoffResult>((resolve, reject) => {
       let source: WispTelegramEventSource | null = null;
       let settled = false;
       const timeoutMs = Math.max(0, prepared.expiresAt - Date.now());
@@ -446,7 +433,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
         source?.close();
         source = null;
       };
-      const finishResolve = (value: HandoffResult) => {
+      const finishResolve = (value: WispTelegramHandoffResult) => {
         if (settled) return;
         settled = true;
         cleanup();
@@ -466,12 +453,16 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
 
       try {
         source = eventSourceFactory(
-          apiEndpoint(`telegram/dapp/events?id=${encodeURIComponent(prepared.id)}`),
+          apiEndpoint(
+            `${WISP_TELEGRAM_HANDOFF_EVENTS_PATH}?id=${encodeURIComponent(prepared.id)}`,
+          ),
         );
         source.onmessage = (event) => {
           try {
-            const status = JSON.parse(String(event.data || "")) as HandoffStatus;
-            if (!status || status.id !== prepared.id) return;
+            const status = parseWispTelegramHandoffStatus(
+              JSON.parse(String(event.data || "")),
+              prepared.id,
+            );
             const result = terminalResult(status);
             if (result) finishResolve(result);
           } catch (error) {
@@ -488,15 +479,15 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   }
 
   async function waitForResult(
-    prepared: PreparedHandoff,
+    prepared: WispTelegramPreparedHandoff,
     signal?: AbortSignal,
-  ): Promise<HandoffResult> {
+  ): Promise<WispTelegramHandoffResult> {
     const immediate = terminalResult(prepared);
     if (immediate) return immediate;
     return waitForEventResult(prepared, signal);
   }
 
-  function sessionFromResult(result: HandoffResult): WispTelegramSession {
+  function sessionFromResult(result: WispTelegramHandoffResult): WispTelegramSession {
     const sessionId = opaqueSessionId(result.sessionId);
     if (!sessionId) throw new Error("Wisp Telegram did not return a wallet session id");
     const chainId = String(result.chainId || VEXANIUM_MAINNET_CHAIN_ID).toLowerCase();

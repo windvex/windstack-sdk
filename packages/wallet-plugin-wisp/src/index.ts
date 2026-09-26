@@ -69,3 +69,22 @@ export type {
   WispTelegramTransport,
   WispTelegramTransportOptions,
 } from "./WispTelegramTransport.js";
+export {
+  WISP_TELEGRAM_HANDOFF_EVENTS_PATH,
+  WISP_TELEGRAM_HANDOFF_EVENT_RETRY_MS,
+  WISP_TELEGRAM_HANDOFF_KINDS,
+  WISP_TELEGRAM_HANDOFF_PREPARE_PATH,
+  WISP_TELEGRAM_HANDOFF_STATUSES,
+  WISP_TELEGRAM_HANDOFF_TERMINAL_STATUSES,
+  isWispTelegramHandoffStatus,
+  parseWispTelegramHandoffStatus,
+  parseWispTelegramPreparedHandoff,
+} from "./telegram-protocol.js";
+export type {
+  WispTelegramHandoffKind,
+  WispTelegramHandoffPrepareRequest,
+  WispTelegramHandoffResult,
+  WispTelegramHandoffStatus,
+  WispTelegramHandoffStatusValue,
+  WispTelegramPreparedHandoff,
+} from "./telegram-protocol.js";

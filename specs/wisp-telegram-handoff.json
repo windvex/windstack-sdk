@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "transport": {
+    "preparePath": "telegram/dapp/prepare",
+    "eventsPath": "telegram/dapp/events",
+    "eventSource": {
+      "canonical": true,
+      "retryMs": 1500,
+      "resumeHeader": "Last-Event-ID",
+      "pollingFallback": false
+    }
+  },
+  "request": {
+    "kinds": ["connect", "restore", "sign", "disconnect"],
+    "originBinding": "exact-https-browser-origin",
+    "sessionBoundKinds": ["restore", "sign", "disconnect"],
+    "signingSchemes": ["vsr", "esr"]
+  },
+  "status": {
+    "values": ["pending", "opened", "approved", "rejected", "failed"],
+    "eventIds": {
+      "pending": 1,
+      "opened": 2,
+      "terminal": 3
+    },
+    "terminal": ["approved", "rejected", "failed"]
+  },
+  "result": {
+    "sessionFields": [
+      "sessionId",
+      "actor",
+      "permission",
+      "chainId",
+      "sessionExpiresAt"
+    ],
+    "transactionId": "required-for-approved-sign",
+    "sessionInvalidated": "allowed-only-on-failed-existing-session"
+  },
+  "storage": {
+    "sessionPointerOriginBound": true,
+    "restoreRevalidatesWalletSession": true
+  }
+}
