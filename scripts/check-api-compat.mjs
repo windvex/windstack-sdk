@@ -1,3 +1,122 @@
+/**
+ * WindStack SDK
+ * Created by Gilang Ramadan
+ * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+ * SPDX-License-Identifier: MIT
+ */
+import { spawnSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import {
+  git,
+  loadReleaseEntries,
+  packageDirectories,
+  releaseRoot,
+  root,
+} from "./release-artifacts.mjs";
+
+const { rootManifest: candidateManifest } = await loadReleaseEntries();
+
+function resolveApiBaseline() {
+  const configured = process.env.API_BASE_TAG?.trim();
+  if (configured) return configured;
+
+  const tags = git(["tag", "--list", "v[0-9]*", "--sort=-version:refname"], {
+    allowFailure: true,
+  })
+    .split("\n")
+    .filter(Boolean);
+
+  for (const tag of tags) {
+    const manifestText = git(["show", `${tag}:package.json`], { allowFailure: true });
+    if (!manifestText) continue;
+    try {
+      if (JSON.parse(manifestText).version !== candidateManifest.version) return tag;
+    } catch {
+      // Ignore malformed historical tags.
+    }
+  }
+
+  throw new Error("Unable to resolve the previous WindStack release tag");
+}
+
+function runBuild(repositoryRoot) {
+  const tscPath = path.join(root, "node_modules", "typescript", "bin", "tsc");
+  const result = spawnSync(
+    process.execPath,
+    [tscPath, "-b", ...packageDirectories.map((directory) => `packages/${directory}`)],
+    {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      stdio: "inherit",
+    },
+  );
+  if (result.status !== 0) {
+    throw new Error(`Unable to build public declarations in ${repositoryRoot}`);
+  }
+}
+
+function normalizeDeclaration(source) {
+  return String(source)
+    .replaceAll("\r\n", "\n")
+    .split("\n")
+    .map((line) => line.trim().replace(/\s+/gu, " "))
+    .filter(Boolean);
+}
+
+function isSubsequence(previousLines, candidateLines) {
+  let candidateIndex = 0;
+  for (const previousLine of previousLines) {
+    while (
+      candidateIndex < candidateLines.length &&
+      candidateLines[candidateIndex] !== previousLine
+    ) {
+      candidateIndex += 1;
+    }
+    if (candidateIndex >= candidateLines.length) return false;
+    candidateIndex += 1;
+  }
+  return true;
+}
+
+function declarationCandidates(filePath, specifier) {
+  const base = path.resolve(path.dirname(filePath), specifier);
+  const candidates = [];
+
+  if (/\.js$/u.test(base)) candidates.push(base.replace(/\.js$/u, ".d.ts"));
+  if (/\.mjs$/u.test(base)) candidates.push(base.replace(/\.mjs$/u, ".d.mts"));
+  if (/\.cjs$/u.test(base)) candidates.push(base.replace(/\.cjs$/u, ".d.cts"));
+  if (/\.d\.(?:ts|mts|cts)$/u.test(base)) candidates.push(base);
+  if (!path.extname(base)) {
+    candidates.push(`${base}.d.ts`);
+    candidates.push(path.join(base, "index.d.ts"));
+  }
+
+  return [...new Set(candidates)];
+}
+
+async function readableFile(candidates) {
+  for (const filePath of candidates) {
+    try {
+      await readFile(filePath, "utf8");
+      return filePath;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+  return null;
+}
+
+async function collectDeclarationClosure(entryPath, packageRoot) {
+  const seen = new Set();
+  const files = new Map();
+  const queue = [entryPath];
+
+  while (queue.length) {
+    const filePath = queue.shift();
+    if (seen.has(filePath)) continue;
+    seen.add(filePath);
 
     const source = await readFile(filePath, "utf8");
     const relativePath = path.relative(packageRoot, filePath).replaceAll(path.sep, "/");
@@ -191,7 +310,6 @@ try {
 
   console.log(
     `API compatibility: ${additions.length} additive changes, ${changes.length} reviewed changes, ${unapproved.length} unapproved.`,
-
   );
   for (const change of unapproved) {
     console.error(
@@ -209,3 +327,8 @@ try {
     spawnSync("git", ["worktree", "remove", "--force", baselineRoot], {
       cwd: root,
       encoding: "utf8",
+      stdio: "ignore",
+    });
+  }
+  await rm(temporaryRoot, { recursive: true, force: true });
+}
