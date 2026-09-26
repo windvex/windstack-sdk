@@ -17,7 +17,7 @@ import {
 import { WISP_PROVIDER_NAME, WISP_PROVIDER_RDNS } from "./identity.js";
 
 export type WispVexaniumProviderInfoOptions = {
-  uuid: string;
+  uuid?: string;
   icon?: string;
   version?: string;
   chains?: readonly VexaniumChainId[];
@@ -25,15 +25,29 @@ export type WispVexaniumProviderInfoOptions = {
 };
 
 export type WispEip6963ProviderInfoOptions = {
-  uuid: string;
+  uuid?: string;
   icon: string;
 };
 
+export function createWispProviderInstanceUuid(): string {
+  const crypto = globalThis.crypto;
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  if (!crypto?.getRandomValues) {
+    throw new Error("Secure platform randomness is required for provider instance identity");
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export function createWispVexaniumProviderInfo(
-  options: WispVexaniumProviderInfoOptions,
+  options: WispVexaniumProviderInfoOptions = {},
 ): VexaniumProviderInfo {
   return createVexaniumProviderInfo({
-    uuid: options.uuid,
+    uuid: options.uuid ?? createWispProviderInstanceUuid(),
     name: WISP_PROVIDER_NAME,
     rdns: WISP_PROVIDER_RDNS,
     ...(options.icon ? { icon: options.icon } : {}),
@@ -48,7 +62,7 @@ export function createWispEip6963ProviderInfo(
   options: WispEip6963ProviderInfoOptions,
 ): EIP6963ProviderInfo {
   const info: EIP6963ProviderInfo = {
-    uuid: options.uuid,
+    uuid: options.uuid ?? createWispProviderInstanceUuid(),
     name: WISP_PROVIDER_NAME,
     icon: options.icon,
     rdns: WISP_PROVIDER_RDNS,

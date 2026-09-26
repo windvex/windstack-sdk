@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "message": {
+    "type": "wisp:browser:navigate",
+    "version": 1,
+    "dispositions": [
+      "browser",
+      "external"
+    ],
+    "url": {
+      "protocol": "https",
+      "credentials": false
+    }
+  },
+  "security": {
+    "sourceWindow": "exact-embedded-frame",
+    "origin": "exact-dapp-origin",
+    "parentTargetOrigin": "exact-wallet-origin",
+    "wildcardTargetOrigin": false,
+    "productAllowlist": false
+  }
+}

@@ -9,6 +9,7 @@
   "references": [
     { "path": "../antelope" },
     { "path": "../core" },
+    { "path": "../evm" },
     { "path": "../session" },
     { "path": "../vexanium" }
   ]

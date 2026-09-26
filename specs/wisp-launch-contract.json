@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "link": {
+    "defaultUrl": "https://link.windcrypto.com/dapp",
+    "hosts": [
+      "link.windcrypto.com",
+      "windcrypto.com"
+    ],
+    "targetProtocol": "https",
+    "credentials": false
+  },
+  "requestKinds": [
+    "browser",
+    "signing-request"
+  ],
+  "signingRequest": {
+    "schemes": [
+      "vsr",
+      "esr"
+    ],
+    "canonicalVexaniumScheme": "vsr",
+    "esrPolicy": "accepted-for-antelope-interoperability"
+  },
+  "metadata": {
+    "requestId": "optional",
+    "origin": "optional-exact-https-origin",
+    "appName": "optional",
+    "appIcon": "optional-https-url",
+    "chainId": "optional",
+    "expiresAt": "optional-epoch-milliseconds"
+  }
+}
