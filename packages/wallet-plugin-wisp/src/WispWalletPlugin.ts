@@ -6,6 +6,7 @@
  */
 import { bytesToHex, type SignRequest, type Signer } from "@windstack/antelope";
 import type { DappMetadataInput } from "@windstack/core";
+import { WISP_PROVIDER_NAME, WISP_PROVIDER_RDNS } from "./identity.js";
 import type {
   WalletLoginContext,
   WalletLoginResult,
@@ -24,8 +25,6 @@ import {
   type VexaniumClient,
   type VexaniumProvider,
 } from "@windstack/vexanium";
-
-const WISP_PROVIDER_RDNS = "com.wisp.wallet";
 
 export type WispWalletPluginMetadata = {
   name?: string;
@@ -95,7 +94,7 @@ export class WispWalletPlugin implements WalletPlugin {
     this.suppliedProvider = options.provider;
     this.dapp = options.dapp;
     this.metadata = Object.freeze({
-      name: "Wisp",
+      name: WISP_PROVIDER_NAME,
       description: "Connect and sign Vexanium transactions with Wisp.",
       ...options.metadata,
     });

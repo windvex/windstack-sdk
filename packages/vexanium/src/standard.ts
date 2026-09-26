@@ -20,6 +20,7 @@ import type {
   VexaniumAccountsResponse,
   VexaniumCapabilitiesRequest,
   VexaniumCapabilitiesResponse,
+  VexaniumChainId,
   VexaniumCapability,
   VexaniumConnectResponse,
   VexaniumProviderInfo,
@@ -67,7 +68,11 @@ function parseMajor(version: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-function hasValidAccounts(value: unknown, chainId: string, requireNonEmpty: boolean): boolean {
+function hasValidAccounts(
+  value: unknown,
+  chainId: VexaniumChainId,
+  requireNonEmpty: boolean,
+): boolean {
   if (!Array.isArray(value) || (requireNonEmpty && value.length === 0)) return false;
   try {
     normalizeVexaniumAccounts(value, chainId);

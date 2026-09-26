@@ -41,6 +41,7 @@ import {
   parseSigningRequest as parseVexaniumSigningRequest,
 } from "./signing-request.js";
 import {
+  assertVexaniumAccountsResponse,
   assertVexaniumCapabilitiesResponse,
   assertVexaniumConnectResponse,
   assertVexaniumProviderInfo,
@@ -211,23 +212,6 @@ function computeFailureDetail(value: unknown): string {
     if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
   }
   return "";
-}
-
-function assertAccountsResponse(value: unknown): asserts value is VexaniumAccountsResponse {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    Array.isArray(value) ||
-    typeof (value as { sessionId?: unknown }).sessionId !== "string" ||
-    !isVexaniumFullChainId((value as { chainId?: unknown }).chainId) ||
-    !Array.isArray((value as { accounts?: unknown }).accounts)
-  ) {
-    throw new VexaniumProviderError(
-      VEXANIUM_ERROR_CODES.INVALID_REQUEST,
-      "Malformed vex_getAccounts response",
-      value,
-    );
-  }
 }
 
 function assertValidSignatures(value: unknown, method: string): asserts value is string[] {
@@ -597,7 +581,7 @@ export async function createVexaniumClient(
       const rawResponse = await request<VexaniumAccountsResponse>({
         method: VEXANIUM_METHODS.GET_ACCOUNTS,
       });
-      assertAccountsResponse(rawResponse);
+      assertVexaniumAccountsResponse(rawResponse);
       const accounts = normalizeVexaniumAccounts(rawResponse.accounts, rawResponse.chainId);
       return updateSession({
         accounts,
@@ -702,7 +686,7 @@ export async function createVexaniumClient(
 
   const handleAccountsChanged = (payload: VexaniumProviderEventMap["accountsChanged"]): void => {
     try {
-      assertAccountsResponse(payload);
+      assertVexaniumAccountsResponse(payload);
       if (!sameVexaniumChain(payload.chainId, vexNative.chainId)) return;
       const accounts = normalizeVexaniumAccounts(payload.accounts, payload.chainId);
       updateSession({
