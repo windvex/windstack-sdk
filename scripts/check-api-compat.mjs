@@ -108,7 +108,9 @@ function snapshotSymbol(checker, symbol) {
   const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
   const declarations = target.declarations ?? symbol.declarations ?? [];
   const location = target.valueDeclaration ?? declarations[0];
-  const declarationKinds = [...new Set(declarations.map((declaration) => ts.SyntaxKind[declaration.kind]))].sort();
+  const declarationKinds = [
+    ...new Set(declarations.map((declaration) => ts.SyntaxKind[declaration.kind])),
+  ].sort();
 
   let valueType = null;
   let declaredType = null;
@@ -120,7 +122,9 @@ function snapshotSymbol(checker, symbol) {
     valueType = normalizeText(checker.typeToString(type, location, formatFlags));
     callSignatures = checker
       .getSignaturesOfType(type, ts.SignatureKind.Call)
-      .map((signature) => normalizeText(checker.signatureToString(signature, location, formatFlags)))
+      .map((signature) =>
+        normalizeText(checker.signatureToString(signature, location, formatFlags)),
+      )
       .sort();
     constructSignatures = checker
       .getSignaturesOfType(type, ts.SignatureKind.Construct)
@@ -166,7 +170,9 @@ async function snapshotRepository(repositoryRoot) {
     const source = program.getSourceFile(entry.declarationPath);
     if (!source) {
       throw new Error(
-        `Unable to load declaration entry ${entry.packageName}${entry.entry === "." ? "" : entry.entry}`,
+        `Unable to load declaration entry ${entry.packageName}${
+          entry.entry === "." ? "" : entry.entry
+        }`,
       );
     }
     const moduleSymbol = checker.getSymbolAtLocation(source);
@@ -323,6 +329,7 @@ try {
 
   console.log(
     `API compatibility: ${added.length} additions, ${changes.length} reviewed changes, ${unapproved.length} unapproved.`,
+
   );
   for (const change of unapproved) {
     console.error(
