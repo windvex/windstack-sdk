@@ -72,13 +72,7 @@ const stagingDirectory = await mkdtemp(path.join(releaseRoot, "candidate-staging
 try {
   const packages = [];
   for (const { manifest } of entries) {
-    run("npm", [
-      "pack",
-      "--workspace",
-      manifest.name,
-      "--pack-destination",
-      stagingDirectory,
-    ]);
+    run("npm", ["pack", "--workspace", manifest.name, "--pack-destination", stagingDirectory]);
     const filename = tarballFilename(manifest.name, manifest.version);
     const filePath = path.join(stagingDirectory, filename);
     await access(filePath);
