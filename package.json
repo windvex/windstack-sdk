@@ -27,9 +27,13 @@
     "verify:vexanium": "node scripts/verify-vexanium-live.mjs",
     "validate:native": "npm run clean && npm run format:check && npm run check:boundaries && npm run check:release && npm run check:public-content && npm run build:native && npm run test:native && npm run pack:native",
     "validate": "npm run clean && npm run format:check && npm run lint && npm run check:boundaries && npm run check:release && npm run check:public-content && npm run build && npm run typecheck && npm test && npm run pack:dry-run",
-    "release:dry-run": "npm run validate && npm run audit:release && npm run verify:vexanium && npm audit && npm run audit:native",
+    "release:dry-run": "npm run candidate:verify && npm run audit:release && npm run verify:vexanium && npm audit && npm run audit:native",
     "release:npm": "node scripts/publish-release.mjs",
-    "check:boundaries": "node scripts/check-package-boundaries.mjs"
+    "check:boundaries": "node scripts/check-package-boundaries.mjs",
+    "check:api": "node scripts/check-api-compat.mjs",
+    "candidate:create": "node scripts/create-release-candidate.mjs",
+    "candidate:verify": "node scripts/verify-release-candidate.mjs",
+    "release:candidate": "npm run validate && npm run check:api && npm run candidate:create && npm run audit:release"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
