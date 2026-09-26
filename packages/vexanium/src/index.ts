@@ -50,12 +50,26 @@ export {
 } from "./errors.js";
 export {
   assertCompatibleVexaniumProviderVersion,
+  assertVexaniumAccountsResponse,
+  assertVexaniumCapabilitiesRequest,
   assertVexaniumCapabilitiesResponse,
   assertVexaniumConnectResponse,
   assertVexaniumProviderInfo,
   isCompatibleVexaniumProviderVersion,
   isVexaniumProviderInfo,
 } from "./standard.js";
+export {
+  createVexaniumAccountsResponse,
+  createVexaniumCapabilitiesResponse,
+  createVexaniumConnectResponse,
+  createVexaniumProviderInfo,
+} from "./provider-author.js";
+export type {
+  CreateVexaniumAccountsResponseInput,
+  CreateVexaniumCapabilitiesResponseInput,
+  CreateVexaniumConnectResponseInput,
+  CreateVexaniumProviderInfoInput,
+} from "./provider-author.js";
 export {
   announceVexaniumProvider,
   discoverVexaniumProviders,

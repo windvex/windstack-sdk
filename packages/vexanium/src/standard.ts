@@ -1,3 +1,10 @@
+/**
+ * WindStack SDK
+ * Created by Gilang Ramadan
+ * Copyright (c) 2026 PT WIND KRIPTOGRAFI TEKNOLOGI
+ * SPDX-License-Identifier: MIT
+ */
+import { normalizeVexaniumAccounts } from "./accounts.js";
 import {
   VEXANIUM_CAPABILITIES,
   VEXANIUM_PROVIDER_MAJOR_VERSION,
@@ -10,6 +17,8 @@ import {
   vexaniumUnsupportedCapability,
 } from "./errors.js";
 import type {
+  VexaniumAccountsResponse,
+  VexaniumCapabilitiesRequest,
   VexaniumCapabilitiesResponse,
   VexaniumCapability,
   VexaniumConnectResponse,
@@ -56,6 +65,16 @@ function isSafeIcon(value: unknown): boolean {
 function parseMajor(version: string): number | null {
   const match = SEMVER_PATTERN.exec(version.trim());
   return match ? Number(match[1]) : null;
+}
+
+function hasValidAccounts(value: unknown, chainId: string, requireNonEmpty: boolean): boolean {
+  if (!Array.isArray(value) || (requireNonEmpty && value.length === 0)) return false;
+  try {
+    normalizeVexaniumAccounts(value, chainId);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function isCompatibleVexaniumProviderVersion(version: string): boolean {
@@ -107,6 +126,44 @@ export function assertVexaniumProviderInfo(value: unknown): asserts value is Vex
     );
   }
   assertCompatibleVexaniumProviderVersion(value.version);
+}
+
+export function assertVexaniumCapabilitiesRequest(
+  value: unknown,
+): asserts value is VexaniumCapabilitiesRequest {
+  if (
+    !isRecord(value) ||
+    value.standard !== VEXANIUM_PROVIDER_STANDARD ||
+    !isNonEmptyString(value.version) ||
+    (value.requiredCapabilities !== undefined &&
+      (!Array.isArray(value.requiredCapabilities) ||
+        !value.requiredCapabilities.every(isVexaniumCapability) ||
+        !allUnique(value.requiredCapabilities)))
+  ) {
+    throw new VexaniumProviderError(
+      VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+      "Malformed vex_getCapabilities request",
+      value,
+    );
+  }
+  assertCompatibleVexaniumProviderVersion(value.version);
+}
+
+export function assertVexaniumAccountsResponse(
+  value: unknown,
+): asserts value is VexaniumAccountsResponse {
+  if (
+    !isRecord(value) ||
+    !isNonEmptyString(value.sessionId) ||
+    !isVexaniumFullChainId(value.chainId) ||
+    !hasValidAccounts(value.accounts, value.chainId, false)
+  ) {
+    throw new VexaniumProviderError(
+      VEXANIUM_ERROR_CODES.INVALID_REQUEST,
+      "Malformed vex_getAccounts response",
+      value,
+    );
+  }
 }
 
 export function assertVexaniumCapabilitiesResponse(
@@ -162,8 +219,7 @@ export function assertVexaniumConnectResponse(
     !isNonEmptyString(value.version) ||
     !isNonEmptyString(value.sessionId) ||
     !isVexaniumFullChainId(value.chainId) ||
-    !Array.isArray(value.accounts) ||
-    value.accounts.length === 0 ||
+    !hasValidAccounts(value.accounts, value.chainId, true) ||
     !Array.isArray(value.capabilities) ||
     !value.capabilities.every(isVexaniumCapability) ||
     !allUnique(value.capabilities)
