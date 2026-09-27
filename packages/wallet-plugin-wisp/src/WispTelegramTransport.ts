@@ -332,6 +332,18 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   if (!storageKey) throw new TypeError("Wisp Telegram storageKey must be non-empty");
   let currentSession: WispTelegramSession | null = null;
   const sessionListeners = new Set<WispTelegramSessionListener>();
+  let sessionGeneration = 0;
+  let storageMutation: Promise<void> = Promise.resolve();
+
+  function sessionChangedError() {
+    return new DOMException("Wisp Telegram session changed during request", "AbortError");
+  }
+
+  function queueStorageMutation(operation: () => MaybePromise<void>) {
+    const pending = storageMutation.then(operation, operation);
+    storageMutation = pending.catch(() => undefined);
+    return pending;
+  }
 
   function publishSession(session: WispTelegramSession | null) {
     currentSession = session;
@@ -529,7 +541,10 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     });
   }
 
-  async function persistSession(session: WispTelegramSession) {
+  async function persistSession(
+    session: WispTelegramSession,
+    expectedGeneration = sessionGeneration,
+  ) {
     const stored: StoredSession = {
       version: 1,
       sessionId: session.sessionId,
@@ -539,18 +554,28 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
       origin: session.origin,
       expiresAt: session.expiresAt,
     };
-    await storage.setItem(storageKey, JSON.stringify(stored));
+    await queueStorageMutation(async () => {
+      if (expectedGeneration !== sessionGeneration) throw sessionChangedError();
+      await storage.setItem(storageKey, JSON.stringify(stored));
+      if (expectedGeneration !== sessionGeneration) throw sessionChangedError();
+    });
+    if (expectedGeneration !== sessionGeneration) throw sessionChangedError();
     publishSession(session);
+    if (expectedGeneration !== sessionGeneration || currentSession !== session) {
+      throw sessionChangedError();
+    }
     return session;
   }
 
   async function clearSession() {
+    sessionGeneration += 1;
     publishSession(null);
-    await storage.removeItem(storageKey);
+    await queueStorageMutation(() => storage.removeItem(storageKey));
   }
 
   async function getStoredSession(): Promise<WispTelegramSession | null> {
     try {
+      await storageMutation;
       const raw = await storage.getItem(storageKey);
       if (!raw) return null;
       const value = JSON.parse(raw) as Partial<StoredSession>;
@@ -595,9 +620,13 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   async function connect(signal?: AbortSignal) {
     if (currentSession) throw new WispTelegramAlreadyConnectedError();
     if (await getStoredSession()) throw new WispTelegramRestoreRequiredError();
+    const generation = sessionGeneration;
 
     const prepared = await prepare({ kind: "connect", request: "" }, signal);
-    return persistSession(sessionFromResult(await waitForResult(prepared, signal), prepared.id));
+    return persistSession(
+      sessionFromResult(await waitForResult(prepared, signal), prepared.id),
+      generation,
+    );
   }
 
   async function restore(signal?: AbortSignal): Promise<WispTelegramSession | null> {
@@ -605,6 +634,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
 
     const stored = await getStoredSession();
     if (!stored) return null;
+    const generation = sessionGeneration;
     try {
       const prepared = await prepare(
         {
@@ -624,7 +654,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
         await clearSession();
         throw new Error("Wisp Telegram restored a different wallet session");
       }
-      return persistSession(restored);
+      return persistSession(restored, generation);
     } catch (error) {
       if (error instanceof WispTelegramResultError) {
         await clearSession();
@@ -687,6 +717,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
       throw new TypeError("Wisp Telegram signing requires a canonical Vexanium VSR");
     }
     const session = await requireActiveSession();
+    const generation = sessionGeneration;
 
     try {
       const prepared = await prepare(
@@ -725,7 +756,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
         },
         session.connectionHandoffId,
       );
-      await persistSession(refreshed);
+      await persistSession(refreshed, generation);
       return {
         transactionId,
         signatures: [],

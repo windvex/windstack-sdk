@@ -181,6 +181,7 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
   ) => {
     if (destroyed) throw new Error("Wisp connector has been destroyed");
     if (
+      activeOperation ||
       snapshot.status === "connecting" ||
       snapshot.status === "restoring" ||
       snapshot.status === "disconnecting"
@@ -248,15 +249,16 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
         ? options.telegram
         : createWispTelegramTransport(options.telegram);
       unsubscribeTelegramSession = telegramTransport.subscribeSession((session) => {
-        if (destroyed || snapshot.status !== "connected" || snapshot.transport !== "telegram") {
+        if (destroyed || snapshot.transport !== "telegram") return;
+        if (!session) {
+          setIdle();
           return;
         }
-        const sameSession = Boolean(
-          session &&
-            session.sessionId === snapshot.sessionId &&
-            session.account.permissionLevel === snapshot.account?.permissionLevel,
-        );
-        if (sameSession && session) {
+        if (snapshot.status !== "connected") return;
+        const sameSession =
+          session.sessionId === snapshot.sessionId &&
+          session.account.permissionLevel === snapshot.account?.permissionLevel;
+        if (sameSession) {
           setTelegramSession(session);
           return;
         }

@@ -230,6 +230,38 @@ await telegramConnector.connect({ transport: "telegram" });
 await telegramConnector.disconnect();
 assert.equal(telegramConnector.getSnapshot().status, "idle");
 telegramConnector.destroy();
+assert.equal(
+  telegramSessionListeners.size,
+  0,
+  "destroy must deterministically remove the Telegram lifecycle subscription",
+);
+
+const failingDisconnectTelegram = {
+  ...telegram,
+  async disconnect() {
+    publishTelegramSession(null);
+    throw new Error("wallet revocation unavailable");
+  },
+};
+const failingDisconnectConnector = createWispConnector({ telegram: failingDisconnectTelegram });
+await failingDisconnectConnector.connect({ transport: "telegram" });
+await assert.rejects(
+  () => failingDisconnectConnector.disconnect(),
+  /wallet revocation unavailable/u,
+);
+assert.equal(failingDisconnectConnector.getSnapshot().status, "error");
+assert.equal(
+  failingDisconnectConnector.getSnapshot().account,
+  null,
+  "a failed remote Telegram revoke must not leave a stale local account",
+);
+assert.equal(
+  failingDisconnectConnector.getSnapshot().sessionId,
+  null,
+  "a failed remote Telegram revoke must not leave a stale local session id",
+);
+failingDisconnectConnector.destroy();
+assert.equal(telegramSessionListeners.size, 0);
 
 let pendingSignal;
 const pendingTelegram = {

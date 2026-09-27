@@ -23,6 +23,39 @@ function createStorage() {
   };
 }
 
+function createDeferredSetStorage() {
+  const values = new Map();
+  let releaseSet = null;
+  let markSetStarted;
+  const setStarted = new Promise((resolve) => {
+    markSetStarted = resolve;
+  });
+  return {
+    storage: {
+      getItem(key) {
+        return values.get(key) ?? null;
+      },
+      setItem(key, value) {
+        markSetStarted();
+        return new Promise((resolve) => {
+          releaseSet = () => {
+            values.set(key, value);
+            resolve();
+          };
+        });
+      },
+      removeItem(key) {
+        values.delete(key);
+      },
+    },
+    waitForSet: () => setStarted,
+    releaseSet() {
+      assert.ok(releaseSet, "expected a pending storage write");
+      releaseSet();
+    },
+  };
+}
+
 function response(status, body) {
   return {
     ok: status >= 200 && status < 300,
@@ -373,6 +406,30 @@ assert.equal(
   "transient SSE errors must stay on the event transport instead of falling back to polling",
 );
 
+const raceHarness = createHarness();
+const deferredStorage = createDeferredSetStorage();
+const racing = createWispTelegramTransport({
+  ...options,
+  storage: deferredStorage.storage,
+  fetch: raceHarness.fetch,
+  eventSource: raceHarness.eventSource,
+  openUrl(url) {
+    raceHarness.opened.push(url);
+  },
+});
+const pendingRaceConnect = racing.connect();
+await deferredStorage.waitForSet();
+const pendingRaceClear = racing.clearSession();
+deferredStorage.releaseSet();
+await assert.rejects(
+  pendingRaceConnect,
+  { name: "AbortError" },
+  "an invalidated in-flight connect must not republish or persist its stale session",
+);
+await pendingRaceClear;
+assert.equal(racing.connected(), false);
+assert.equal(await racing.getStoredSession(), null);
+
 const noStreamStorage = createStorage();
 const noStreamHarness = createHarness();
 const noStream = createWispTelegramTransport({
@@ -397,6 +454,7 @@ console.log("PASS: connect uses only a short Telegram pairing token");
 console.log("PASS: interactive connect exposes a non-persisted backend verification proof");
 console.log("PASS: active-session signing opens Wisp without a handoff token or VSR in startapp");
 console.log("PASS: Wisp Telegram persisted pointer is not treated as a live connection");
+console.log("PASS: invalidated in-flight Telegram writes cannot resurrect a cleared session");
 console.log("PASS: cold restore revalidates immediately without reopening Wisp");
 console.log("PASS: connect/sign/transact enforce the restored active-session lifecycle");
 console.log("PASS: signing is bound to the restored session and account permission");
