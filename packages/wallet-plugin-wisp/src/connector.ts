@@ -94,6 +94,7 @@ type ProviderRuntime = {
   source: "injected" | "embedded";
   client: VexaniumClient;
   manager: SessionManager;
+  unsubscribeSession: () => void;
 };
 
 function runtimeSessionStorage(): SessionStorage | null {
@@ -282,7 +283,44 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
         storage,
         storageKey: options.sessionStorageKey ?? "windstack:wisp-connector:provider",
       });
-      return { source, client, manager };
+      const runtime: ProviderRuntime = {
+        source,
+        client,
+        manager,
+        unsubscribeSession: () => undefined,
+      };
+      runtime.unsubscribeSession = client.subscribeSession(({ session, accounts }) => {
+        if (destroyed || snapshot.status !== "connected" || snapshot.transport !== runtime.source) {
+          return;
+        }
+
+        const managed = runtime.manager.getSession();
+        const account = managed
+          ? accounts.find(
+              (item) =>
+                item.actor === managed.identity.actor &&
+                item.permission === managed.identity.permission,
+            )
+          : undefined;
+        const sameSession = Boolean(
+          managed &&
+            account &&
+            session &&
+            session?.walletSessionId === managed.walletSessionId &&
+            session.chainId === managed.chain.id,
+        );
+
+        if (sameSession && session && account) {
+          publish({ ...snapshot, account, sessionId: session.walletSessionId ?? null });
+          return;
+        }
+
+        setIdle();
+        void runtime.manager.logout().catch((error) => {
+          if (!destroyed) fail(error);
+        });
+      });
+      return runtime;
     })();
 
     try {
@@ -418,6 +456,7 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
       activeOperation?.abort();
       activeOperation = null;
       providerRuntime?.client.destroy();
+      providerRuntime?.unsubscribeSession();
       embeddedProviders?.destroy();
       listeners.clear();
       providerRuntime = null;

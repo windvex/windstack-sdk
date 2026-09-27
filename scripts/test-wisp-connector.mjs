@@ -18,6 +18,7 @@ const ALL_METHODS = Object.values(VEXANIUM_METHODS);
 const SESSION_ID = "wisp_connector_session_1";
 
 function createProvider() {
+  const listeners = new Map();
   const accounts = [
     {
       actor: "gvexa",
@@ -32,6 +33,17 @@ function createProvider() {
 
   return {
     providerInfo,
+    on(event, handler) {
+      const handlers = listeners.get(event) ?? new Set();
+      handlers.add(handler);
+      listeners.set(event, handlers);
+    },
+    off(event, handler) {
+      listeners.get(event)?.delete(handler);
+    },
+    emit(event, payload) {
+      for (const handler of listeners.get(event) ?? []) handler(payload);
+    },
     async request({ method, params }) {
       if (method === VEXANIUM_METHODS.GET_CAPABILITIES) {
         return {
@@ -122,6 +134,33 @@ assert.equal(restored.sessionId, SESSION_ID);
 await restoredConnector.disconnect();
 assert.equal(restoredConnector.getSnapshot().status, "idle");
 restoredConnector.destroy();
+
+const lifecycleStorage = new MemorySessionStorage();
+const lifecycleProvider = createProvider();
+const lifecycleConnector = createWispConnector({
+  provider: lifecycleProvider,
+  sessionStorage: lifecycleStorage,
+});
+await lifecycleConnector.connect();
+lifecycleProvider.emit("accountsChanged", {
+  standard: VEXANIUM_PROVIDER_STANDARD,
+  version: VEXANIUM_PROVIDER_VERSION,
+  sessionId: SESSION_ID,
+  chainId: VEXANIUM_MAINNET_CHAIN_ID,
+  accounts: [],
+});
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(
+  lifecycleConnector.getSnapshot().status,
+  "idle",
+  "provider account revocation must invalidate the connector snapshot",
+);
+assert.equal(
+  await lifecycleStorage.get("windstack:wisp-connector:provider"),
+  null,
+  "provider account revocation must clear the persisted connector session",
+);
+lifecycleConnector.destroy();
 
 const telegramSession = {
   sessionId: "telegram-session-1",
