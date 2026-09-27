@@ -10,6 +10,7 @@ Release history for the WindStack package set.
 - Added canonical Wisp identity, provider metadata, browser navigation, embedded bootstrap, and launch/deep-link helpers.
 - Added generic provider-author and lifecycle primitives for Vexanium wallets without requiring Wisp source code.
 - Added a non-persisted Telegram connection handoff proof so application backends can verify wallet-authenticated login without reimplementing the client transport.
+- Made connector teardown cancel active Telegram handoffs and suppress late state publication after application unmount.
 
 ### 2.3.4 — 2026-09-21
 

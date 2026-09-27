@@ -160,6 +160,7 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
   let providerRuntime: ProviderRuntime | null = null;
   let embeddedProviders: WispEmbeddedProviders | null = null;
   let telegramTransport: WispTelegramTransport | null = null;
+  let activeOperation: AbortController | null = null;
   let destroyed = false;
 
   const publish = (next: WispConnectorSnapshot) => {
@@ -184,12 +185,25 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
     ) {
       throw new Error("A Wisp connector operation is already in progress");
     }
+    const controller = new AbortController();
+    activeOperation = controller;
     publish({ ...snapshot, status, error: null });
+    return controller;
+  };
+
+  const finish = (controller: AbortController) => {
+    if (activeOperation === controller) activeOperation = null;
+  };
+
+  const assertActive = (signal: AbortSignal) => {
+    if (destroyed || signal.aborted) {
+      throw new DOMException("Wisp connector request cancelled", "AbortError");
+    }
   };
 
   const fail = (error: unknown) => {
     const normalized = connectorError(error);
-    publish({ ...snapshot, status: "error", error: normalized });
+    if (!destroyed) publish({ ...snapshot, status: "error", error: normalized });
     return normalized;
   };
 
@@ -273,6 +287,11 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
 
     try {
       providerRuntime = await providerRuntimePromise;
+      if (destroyed) {
+        providerRuntime.client.destroy();
+        providerRuntime = null;
+        throw new DOMException("Wisp connector request cancelled", "AbortError");
+      }
       return providerRuntime;
     } catch (error) {
       providerRuntimePromise = null;
@@ -280,52 +299,66 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
     }
   };
 
-  const connectProvider = async (): Promise<WispConnectorSnapshot | null> => {
+  const connectProvider = async (signal: AbortSignal): Promise<WispConnectorSnapshot | null> => {
     const runtime = await ensureProviderRuntime();
+    assertActive(signal);
     if (!runtime.client.isAvailable()) return null;
     const session = await runtime.manager.login();
+    if (destroyed || signal.aborted) {
+      await runtime.manager.logout().catch(() => undefined);
+      assertActive(signal);
+    }
     return setProviderSession(session, runtime.source);
   };
 
-  const connectTelegram = async (): Promise<WispConnectorSnapshot> => {
+  const connectTelegram = async (signal: AbortSignal): Promise<WispConnectorSnapshot> => {
     const telegram = ensureTelegramTransport();
     if (!telegram) throw new Error("Wisp Telegram transport is not configured");
-    return setTelegramSession(await telegram.connect());
+    const session = await telegram.connect(signal);
+    assertActive(signal);
+    return setTelegramSession(session);
   };
 
   const connect = async (
     connectOptions: WispConnectorConnectOptions = {},
   ): Promise<WispConnectorSnapshot> => {
     if (snapshot.status === "connected") return snapshot;
-    begin("connecting");
+    const controller = begin("connecting");
     try {
-      if (connectOptions.transport === "telegram") return await connectTelegram();
+      if (connectOptions.transport === "telegram") {
+        return await connectTelegram(controller.signal);
+      }
 
-      const providerSnapshot = await connectProvider();
+      const providerSnapshot = await connectProvider(controller.signal);
       if (providerSnapshot) return providerSnapshot;
       if (connectOptions.transport === "provider") {
         throw new Error("No Wisp provider is available");
       }
-      if (options.telegram) return await connectTelegram();
+      if (options.telegram) return await connectTelegram(controller.signal);
       throw new Error("No Wisp provider is available and Telegram fallback is not configured");
     } catch (error) {
       throw fail(error);
+    } finally {
+      finish(controller);
     }
   };
 
   const restore = async (): Promise<WispConnectorSnapshot> => {
     if (snapshot.status === "connected") return snapshot;
-    begin("restoring");
+    const controller = begin("restoring");
     try {
       const runtime = await ensureProviderRuntime();
+      assertActive(controller.signal);
       if (runtime.client.isAvailable()) {
         const providerSession = await runtime.manager.restore();
+        assertActive(controller.signal);
         if (providerSession) return setProviderSession(providerSession, runtime.source);
       }
 
       const telegram = ensureTelegramTransport();
       if (telegram) {
-        const telegramSession = await telegram.restore();
+        const telegramSession = await telegram.restore(controller.signal);
+        assertActive(controller.signal);
         if (telegramSession) return setTelegramSession(telegramSession);
       }
 
@@ -333,6 +366,8 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
       return snapshot;
     } catch (error) {
       throw fail(error);
+    } finally {
+      finish(controller);
     }
   };
 
@@ -343,17 +378,20 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
     }
 
     const activeTransport = snapshot.transport;
-    begin("disconnecting");
+    const controller = begin("disconnecting");
     try {
       if (activeTransport === "telegram") {
         const telegram = ensureTelegramTransport();
-        if (telegram) await telegram.disconnect();
+        if (telegram) await telegram.disconnect(controller.signal);
       } else if (providerRuntime) {
         await providerRuntime.manager.logout();
       }
+      assertActive(controller.signal);
       setIdle();
     } catch (error) {
       throw fail(error);
+    } finally {
+      finish(controller);
     }
   };
 
@@ -377,6 +415,8 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      activeOperation?.abort();
+      activeOperation = null;
       providerRuntime?.client.destroy();
       embeddedProviders?.destroy();
       listeners.clear();

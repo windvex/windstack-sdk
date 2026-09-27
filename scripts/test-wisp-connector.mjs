@@ -176,4 +176,26 @@ await telegramConnector.disconnect();
 assert.equal(telegramConnector.getSnapshot().status, "idle");
 telegramConnector.destroy();
 
+let pendingSignal;
+const pendingTelegram = {
+  ...telegram,
+  connect(signal) {
+    pendingSignal = signal;
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener(
+        "abort",
+        () => reject(new DOMException("Wallet request cancelled", "AbortError")),
+        { once: true },
+      );
+    });
+  },
+};
+const disposableConnector = createWispConnector({ telegram: pendingTelegram });
+const pendingConnect = disposableConnector.connect({ transport: "telegram" });
+await Promise.resolve();
+disposableConnector.destroy();
+await assert.rejects(pendingConnect, { name: "AbortError" });
+assert.equal(pendingSignal.aborted, true);
+assert.equal(disposableConnector.getSnapshot().status, "idle");
+
 console.log("Wisp framework-neutral connector: PASS");
