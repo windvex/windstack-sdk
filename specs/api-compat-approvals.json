@@ -42,6 +42,13 @@
       "entry": ".",
       "file": "dist/types.d.ts",
       "reason": "Names existing event payload shapes with aliases while keeping their structural types unchanged."
+    },
+    {
+      "kind": "declaration-changed",
+      "package": "@windstack/wallet-plugin-wisp",
+      "entry": ".",
+      "file": "dist/index.d.ts",
+      "reason": "Adds the public WispTelegramSessionListener and subscribeSession lifecycle subscription while preserving existing wallet-plugin-wisp exports and transport methods."
     }
   ]
 }
