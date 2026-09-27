@@ -161,6 +161,7 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
   let providerRuntime: ProviderRuntime | null = null;
   let embeddedProviders: WispEmbeddedProviders | null = null;
   let telegramTransport: WispTelegramTransport | null = null;
+  let unsubscribeTelegramSession: (() => void) | null = null;
   let activeOperation: AbortController | null = null;
   let destroyed = false;
 
@@ -242,9 +243,26 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
 
   const ensureTelegramTransport = (): WispTelegramTransport | null => {
     if (!options.telegram) return null;
-    telegramTransport ??= isTelegramTransport(options.telegram)
-      ? options.telegram
-      : createWispTelegramTransport(options.telegram);
+    if (!telegramTransport) {
+      telegramTransport = isTelegramTransport(options.telegram)
+        ? options.telegram
+        : createWispTelegramTransport(options.telegram);
+      unsubscribeTelegramSession = telegramTransport.subscribeSession((session) => {
+        if (destroyed || snapshot.status !== "connected" || snapshot.transport !== "telegram") {
+          return;
+        }
+        const sameSession = Boolean(
+          session &&
+            session.sessionId === snapshot.sessionId &&
+            session.account.permissionLevel === snapshot.account?.permissionLevel,
+        );
+        if (sameSession && session) {
+          setTelegramSession(session);
+          return;
+        }
+        setIdle();
+      });
+    }
     return telegramTransport;
   };
 
@@ -457,6 +475,8 @@ export function createWispConnector(options: WispConnectorOptions = {}): WispCon
       activeOperation = null;
       providerRuntime?.client.destroy();
       providerRuntime?.unsubscribeSession();
+      unsubscribeTelegramSession?.();
+      unsubscribeTelegramSession = null;
       embeddedProviders?.destroy();
       listeners.clear();
       providerRuntime = null;

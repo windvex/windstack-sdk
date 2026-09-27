@@ -11,7 +11,7 @@ Release history for the WindStack package set.
 - Added generic provider-author and lifecycle primitives for Vexanium wallets without requiring Wisp source code.
 - Added a non-persisted Telegram connection handoff proof so application backends can verify wallet-authenticated login without reimplementing the client transport.
 - Made connector teardown cancel active Telegram handoffs and suppress late state publication after application unmount.
-- Made provider account, chain, and disconnect events invalidate mismatched connector sessions and their persisted pointers.
+- Made provider account, chain, disconnect, and Telegram session lifecycle events invalidate stale connector snapshots and persisted pointers.
 
 ### 2.3.4 — 2026-09-21
 

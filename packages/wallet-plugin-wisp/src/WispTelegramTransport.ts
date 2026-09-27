@@ -96,6 +96,8 @@ export type WispTelegramSession = Readonly<{
   validatedAt: number;
 }>;
 
+export type WispTelegramSessionListener = (session: WispTelegramSession | null) => void;
+
 export type WispTelegramTransactArgs = {
   actions: readonly VexaniumActionInput[];
   signal?: AbortSignal;
@@ -329,6 +331,18 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
   const storageKey = String(options.storageKey || DEFAULT_STORAGE_KEY).trim();
   if (!storageKey) throw new TypeError("Wisp Telegram storageKey must be non-empty");
   let currentSession: WispTelegramSession | null = null;
+  const sessionListeners = new Set<WispTelegramSessionListener>();
+
+  function publishSession(session: WispTelegramSession | null) {
+    currentSession = session;
+    for (const listener of [...sessionListeners]) {
+      try {
+        listener(session);
+      } catch {
+        // Consumer listeners cannot break wallet-session state transitions.
+      }
+    }
+  }
 
   function apiEndpoint(path: string) {
     return `${baseApiUrl}/${String(path || "").replace(/^\/+/, "")}`;
@@ -526,12 +540,12 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
       expiresAt: session.expiresAt,
     };
     await storage.setItem(storageKey, JSON.stringify(stored));
-    currentSession = session;
+    publishSession(session);
     return session;
   }
 
   async function clearSession() {
-    currentSession = null;
+    publishSession(null);
     await storage.removeItem(storageKey);
   }
 
@@ -763,6 +777,13 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     connect,
     restore,
     disconnect,
+    subscribeSession(listener: WispTelegramSessionListener) {
+      if (typeof listener !== "function") {
+        throw new TypeError("Wisp Telegram session listener is required");
+      }
+      sessionListeners.add(listener);
+      return () => sessionListeners.delete(listener);
+    },
     connected: () => currentSession !== null,
     getSession: () => currentSession,
     getSessionId: async () => currentSession?.sessionId ?? null,

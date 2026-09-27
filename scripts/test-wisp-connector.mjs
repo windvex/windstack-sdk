@@ -177,16 +177,25 @@ const telegramSession = {
   validatedAt: Date.now(),
 };
 let telegramConnected = false;
+const telegramSessionListeners = new Set();
+function publishTelegramSession(session) {
+  telegramConnected = session !== null;
+  for (const listener of [...telegramSessionListeners]) listener(session);
+}
 const telegram = {
   async connect() {
-    telegramConnected = true;
+    publishTelegramSession(telegramSession);
     return telegramSession;
   },
   async restore() {
     return telegramConnected ? telegramSession : null;
   },
   async disconnect() {
-    telegramConnected = false;
+    publishTelegramSession(null);
+  },
+  subscribeSession(listener) {
+    telegramSessionListeners.add(listener);
+    return () => telegramSessionListeners.delete(listener);
   },
   connected: () => telegramConnected,
   getSession: () => (telegramConnected ? telegramSession : null),
@@ -196,7 +205,7 @@ const telegram = {
   getChain: () => VEXANIUM_MAINNET_CHAIN_ID,
   getCapabilities: () => [],
   async clearSession() {
-    telegramConnected = false;
+    publishTelegramSession(null);
   },
   async signSigningRequest() {
     throw new Error("not used");
@@ -211,6 +220,13 @@ const telegramConnectedSnapshot = await telegramConnector.connect({ transport: "
 assert.equal(telegramConnectedSnapshot.status, "connected");
 assert.equal(telegramConnectedSnapshot.transport, "telegram");
 assert.equal(telegramConnectedSnapshot.sessionId, "telegram-session-1");
+await telegram.clearSession();
+assert.equal(
+  telegramConnector.getSnapshot().status,
+  "idle",
+  "Telegram transport invalidation must invalidate the connector snapshot",
+);
+await telegramConnector.connect({ transport: "telegram" });
 await telegramConnector.disconnect();
 assert.equal(telegramConnector.getSnapshot().status, "idle");
 telegramConnector.destroy();

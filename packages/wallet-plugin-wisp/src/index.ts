@@ -64,6 +64,7 @@ export type {
   WispTelegramEventSource,
   WispTelegramEventSourceFactory,
   WispTelegramSession,
+  WispTelegramSessionListener,
   WispTelegramSessionStorage,
   WispTelegramTransactArgs,
   WispTelegramTransport,
