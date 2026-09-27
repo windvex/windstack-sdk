@@ -188,6 +188,11 @@ const connected = await first.connect();
 assert.equal(first.connected(), true);
 assert.equal(await first.getSessionId(), SESSION_ID);
 assert.equal(connected.sessionId, SESSION_ID);
+assert.equal(
+  connected.connectionHandoffId,
+  "handoff-1",
+  "interactive connect must expose its one-time server-verifiable handoff proof",
+);
 assert.equal(connected.account.permissionLevel, "gvexa@active");
 assert.equal(connected.accounts.length, 1);
 assert.equal(connected.expiresAt, SESSION_EXPIRES_AT);
@@ -219,6 +224,11 @@ const second = createWispTelegramTransport({
 const pointer = await second.getStoredSession();
 assert.ok(pointer);
 assert.equal(pointer.sessionId, connected.sessionId);
+assert.equal(
+  pointer.connectionHandoffId,
+  undefined,
+  "connection proof must never be persisted with the session pointer",
+);
 assert.equal(
   pointer.validatedAt,
   0,
@@ -255,6 +265,11 @@ assert.deepEqual(
   ["gvexa@active"],
 );
 assert.equal(restored.sessionId, connected.sessionId);
+assert.equal(
+  restored.connectionHandoffId,
+  undefined,
+  "restored sessions must not replay the original connection proof",
+);
 assert.equal(secondHarness.prepareBodies[0].kind, "restore");
 assert.equal(secondHarness.prepareBodies[0].sessionId, connected.sessionId);
 assert.equal(secondHarness.prepareBodies[0].origin, "https://swap.windcrypto.com");
@@ -288,6 +303,11 @@ const result = await second.transact(fakeClient, {
 });
 
 assert.equal(result.transactionId, TX_ID);
+assert.equal(
+  second.getSession().connectionHandoffId,
+  undefined,
+  "signing a restored session must not invent a connection proof",
+);
 assert.equal(actionInputs.length, 3);
 assert.equal(createdRequests.length, 1, "multi-action transaction must create exactly one VSR");
 assert.equal(createdRequests[0].actions.length, 3);
@@ -374,6 +394,7 @@ assert.equal(noStreamHarness.statusPolls(), 0);
 console.log("PASS: Wisp Telegram API base paths preserve /wisp/v1");
 console.log("PASS: Wisp Telegram uses resumable SSE without a legacy status-poll fallback");
 console.log("PASS: connect uses only a short Telegram pairing token");
+console.log("PASS: interactive connect exposes a non-persisted backend verification proof");
 console.log("PASS: active-session signing opens Wisp without a handoff token or VSR in startapp");
 console.log("PASS: Wisp Telegram persisted pointer is not treated as a live connection");
 console.log("PASS: cold restore revalidates immediately without reopening Wisp");

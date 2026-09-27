@@ -109,6 +109,10 @@ if (restored) {
 async function connectWisp() {
   const session = await wisp.connect();
   console.log(session.account.permissionLevel);
+  // If your application has a backend, send this opaque value to it once.
+  // The backend must validate the completed handoff with Wisp before issuing
+  // an application session; never trust account data supplied by the browser.
+  console.log(session.connectionHandoffId);
   return session;
 }
 
@@ -137,6 +141,8 @@ async function disconnectWisp() {
 `apiUrl` is the Wisp API base, including its deployed path prefix. WindStack appends `telegram/dapp/*` beneath that base and preserves `/wisp/v1`; it does not use the shared domain's root `/telegram/*`, `/rpc`, `/v1/*`, or `/v3/*` routes.
 
 `connect()` is interactive and creates a new wallet authorization. It rejects when a live session is already connected, and it also rejects when a persisted pointer still needs `restore()` so an application cannot accidentally replace an unresolved session.
+
+The session returned by an interactive `connect()` includes `connectionHandoffId`, an opaque, non-persisted proof for application backends that need wallet-authenticated login. Forward it once over the application's authenticated HTTPS API, then have the backend validate the terminal handoff directly with Wisp and consume the proof atomically. Never accept the browser-provided account as authentication. Restored sessions intentionally omit this proof so an old connection result cannot be replayed; application login persistence remains application-owned.
 
 `restore()` is the startup/session-recovery operation. It asks Wisp to validate the exact persisted session against DApp origin, Vexanium chain, account, permission, expiry, and revocation state. When Wisp already knows the session, restore completes from the authoritative session registry without opening the wallet Mini App. If the session is expired, revoked, or mismatched, restore returns no active session and clears the stale pointer. It never falls back to `connect()`.
 

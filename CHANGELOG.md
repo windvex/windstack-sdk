@@ -4,6 +4,13 @@
 
 Release history for the WindStack package set.
 
+### 2.4.0 — 2026-09-27
+
+- Added framework-neutral Wisp connector APIs for injected, embedded, and Telegram wallet sessions.
+- Added canonical Wisp identity, provider metadata, browser navigation, embedded bootstrap, and launch/deep-link helpers.
+- Added generic provider-author and lifecycle primitives for Vexanium wallets without requiring Wisp source code.
+- Added a non-persisted Telegram connection handoff proof so application backends can verify wallet-authenticated login without reimplementing the client transport.
+
 ### 2.3.4 — 2026-09-21
 
 - Reissued the EVM frame bridge so the public npm package exposes both `createEvmFrameHost` and `createEvmFrameProvider` together with their TypeScript declarations.

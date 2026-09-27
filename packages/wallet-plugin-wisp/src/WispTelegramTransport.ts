@@ -86,6 +86,12 @@ export type WispTelegramSession = Readonly<{
   capabilities: typeof TELEGRAM_CAPABILITIES;
   origin: string;
   expiresAt?: number;
+  /**
+   * Opaque proof for the interactive connection that created this session.
+   * Forward it once to an application backend that independently validates the
+   * completed handoff. It is never persisted and is absent after restore.
+   */
+  connectionHandoffId?: string;
   /** Zero means this is only a persisted pointer and has not been revalidated this runtime. */
   validatedAt: number;
 }>;
@@ -485,7 +491,10 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     return waitForEventResult(prepared, signal);
   }
 
-  function sessionFromResult(result: WispTelegramHandoffResult): WispTelegramSession {
+  function sessionFromResult(
+    result: WispTelegramHandoffResult,
+    connectionHandoffId?: string,
+  ): WispTelegramSession {
     const sessionId = opaqueSessionId(result.sessionId);
     if (!sessionId) throw new Error("Wisp Telegram did not return a wallet session id");
     const chainId = String(result.chainId || VEXANIUM_MAINNET_CHAIN_ID).toLowerCase();
@@ -501,6 +510,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
       capabilities: TELEGRAM_CAPABILITIES,
       origin,
       expiresAt: normalizeExpiry(result.sessionExpiresAt),
+      ...(connectionHandoffId ? { connectionHandoffId } : {}),
       validatedAt: Date.now(),
     });
   }
@@ -573,7 +583,7 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
     if (await getStoredSession()) throw new WispTelegramRestoreRequiredError();
 
     const prepared = await prepare({ kind: "connect", request: "" }, signal);
-    return persistSession(sessionFromResult(await waitForResult(prepared, signal)));
+    return persistSession(sessionFromResult(await waitForResult(prepared, signal), prepared.id));
   }
 
   async function restore(signal?: AbortSignal): Promise<WispTelegramSession | null> {
@@ -690,14 +700,17 @@ export function createWispTelegramTransport(options: WispTelegramTransportOption
         throw new Error("Wisp Telegram did not return a broadcast transaction id");
       }
 
-      const refreshed = sessionFromResult({
-        ...result,
-        actor: signer.actor,
-        permission: signer.permission,
-        sessionId: session.sessionId,
-        chainId: session.chainId,
-        sessionExpiresAt: result.sessionExpiresAt ?? session.expiresAt,
-      });
+      const refreshed = sessionFromResult(
+        {
+          ...result,
+          actor: signer.actor,
+          permission: signer.permission,
+          sessionId: session.sessionId,
+          chainId: session.chainId,
+          sessionExpiresAt: result.sessionExpiresAt ?? session.expiresAt,
+        },
+        session.connectionHandoffId,
+      );
       await persistSession(refreshed);
       return {
         transactionId,
